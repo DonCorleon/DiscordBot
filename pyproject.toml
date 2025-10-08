@@ -1,0 +1,10 @@
+[project]
+name = "discordbot"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "discord-ext-voice-recv==0.5.2a179",
+    "numpy>=2.3.3",
+    "vosk>=0.3.45",
+]
