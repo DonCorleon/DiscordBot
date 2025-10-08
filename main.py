@@ -3,6 +3,7 @@ from discord.ext import commands
 import os
 from datetime import datetime, UTC
 
+from token import TOKEN
 
 # -----------------------
 # Logging setup
@@ -65,4 +66,4 @@ async def on_ready():
             print(f"Loaded cog: {filename[:-3]}")
 
 # --- Run the bot ---
-bot.run("MTQyMTM4ODIyNTExMjQ0NDk5OA.Gw-7_I.VRyiUwYpxxAMzVVH_uLwo2xdmrXiWE4tVfgVpg")
+bot.run(TOKEN)
