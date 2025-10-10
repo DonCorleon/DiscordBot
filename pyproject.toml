@@ -6,5 +6,7 @@ requires-python = ">=3.13"
 dependencies = [
     "discord-ext-voice-recv==0.5.2a179",
     "numpy>=2.3.3",
+    "pyttsx3==2.99",
+    "speechrecognition==3.14.3",
     "vosk>=0.3.45",
 ]

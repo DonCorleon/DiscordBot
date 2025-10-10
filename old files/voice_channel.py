@@ -58,6 +58,20 @@ class VoiceCog(BaseCog):
         super().__init__(bot)
         self.vosk_model = Model("vosk/vosk-model-small-en-us-0.15")
 
+    @voice_recv.AudioSink.listener()
+    def on_voice_member_speaking_start(self, user: discord.Member):
+        try:
+            logger.info(f"🎤 [Event] {user.display_name} started speaking")
+        except Exception as e:
+            logger.error(f"🎤 [Event] started speaking : {e}")
+
+    @voice_recv.AudioSink.listener()
+    def on_voice_member_speaking_stop(self, user: discord.Member):
+        try:
+            logger.info(f"🎤 [Event] {user.display_name} stoped speaking")
+        except Exception as e:
+            logger.error(f"🎤 [Event] stoped speaking : {e}")
+
     @commands.command(name="join")
     async def join(self, ctx):
         if not ctx.author.voice or not ctx.author.voice.channel:
@@ -91,6 +105,8 @@ class VoiceCog(BaseCog):
                 super().__init__()
                 self.cog = cog
                 self.buffers = {}
+                self.MAX_BUFFER_SIZE = 16000 * 2 * 10  # ~10 seconds of 16-bit mono @16 kHz
+
 
             def write(self, user, data):
                 if not data.pcm:
@@ -103,13 +119,16 @@ class VoiceCog(BaseCog):
                 if user.id not in self.buffers:
                     self.buffers[user.id] = bytearray()
                 self.buffers[user.id].extend(sink_data)
-
+                if len(self.buffers[user.id]) > self.MAX_BUFFER_SIZE:
+                    self.buffers[user.id] = self.buffers[user.id][-self.MAX_BUFFER_SIZE:]
+                '''
                 task_future = self.cog.buffer_tasks.get(user.id)
                 if not task_future or task_future.done():
                     future = asyncio.run_coroutine_threadsafe(
                         self.cog.transcribe_user(user.id, self), self.cog.bot.loop
                     )
                     self.cog.buffer_tasks[user.id] = future
+                '''
 
             def wants_opus(self):
                 return False
@@ -117,19 +136,7 @@ class VoiceCog(BaseCog):
             def cleanup(self):
                 pass
 
-            #@voice_recv.AudioSink.listener()
-            def on_voice_member_speaking_start(self, user: discord.Member):
-                try:
-                    logger.info(f"🎤 [Event] {user.display_name} started speaking")
-                except Exception as e:
-                    logger.error(f"🎤 [Event] started speaking : {e}")
 
-            #@voice_recv.AudioSink.listener()
-            def on_voice_member_speaking_stop(self, user: discord.Member):
-                try:
-                    logger.info(f"🎤 [Event] {user.display_name} stoped speaking")
-                except Exception as e:
-                    logger.error(f"🎤 [Event] stoped speaking : {e}")
 
         sink = VoskSink(self)
         vc.listen(sink)
@@ -137,9 +144,11 @@ class VoiceCog(BaseCog):
         await ctx.send("🎙️ Started recording and transcribing (48→16 kHz fixed).")
 
     async def transcribe_user(self, user_id, sink: "VoskSink"):
-        recognizer = KaldiRecognizer(self.vosk_model, 16000)
+        pass
+        #recognizer = KaldiRecognizer(self.vosk_model, 16000)
         while user_id in sink.buffers and sink.buffers[user_id]:
             audio_bytes = bytes(sink.buffers[user_id])
+            '''
             if recognizer.AcceptWaveform(audio_bytes):
                 result_json = json.loads(recognizer.Result())
                 text = result_json.get("text", "").strip()
@@ -155,6 +164,7 @@ class VoiceCog(BaseCog):
             else:
                 json.loads(recognizer.PartialResult())
             await asyncio.sleep(0.1)
+            '''
 
     @commands.command(name="stop")
     async def stop(self, ctx):

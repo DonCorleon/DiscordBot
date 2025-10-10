@@ -3,7 +3,17 @@ import traceback
 from functools import wraps
 from discord.ext import commands
 
+# Configure logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # or DEBUG for more verbose output
+
+# Only add a console handler if it hasn't been added yet
+if not logger.hasHandlers():
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 def log_command_errors(func):
     @wraps(func)

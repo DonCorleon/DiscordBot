@@ -30,23 +30,33 @@ class GeneralCog(BaseCog):
         embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         await ctx.send(embed=embed)
 
-    @commands.command(name="helpme")
+    @commands.command(name="help", help="show this sucker")
     async def helpme(self, ctx):
-        """Displays a dynamic help message with available commands."""
+        """Displays a dynamic help message with available commands grouped by cog."""
         embed = discord.Embed(
             title="🧭 Bot Commands",
             color=discord.Color.blue(),
-            description="Here's a list of available commands:",
+            description="Here's a list of available commands grouped by category:"
         )
 
-        # Loop through all commands the bot knows
+        # Group commands by cog
+        cogs = {}
         for command in self.bot.commands:
             if command.hidden:
-                continue  # skip hidden commands
-            name = f"~{command.name}"
-            desc = command.help or "No description available."
-            usage = f"`~{command.name} {command.signature}`" if command.signature else f"`~{command.name}`"
-            embed.add_field(name=f"{name}", value=f"{desc}\nUsage: {usage}", inline=False)
+                continue
+            cog_name = command.cog_name or "No Category"
+            if cog_name not in cogs:
+                cogs[cog_name] = []
+            cogs[cog_name].append(command)
+
+        # Add commands grouped by cog to the embed
+        for cog_name, commands_list in cogs.items():
+            value_lines = []
+            for command in commands_list:
+                usage = f"`~{command.name} {command.signature}`" if command.signature else f"`~{command.name}`"
+                desc = command.help or "No description available."
+                value_lines.append(f"{usage} — {desc}")
+            embed.add_field(name=cog_name, value="\n".join(value_lines), inline=False)
 
         embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         await ctx.send(embed=embed)
@@ -93,7 +103,7 @@ class GeneralCog(BaseCog):
         embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         await ctx.send(embed=embed)
 
-    @commands.command(name="reload", help="Reloads all cog modules")
+    @commands.command(name="reload", help="Reloads  specified cog/s or all cogs modules")
     @commands.is_owner()
     async def reload(self, ctx, cog_name: str = None):
         """Reloads all cogs, or a specific one (owner only)."""

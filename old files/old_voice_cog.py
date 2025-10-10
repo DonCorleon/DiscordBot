@@ -51,6 +51,14 @@ class VoiceCog(BaseCog):
                     self.buffers[user.id] = bytearray()
                 self.buffers[user.id].extend(data.pcm)
 
+            @voice_recv.AudioSink.listener()
+            def on_voice_member_speaking_start(self, user: discord.Member):
+                    logger.info(f"{user.display_name} started speaking")
+
+            @voice_recv.AudioSink.listener()
+            def on_voice_member_speaking_stop(self, user: discord.Member):
+                    logger.info(f"{user.display_name} stoped speaking")
+
             def wants_opus(self) -> bool:
                 return False  # receive PCM
 
