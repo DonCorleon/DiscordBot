@@ -4,16 +4,7 @@ from functools import wraps
 from discord.ext import commands
 
 # Configure logger
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # or DEBUG for more verbose output
-
-# Only add a console handler if it hasn't been added yet
-if not logger.hasHandlers():
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
+logger = logging.getLogger(f"discordbot.{__name__}")
 
 def log_command_errors(func):
     @wraps(func)
@@ -28,11 +19,14 @@ class BaseCog(commands.Cog):
     """Base Cog class to inherit in all cogs for automatic error logging."""
 
     def __init__(self, bot: commands.Bot):
+        #super().__init__(bot)
         self.bot = bot
 
         # Automatically wrap all commands in this cog
         for command in self.get_commands():
             command.callback = log_command_errors(command.callback)
+
+        #logger.info(f"Loaded cog: {self.__class__.__name__}")
 
     async def cog_command_error(self, ctx: commands.Context, error: commands.CommandError):
         # Log full traceback

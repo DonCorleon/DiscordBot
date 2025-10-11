@@ -3,4 +3,6 @@ SOUNDBOARD = {
         "quack": "soundboard/quack1.mp3",
         "america": "soundboard/merica.ogg",
         "jihad": "soundboard/dirka_dirka.ogg",
+        "ding": "soundboard/ring-a-ding.ogg",
+        "ring": "soundboard/ring-a-ding.ogg",
     }

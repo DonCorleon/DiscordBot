@@ -115,6 +115,7 @@ def save_soundboard(file_path: str, soundboard: Dict[str, GuildSoundboard]):
 
 class Soundboard(BaseCog):
     def __init__(self, bot):
+        super().__init__(bot)
         self.bot = bot
 
     @commands.command(help="lets you add a sound to the soundboard!!")

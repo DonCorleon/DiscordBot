@@ -3,10 +3,6 @@ from discord.ext import commands, voice_recv
 import os
 from datetime import datetime, UTC
 from bottoken import TOKEN
-
-# -----------------------
-# Logging setup
-# -----------------------
 import logging
 from logging.handlers import TimedRotatingFileHandler
 
@@ -17,7 +13,6 @@ formatter = logging.Formatter(
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 
-# --- File handler ---
 file_handler = TimedRotatingFileHandler(
     "logs/discordbot.log",
     when="midnight",
@@ -27,44 +22,27 @@ file_handler = TimedRotatingFileHandler(
 )
 file_handler.setFormatter(formatter)
 
-# --- Console handler ---
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(formatter)
 
-# --- discord bot logger ---
-logger = logging.getLogger("discordbot")
-logger.setLevel(logging.INFO)
-logger.addHandler(console_handler)
-logger.addHandler(file_handler)
-logger.propagate = False  # prevent double logging
-
-'''
-# -----------------------
-# Enable detailed voice_recv logging
-# -----------------------
-
-# Let Discord internals use DEBUG level
-#discord.utils.setup_logging(level=logging.DEBUG, root=False)
-
-
-# Attach handlers to all voice_recv components
-for name in [
-    #"discord.ext.voice_recv",
-    "discord.ext.voice_recv.router",
-    #"discord.ext.voice_recv.reader",
-    #"discord.ext.voice_recv.rtp",
-    #"discord.gateway",
-]:
+# Remove default Discord handlers before adding yours
+for name in ["discord", "discord.client", "discord.gateway", "discord.voice_state"]:
     log = logging.getLogger(name)
-    log.setLevel(logging.DEBUG)
+    log.handlers.clear()
+    log.setLevel(logging.INFO)
     log.addHandler(console_handler)
     log.addHandler(file_handler)
     log.propagate = False
 
-# Optional ultra-verbose packet tracing
-#logging.addLevelName(5, "TRACE")
-'''
-logging.getLogger("discord.ext.voice_recv.reader").setLevel(logging.WARNING)
+# Configure YOUR bot's logger
+logger = logging.getLogger("discordbot")
+logger.setLevel(logging.INFO)
+logger.addHandler(console_handler)
+logger.addHandler(file_handler)
+logger.propagate = False
+
+logger.info("Bot starting...")
+
 
 # -----------------------
 # Bot setup
@@ -78,12 +56,11 @@ bot.start_time = datetime.now(UTC)
 
 @bot.event
 async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    logger.info(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
 
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
             await bot.load_extension(f"cogs.{filename[:-3]}")
-            print(f"Loaded cog: {filename[:-3]}")
 
 # -----------------------
 # Run the bot
