@@ -258,7 +258,11 @@ class VoiceSpeechCog(BaseCog):
         if not soundboard_cog:
             return await ctx.send("⚠️ Soundboard cog not loaded.")
 
-        files = soundboard_cog.get_soundfiles_for_text(ctx.guild.id, input_text)
+        files = soundboard_cog.get_soundfiles_for_text(
+            guild_id=ctx.guild.id,
+            user_id=ctx.author.id,
+            text=input_text
+        )
         valid_files = [f for f in files if os.path.isfile(f)]
         if valid_files:
             for f in valid_files:

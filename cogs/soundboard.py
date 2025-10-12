@@ -207,7 +207,6 @@ def save_soundboard(file_path: str, soundboard: Dict[str, GuildSoundboard]):
         raise
     except Exception as e:
         logger.error(f"Unexpected error saving soundboard: {e}", exc_info=True)
-        print(soundboard)
         raise
 
 
@@ -865,13 +864,11 @@ class Soundboard(BaseCog):
     def increment_play_stats(self, guild_id: str, soundfile: str, user_id: str):
         """
         Increment the play statistics for a sound.
-
         Updates:
-        - week, month, total
-        - guild_play_count[guild_id]
-        - last_played timestamp
-        - played_by (last user only)
-
+            - week, month, total
+            - guild_play_count[guild_id]
+            - last_played timestamp
+            - played_by (last user only)
         Args:
             guild_id: Discord guild ID
             soundfile: Path to the sound file being played
@@ -879,7 +876,6 @@ class Soundboard(BaseCog):
         """
         # Try the specific guild first
         guild_data = self.soundboard.get(guild_id)
-
         # If not found, also check default_guild
         if not guild_data or not any(entry.soundfile == soundfile for entry in guild_data.sounds.values()):
             default_data = self.soundboard.get("default_guild")
@@ -889,18 +885,15 @@ class Soundboard(BaseCog):
                     if entry.soundfile == soundfile:
                         guild_data = default_data
                         break
-
         if not guild_data:
             logger.warning(f"Soundfile '{soundfile}' not found in guild '{guild_id}' or 'default_guild'")
             return
-
-        # Find the sound entry
+        #Find the sound entry
         sound_entry: SoundEntry | None = None
         for entry in guild_data.sounds.values():
             if entry.soundfile == soundfile:
                 sound_entry = entry
                 break
-
         if not sound_entry:
             logger.warning(f"Soundfile '{soundfile}' not found in guild '{guild_id}' or 'default_guild'")
             return
@@ -911,8 +904,8 @@ class Soundboard(BaseCog):
         stats.total += 1
         stats.guild_play_count[guild_id] = stats.guild_play_count.get(guild_id, 0) + 1
         stats.last_played = datetime.utcnow().isoformat()
-        stats.played_by = [user_id]  # only last user
-
+        stats.played_by = [user_id]
+        # only last user
         # Save JSON
         try:
             save_soundboard(SOUNDBOARD_FILE, self.soundboard)
@@ -920,58 +913,77 @@ class Soundboard(BaseCog):
         except Exception as e:
             logger.error(f"Failed to save soundboard after incrementing stats: {e}", exc_info=True)
 
-    def get_soundfiles_for_text(self, guild_id: int, user_id: int, text: str) -> list[str]:
+    def get_soundfiles_for_text(self, guild_id: int, user_id: str, text: str) -> list[str]:
         """
         Return list of soundfile paths for any matching words in the text.
+
+        Flow:
+        1. Split text into individual words
+        2. Convert guild ID to string
+        3. Check each word against guild-specific triggers
+        4. Check each word against default_guild triggers
+        5. Return unique list of matching soundfiles in order found
+
+        Args:
+            guild_id: Discord guild ID
+            text: Text string (sentence or words) to search for triggers
+
+        Returns:
+            List of soundfile paths that match triggers in the text
+
+        Example:
+            >>> get_soundfiles_for_text(12345, "hello world quack")
+            ['soundboard/hello.mp3', 'soundboard/quack.mp3']
         """
         guild_id_str = str(guild_id)
         words = text.lower().split()
         matched_files = []
-        seen_files = set()
+        seen_files = set()  # Track to avoid duplicates
+
+        logger.debug(f"[{guild_id}] Looking up words in text: {words}")
+
+        # Check guild-specific entries
         guild_data = self.soundboard.get(guild_id_str)
+
+        # Check default guild
         default_guild = self.soundboard.get("default_guild")
 
+        # Process each word
         for word in words:
             word_lower = word.strip()
             if not word_lower:
                 continue
+
             found = False
 
-            # Check guild-specific sounds first
+            # Check guild-specific first
             if guild_data:
                 for entry in guild_data.sounds.values():
+                    if entry.is_disabled:
+                        continue
                     if word_lower in [t.lower() for t in entry.triggers]:
-                        if entry.is_disabled:
-                            logger.info(
-                                f"Skipped disabled sound '{entry.title}' for word '{word_lower}' in guild {guild_id_str}")
-                            continue
-                        if entry.is_private and str(user_id) != str(entry.added_by_id):
-                            logger.info(
-                                f"Skipped private sound '{entry.title}' triggered by user {user_id} (added by {entry.added_by_id})")
-                            continue
                         if entry.soundfile not in seen_files:
                             matched_files.append(entry.soundfile)
                             seen_files.add(entry.soundfile)
-                            self.increment_play_stats(guild_id_str, entry.soundfile, user_id)
+                            logger.debug(f"[{guild_id}] Matched '{word_lower}' -> {entry.soundfile}")
                             found = True
                             break
 
-            # Fallback to default guild
-            if not found and default_guild:
+            if default_guild:
                 for entry in default_guild.sounds.values():
+                    if entry.is_disabled:
+                        continue
                     if word_lower in [t.lower() for t in entry.triggers]:
-                        if entry.is_disabled:
-                            logger.info(f"Skipped disabled default sound '{entry.title}' for word '{word_lower}'")
-                            continue
-                        if entry.is_private and str(user_id) != str(entry.added_by_id):
-                            logger.info(
-                                f"Skipped private default sound '{entry.title}' triggered by user {user_id} (added by {entry.added_by_id})")
-                            continue
                         if entry.soundfile not in seen_files:
                             matched_files.append(entry.soundfile)
                             seen_files.add(entry.soundfile)
-                            self.increment_play_stats("default_guild", entry.soundfile, user_id)
+                            logger.debug(f"[{guild_id}] Matched '{word_lower}' in default_guild -> {entry.soundfile}")
                             break
+
+        if matched_files:
+            logger.info(f"[{guild_id}] Found {len(matched_files)} sound(s) for text: '{text}'")
+        else:
+            logger.debug(f"[{guild_id}] No sounds found for text: '{text}'")
 
         return matched_files
 
@@ -1045,13 +1057,13 @@ class Soundboard(BaseCog):
         Shows all available sounds with pagination and details.
         """
         guild_id = str(ctx.guild.id)
-
+        sounds = {}
         # Check for actual guild ID first, then fall back to "default_guild"
         if guild_id in self.soundboard and self.soundboard[guild_id].sounds:
-            sounds = self.soundboard[guild_id].sounds
-        elif "default_guild" in self.soundboard and self.soundboard["default_guild"].sounds:
+            sounds.update(self.soundboard[guild_id].sounds)
+        if "default_guild" in self.soundboard and self.soundboard["default_guild"].sounds:
             logger.info(f"Using default_guild soundboard for guild {guild_id}")
-            sounds = self.soundboard["default_guild"].sounds
+            sounds.update(self.soundboard["default_guild"].sounds)
             guild_id = "default_guild"
         else:
             return await ctx.send("📭 No sounds available in this server's soundboard!")
@@ -1061,23 +1073,11 @@ class Soundboard(BaseCog):
 
         await ctx.send(embed=embed, view=view)
 
-    @commands.command(name="addsound", help="Upload a new sound to the soundboard (attach the file before sending this command)")
-    async def addsound(self, ctx: commands.Context):
-        """Handles uploading a sound file via modal."""
-        if not ctx.message.attachments:
-            return await ctx.send("❌ Please attach a sound file with the command.")
-
-        attachment = ctx.message.attachments[0]
-        if not attachment.filename.lower().endswith((".mp3", ".wav", ".ogg")):
-            return await ctx.send("❌ Unsupported file type. Use mp3, wav, or ogg.")
-
-        view = SoundUploadView(self, str(ctx.guild.id), attachment)
-
-        await ctx.send(
-            f"✅ I have the file `{attachment.filename}` now. "
-            f"Click the button below to add details and upload it!",
-            view=view
-        )
+    @commands.command(help="Add a sound to the soundboard")
+    async def upload(self, ctx):
+        """Upload a new sound (to be implemented with file upload)."""
+        await ctx.send("📤 Sound upload feature coming soon!\n"
+                       "For now, sounds must be added manually to the JSON file.")
 
 
 async def setup(bot):

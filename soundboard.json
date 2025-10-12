@@ -15,13 +15,14 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 4,
-        "month": 4,
-        "total": 4,
+        "week": 8,
+        "month": 8,
+        "total": 8,
         "guild_play_count": {
-          "default_guild": 4
+          "default_guild": 7,
+          "1410579846379081801": 1
         },
-        "last_played": "2025-10-12T09:21:01.060798",
+        "last_played": "2025-10-12T12:54:49.830912",
         "played_by": [
           696940351977422878
         ]
@@ -52,17 +53,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 16,
-        "month": 16,
-        "total": 16,
+        "week": 22,
+        "month": 22,
+        "total": 22,
         "guild_play_count": {
-          "default_guild": 8,
+          "default_guild": 11,
           "1410579846379081801": 4,
-          "1386497411278573652": 4
+          "1386497411278573652": 1
         },
-        "last_played": "2025-10-12T09:59:09.200713",
+        "last_played": "2025-10-12T10:56:35.292069",
         "played_by": [
-          541466211180085248
+          187884767113379840
         ]
       },
       "audio_metadata": {
@@ -90,18 +91,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 52,
-        "month": 52,
-        "total": 52,
+        "week": 100,
+        "month": 100,
+        "total": 100,
         "guild_play_count": {
-          "default_guild": 26,
-          "1410579846379081801": 1,
-          "1386497411278573652": 21,
+          "default_guild": 49,
+          "1410579846379081801": 2,
           "1386497411278573652": 2
         },
-        "last_played": "2025-10-12T10:11:20.785247",
+        "last_played": "2025-10-12T12:53:04.966348",
         "played_by": [
-          187884767113379840
+          696940351977422878
         ]
       },
       "audio_metadata": {
@@ -129,12 +129,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 0,
-        "month": 0,
-        "total": 0,
-        "guild_play_count": {},
-        "last_played": null,
-        "played_by": []
+        "week": 2,
+        "month": 2,
+        "total": 2,
+        "guild_play_count": {
+          "default_guild": 1,
+          "1386497411278573652": 1
+        },
+        "last_played": "2025-10-12T10:51:02.664605",
+        "played_by": [
+          460072954651475970
+        ]
       },
       "audio_metadata": {
         "duration": null,
@@ -198,18 +203,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 21,
-        "month": 21,
-        "total": 21,
+        "week": 25,
+        "month": 25,
+        "total": 25,
         "guild_play_count": {
           "1410579846379081801": 1,
-          "default_guild": 10,
-          "1386497411278573652": 6,
+          "default_guild": 12,
           "1386497411278573652": 2
         },
-        "last_played": "2025-10-12T10:12:39.322468",
+        "last_played": "2025-10-12T10:57:11.008490",
         "played_by": [
-          215475216409821184
+          187884767113379840
         ]
       },
       "audio_metadata": {
@@ -237,18 +241,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 48,
-        "month": 48,
-        "total": 48,
+        "week": 80,
+        "month": 80,
+        "total": 80,
         "guild_play_count": {
-          "default_guild": 24,
+          "default_guild": 40,
           "1410579846379081801": 1,
-          "1386497411278573652": 10,
-          "1386497411278573652": 13
+          "1386497411278573652": 1
         },
-        "last_played": "2025-10-12T10:15:26.355519",
+        "last_played": "2025-10-12T10:57:33.848978",
         "played_by": [
-          188857715550846977
+          187884767113379840
         ]
       },
       "audio_metadata": {
@@ -275,14 +278,53 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 4,
-        "month": 4,
-        "total": 4,
+        "week": 7,
+        "month": 7,
+        "total": 7,
         "guild_play_count": {
-          "default_guild": 2,
-          "1386497411278573652": 2
+          "default_guild": 3,
+          "1386497411278573652": 1,
+          "1410579846379081801": 1
         },
-        "last_played": "2025-10-12T10:15:12.372367",
+        "last_played": "2025-10-12T13:00:16.863989",
+        "played_by": [
+          696940351977422878
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    }
+  },
+  "1386497411278573652": {
+    "oh_yes_suck_a_cock": {
+      "title": "Oh yes suck a cock",
+      "triggers": [
+        "cock",
+        "suck"
+      ],
+      "soundfile": "soundboard/suck_a_cock.ogg",
+      "description": "Cocks",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-12T10:58:55.886874",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 1,
+        "month": 1,
+        "total": 1,
+        "guild_play_count": {
+          "1386497411278573652": 1
+        },
+        "last_played": "2025-10-12T11:01:36.578871",
         "played_by": [
           187884767113379840
         ]
