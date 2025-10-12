@@ -1,0 +1,300 @@
+{
+  "default_guild": {
+    "swamp": {
+      "title": "Shrek Swamp",
+      "triggers": [
+        "swamp"
+      ],
+      "soundfile": "soundboard/what-are-you-doing-in-my-swamp.mp3",
+      "description": "What are you doing in my swamp?",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 4,
+        "month": 4,
+        "total": 4,
+        "guild_play_count": {
+          "default_guild": 4
+        },
+        "last_played": "2025-10-12T09:21:01.060798",
+        "played_by": [
+          696940351977422878
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "bomb": {
+      "title": "CS:Bomb",
+      "triggers": [
+        "bomb",
+        "boom",
+        "bang"
+      ],
+      "soundfile": "soundboard/bomb-has-been-planted-sound-effect-cs-go.mp3",
+      "description": "The bomb has been planted",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-10-12T00:00:00",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 16,
+        "month": 16,
+        "total": 16,
+        "guild_play_count": {
+          "default_guild": 8,
+          "1410579846379081801": 4,
+          "1386497411278573652": 4
+        },
+        "last_played": "2025-10-12T09:59:09.200713",
+        "played_by": [
+          541466211180085248
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "quack": {
+      "title": "Duck Quack",
+      "triggers": [
+        "quack",
+        "duck"
+      ],
+      "soundfile": "soundboard/quack1.mp3",
+      "description": "Duck quacking sound",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 52,
+        "month": 52,
+        "total": 52,
+        "guild_play_count": {
+          "default_guild": 26,
+          "1410579846379081801": 1,
+          "1386497411278573652": 21,
+          "1386497411278573652": 2
+        },
+        "last_played": "2025-10-12T10:11:20.785247",
+        "played_by": [
+          187884767113379840
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "america": {
+      "title": "America",
+      "triggers": [
+        "america",
+        "usa"
+      ],
+      "soundfile": "soundboard/merica.ogg",
+      "description": "America sound effect",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 0,
+        "month": 0,
+        "total": 0,
+        "guild_play_count": {},
+        "last_played": null,
+        "played_by": []
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "jihad": {
+      "title": "Dirka Dirka",
+      "triggers": [
+        "jihad"
+      ],
+      "soundfile": "soundboard/dirka_dirka.ogg",
+      "description": "Team America reference",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 7,
+        "month": 7,
+        "total": 7,
+        "guild_play_count": {
+          "1410579846379081801": 1,
+          "default_guild": 3,
+          "1386497411278573652": 1
+        },
+        "last_played": "2025-10-12T09:20:37.146335",
+        "played_by": [
+          187884767113379840
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "ding": {
+      "title": "Ring a Ding",
+      "triggers": [
+        "ding",
+        "ring"
+      ],
+      "soundfile": "soundboard/ring-a-ding.ogg",
+      "description": "India's favorite driving music!!",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 21,
+        "month": 21,
+        "total": 21,
+        "guild_play_count": {
+          "1410579846379081801": 1,
+          "default_guild": 10,
+          "1386497411278573652": 6,
+          "1386497411278573652": 2
+        },
+        "last_played": "2025-10-12T10:12:39.322468",
+        "played_by": [
+          215475216409821184
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "fuck_i_love_cum!!": {
+      "title": "Fuck I love cum!!",
+      "triggers": [
+        "cum",
+        "come"
+      ],
+      "soundfile": "soundboard/Fuck_i_love_cum.ogg",
+      "description": "Cum",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-12T08:55:18.648574",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 48,
+        "month": 48,
+        "total": 48,
+        "guild_play_count": {
+          "default_guild": 24,
+          "1410579846379081801": 1,
+          "1386497411278573652": 10,
+          "1386497411278573652": 13
+        },
+        "last_played": "2025-10-12T10:15:26.355519",
+        "played_by": [
+          188857715550846977
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "surprise": {
+      "title": "Surprise",
+      "triggers": [
+        "surprise"
+      ],
+      "soundfile": "soundboard/surprise.ogg",
+      "description": "MGS Surprise",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-12T10:02:14.991445",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 4,
+        "month": 4,
+        "total": 4,
+        "guild_play_count": {
+          "default_guild": 2,
+          "1386497411278573652": 2
+        },
+        "last_played": "2025-10-12T10:15:12.372367",
+        "played_by": [
+          187884767113379840
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    }
+  }
+}
