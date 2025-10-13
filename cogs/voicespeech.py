@@ -83,12 +83,12 @@ class VoiceSpeechCog(BaseCog):
         self.queue_tasks.clear()
         logger.info("VoiceSpeechCog cleanup complete.")
 
-    async def _process_sound_queue(self, guild_id: int, volume: float = 0.5):
+    async def _process_sound_queue(self, guild_id: int, default_volume: float = 0.5):
         queue = self.sound_queues[guild_id]
 
         try:
             while True:
-                soundfile, vc, user_id = await queue.get()
+                soundfile, sound_key, volume, vc, user_id = await queue.get()
                 if not vc or not vc.is_connected():
                     logger.warning(f"[Guild {guild_id}] Voice client disconnected, skipping {soundfile}")
                     queue.task_done()
@@ -107,14 +107,16 @@ class VoiceSpeechCog(BaseCog):
                         logger.debug(f"[Guild {guild_id}] Finished playing '{soundfile}'")
                     self.bot.loop.call_soon_threadsafe(event.set)
 
+                # Use the sound's individual volume setting
+                effective_volume = volume * default_volume
                 source = FFmpegPCMAudio(soundfile)
-                source = discord.PCMVolumeTransformer(source, volume=volume)
+                source = discord.PCMVolumeTransformer(source, volume=effective_volume)
                 vc.play(source, after=after_callback)
-                logger.info(f"[Guild {guild_id}] ▶️ Playing '{soundfile}'")
+                logger.info(f"[Guild {guild_id}] ▶️ Playing '{soundfile}' (volume: {effective_volume:.2f})")
 
-                # Update soundboard play stats - FIXED: Convert IDs to strings
+                # Update soundboard play stats - FIXED: Convert IDs to strings and pass sound_key
                 soundboard_cog = self.bot.get_cog("Soundboard")
-                if soundboard_cog:
+                if soundboard_cog and sound_key:
                     soundboard_cog.increment_play_stats(guild_id, soundfile, str(user_id))
 
                 try:
@@ -130,12 +132,14 @@ class VoiceSpeechCog(BaseCog):
         except Exception as e:
             logger.critical(f"[Guild {guild_id}] Unexpected error: {e}", exc_info=True)
 
-    async def queue_sound(self, guild_id: int, soundfile: str, user: discord.User):
+    async def queue_sound(self, guild_id: int, soundfile: str, user: discord.User, sound_key: str = None,
+                          volume: float = 1.0):
         if guild_id not in self.sound_queues:
             self.sound_queues[guild_id] = asyncio.Queue()
             self.queue_tasks[guild_id] = asyncio.create_task(self._process_sound_queue(guild_id))
-        await self.sound_queues[guild_id].put((soundfile, user.guild.voice_client, user.id))
-        logger.debug(f"[Guild {guild_id}] Queued '{soundfile}' (queue size: {self.sound_queues[guild_id].qsize()})")
+        await self.sound_queues[guild_id].put((soundfile, sound_key, volume, user.guild.voice_client, user.id))
+        logger.debug(
+            f"[Guild {guild_id}] Queued '{soundfile}' (volume: {volume:.2f}, queue size: {self.sound_queues[guild_id].qsize()})")
 
     async def _keepalive_loop(self):
         await self.bot.wait_until_ready()
@@ -177,12 +181,13 @@ class VoiceSpeechCog(BaseCog):
                 if not soundboard_cog:
                     return
 
+                # Get list of (soundfile, sound_key, volume) tuples
                 files = soundboard_cog.get_soundfiles_for_text(ctx.guild.id, user.id, transcribed_text)
-                valid_files = [f for f in files if os.path.isfile(f)]
-                if valid_files:
+                if files:
                     async def queue_all():
-                        for f in valid_files:
-                            await self.queue_sound(ctx.guild.id, f, user)
+                        for soundfile, sound_key, volume in files:
+                            if os.path.isfile(soundfile):
+                                await self.queue_sound(ctx.guild.id, soundfile, user, sound_key, volume)
 
                     asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
             except Exception as e:
@@ -314,17 +319,18 @@ class VoiceSpeechCog(BaseCog):
         if not soundboard_cog:
             return await ctx.send("⚠️ Soundboard cog not loaded.")
 
-        # FIXED: Pass ctx.author.id as int (soundboard will convert internally)
+        # Get list of (soundfile, sound_key, volume) tuples
         files = soundboard_cog.get_soundfiles_for_text(
             guild_id=ctx.guild.id,
             user_id=ctx.author.id,
             text=input_text
         )
-        valid_files = [f for f in files if os.path.isfile(f)]
-        if valid_files:
-            for f in valid_files:
-                await self.queue_sound(ctx.guild.id, f, ctx.author)
-            await ctx.send(f"▶️ Queued {len(valid_files)} sound(s).")
+
+        if files:
+            for soundfile, sound_key, volume in files:
+                if os.path.isfile(soundfile):
+                    await self.queue_sound(ctx.guild.id, soundfile, ctx.author, sound_key, volume)
+            await ctx.send(f"▶️ Queued {len(files)} sound(s).")
         else:
             await ctx.send(f"⚠️ No sounds found for: `{input_text}`")
 

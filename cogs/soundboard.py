@@ -4,6 +4,7 @@ from typing import List, Optional, Dict
 from datetime import datetime
 from pathlib import Path
 import traceback
+import random
 
 import discord
 from discord.ext import commands
@@ -639,20 +640,29 @@ class Soundboard(BaseCog):
 
         return count
 
-    def get_soundfiles_for_text(self, guild_id: int, user_id: int, text: str) -> list[str]:
-        """Return list of soundfile paths for matching words in text."""
+    def get_soundfiles_for_text(self, guild_id: int, user_id: int, text: str) -> list[tuple[str, str, float]]:
+        """Return list of (soundfile, sound_key, volume) tuples for matching words in text.
+
+        If multiple sounds share the same trigger, randomly selects one.
+        Returns the sound_key and volume along with soundfile so stats can be tracked properly.
+        """
         guild_id_str = str(guild_id)
-        user_id_str = str(user_id)
         words = text.lower().split()
         matched_files = []
-        seen_files = set()
+        seen_triggers = set()
 
         for word in words:
             word_lower = word.strip()
             if not word_lower:
                 continue
 
-            for entry in self.soundboard.sounds.values():
+            # Skip if we've already matched this trigger
+            if word_lower in seen_triggers:
+                continue
+
+            # Find all sounds that match this trigger
+            candidates = []
+            for key, entry in self.soundboard.sounds.items():
                 if word_lower not in [t.lower() for t in entry.triggers]:
                     continue
 
@@ -663,13 +673,18 @@ class Soundboard(BaseCog):
                 if entry.is_private and entry.guild_id != guild_id_str:
                     continue
 
-                if entry.soundfile in seen_files:
-                    continue
+                candidates.append((key, entry))
 
-                matched_files.append(entry.soundfile)
-                seen_files.add(entry.soundfile)
-                self.increment_play_stats(guild_id, entry.soundfile, user_id_str)
-                break
+            # If we have candidates, randomly choose one
+            if candidates:
+                chosen_key, chosen_entry = random.choice(candidates)
+                volume = chosen_entry.audio_metadata.volume_adjust
+                matched_files.append((chosen_entry.soundfile, chosen_key, volume))
+                seen_triggers.add(word_lower)
+
+                if len(candidates) > 1:
+                    logger.info(
+                        f"[{guild_id}] Randomly selected '{chosen_entry.title}' from {len(candidates)} sounds for trigger '{word_lower}'")
 
         if matched_files:
             logger.info(f"[{guild_id}] Found {len(matched_files)} sound(s) for: '{text}'")
@@ -733,7 +748,7 @@ class Soundboard(BaseCog):
         }
 
         if not filtered_sounds:
-            return await ctx.send("📭 No sounds available!")
+            return await ctx.send("🔭 No sounds available!")
 
         view = SoundboardView(self, guild_id, filtered_sounds)
         embed = view.create_embed()
