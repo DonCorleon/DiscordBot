@@ -1,5 +1,5 @@
 {
-  "default_guild": {
+  "sounds": {
     "swamp": {
       "title": "Shrek Swamp",
       "triggers": [
@@ -10,21 +10,22 @@
       "added_by": "System",
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 8,
-        "month": 8,
-        "total": 8,
+        "week": 12,
+        "month": 12,
+        "total": 12,
         "guild_play_count": {
           "default_guild": 7,
-          "1410579846379081801": 1
+          "1410579846379081801": 5
         },
-        "last_played": "2025-10-12T12:54:49.830912",
+        "last_played": "2025-10-13T13:26:26.244968",
         "played_by": [
-          696940351977422878
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -48,22 +49,23 @@
       "added_by": "System",
       "added_by_id": "0",
       "added_date": "2025-10-12T00:00:00",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 22,
-        "month": 22,
-        "total": 22,
+        "week": 30,
+        "month": 30,
+        "total": 30,
         "guild_play_count": {
           "default_guild": 11,
-          "1410579846379081801": 4,
-          "1386497411278573652": 1
+          "1410579846379081801": 8,
+          "1386497411278573652": 5
         },
-        "last_played": "2025-10-12T10:56:35.292069",
+        "last_played": "2025-10-13T13:26:11.590600",
         "played_by": [
-          187884767113379840
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -86,22 +88,23 @@
       "added_by": "System",
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 100,
-        "month": 100,
-        "total": 100,
+        "week": 146,
+        "month": 146,
+        "total": 146,
         "guild_play_count": {
           "default_guild": 49,
-          "1410579846379081801": 2,
-          "1386497411278573652": 2
+          "1410579846379081801": 6,
+          "1386497411278573652": 44
         },
-        "last_played": "2025-10-12T12:53:04.966348",
+        "last_played": "2025-10-13T13:26:14.996524",
         "played_by": [
-          696940351977422878
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -124,21 +127,23 @@
       "added_by": "System",
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 2,
-        "month": 2,
-        "total": 2,
+        "week": 8,
+        "month": 8,
+        "total": 8,
         "guild_play_count": {
           "default_guild": 1,
-          "1386497411278573652": 1
+          "1386497411278573652": 5,
+          "1410579846379081801": 2
         },
-        "last_played": "2025-10-12T10:51:02.664605",
+        "last_played": "2025-10-13T09:37:58.473185",
         "played_by": [
-          460072954651475970
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -160,22 +165,23 @@
       "added_by": "System",
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 7,
-        "month": 7,
-        "total": 7,
+        "week": 15,
+        "month": 15,
+        "total": 15,
         "guild_play_count": {
-          "1410579846379081801": 1,
+          "1410579846379081801": 5,
           "default_guild": 3,
-          "1386497411278573652": 1
+          "1386497411278573652": 5
         },
-        "last_played": "2025-10-12T09:20:37.146335",
+        "last_played": "2025-10-13T13:26:17.205178",
         "played_by": [
-          187884767113379840
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -198,22 +204,23 @@
       "added_by": "System",
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 25,
-        "month": 25,
-        "total": 25,
+        "week": 27,
+        "month": 27,
+        "total": 27,
         "guild_play_count": {
-          "1410579846379081801": 1,
+          "1410579846379081801": 3,
           "default_guild": 12,
           "1386497411278573652": 2
         },
-        "last_played": "2025-10-12T10:57:11.008490",
+        "last_played": "2025-10-13T09:29:03.535708",
         "played_by": [
-          187884767113379840
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -236,22 +243,23 @@
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
       "added_date": "2025-10-12T08:55:18.648574",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 80,
-        "month": 80,
-        "total": 80,
+        "week": 126,
+        "month": 126,
+        "total": 126,
         "guild_play_count": {
           "default_guild": 40,
-          "1410579846379081801": 1,
-          "1386497411278573652": 1
+          "1410579846379081801": 7,
+          "1386497411278573652": 41
         },
-        "last_played": "2025-10-12T10:57:33.848978",
+        "last_played": "2025-10-13T13:26:49.043124",
         "played_by": [
-          187884767113379840
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -273,22 +281,23 @@
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
       "added_date": "2025-10-12T10:02:14.991445",
+      "guild_id": "default_guild",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 7,
-        "month": 7,
-        "total": 7,
+        "week": 16,
+        "month": 16,
+        "total": 16,
         "guild_play_count": {
           "default_guild": 3,
           "1386497411278573652": 1,
-          "1410579846379081801": 1
+          "1410579846379081801": 7
         },
-        "last_played": "2025-10-12T13:00:16.863989",
+        "last_played": "2025-10-13T09:29:48.147065",
         "played_by": [
-          696940351977422878
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
@@ -299,10 +308,8 @@
         "cooldown": 0,
         "autoplay": false
       }
-    }
-  },
-  "1386497411278573652": {
-    "oh_yes_suck_a_cock": {
+    },
+    "1386497411278573652_oh_yes_suck_a_cock": {
       "title": "Oh yes suck a cock",
       "triggers": [
         "cock",
@@ -313,20 +320,99 @@
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
       "added_date": "2025-10-12T10:58:55.886874",
+      "guild_id": "1386497411278573652",
       "last_edited_by": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 1,
-        "month": 1,
-        "total": 1,
+        "week": 31,
+        "month": 31,
+        "total": 31,
         "guild_play_count": {
-          "1386497411278573652": 1
+          "1386497411278573652": 19,
+          "1410579846379081801": 12
         },
-        "last_played": "2025-10-12T11:01:36.578871",
+        "last_played": "2025-10-13T13:26:59.618720",
         "played_by": [
-          187884767113379840
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "wet_fart": {
+      "title": "Wet Fart",
+      "triggers": [
+        "shit",
+        "fart"
+      ],
+      "soundfile": "soundboard/fart-meme-sound.mp3",
+      "description": "Requested by Mr Duck",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-13T10:37:06.580971",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 20,
+        "month": 20,
+        "total": 20,
+        "guild_play_count": {
+          "1386497411278573652": 12,
+          "1410579846379081801": 8
+        },
+        "last_played": "2025-10-13T13:26:53.903490",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "big_mike": {
+      "title": "Big Mike",
+      "triggers": [
+        "mike",
+        "faggot",
+        "fag"
+      ],
+      "soundfile": "soundboard/mike-tyson-i-bang-you.mp3",
+      "description": "Please dont Big Mike, i love my ass!!",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-13T11:10:22.133852",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 18,
+        "month": 18,
+        "total": 18,
+        "guild_play_count": {
+          "1386497411278573652": 8,
+          "1410579846379081801": 10
+        },
+        "last_played": "2025-10-13T13:28:27.443939",
+        "played_by": [
+          "696940351977422878"
         ]
       },
       "audio_metadata": {

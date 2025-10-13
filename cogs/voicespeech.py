@@ -83,8 +83,9 @@ class VoiceSpeechCog(BaseCog):
         self.queue_tasks.clear()
         logger.info("VoiceSpeechCog cleanup complete.")
 
-    async def _process_sound_queue(self, guild_id: int):
+    async def _process_sound_queue(self, guild_id: int, volume: float = 0.5):
         queue = self.sound_queues[guild_id]
+
         try:
             while True:
                 soundfile, vc, user_id = await queue.get()
@@ -100,19 +101,21 @@ class VoiceSpeechCog(BaseCog):
 
                 def after_callback(error):
                     if error:
-                        logger.error(f"[Guild {guild_id}] FFmpeg playback error for '{soundfile}': {error}", exc_info=error)
+                        logger.error(f"[Guild {guild_id}] FFmpeg playback error for '{soundfile}': {error}",
+                                     exc_info=error)
                     else:
                         logger.debug(f"[Guild {guild_id}] Finished playing '{soundfile}'")
                     self.bot.loop.call_soon_threadsafe(event.set)
 
                 source = FFmpegPCMAudio(soundfile)
+                source = discord.PCMVolumeTransformer(source, volume=volume)
                 vc.play(source, after=after_callback)
                 logger.info(f"[Guild {guild_id}] ▶️ Playing '{soundfile}'")
 
-                # Update soundboard play stats
+                # Update soundboard play stats - FIXED: Convert IDs to strings
                 soundboard_cog = self.bot.get_cog("Soundboard")
                 if soundboard_cog:
-                    soundboard_cog.increment_play_stats(guild_id, soundfile, user_id)
+                    soundboard_cog.increment_play_stats(guild_id, soundfile, str(user_id))
 
                 try:
                     await asyncio.wait_for(event.wait(), timeout=30.0)
@@ -156,17 +159,107 @@ class VoiceSpeechCog(BaseCog):
             logger.info("Keepalive loop cancelled")
             raise
 
-    @commands.command(help="Join caller's voice channel")
-    async def join(self, ctx):
-        if not ctx.author.voice or not ctx.author.voice.channel:
-            return await ctx.send("⚠️ You're not in a voice channel.")
-        channel = ctx.author.voice.channel
+    def _create_speech_listener(self, ctx):
+        """Create a speech recognition listener for the given context."""
+
+        def text_callback(user: discord.User, text: str):
+            try:
+                result = json.loads(text)
+                transcribed_text = result.get("text", "").strip()
+                if not transcribed_text:
+                    return
+
+                guild_name = ctx.guild.name
+                logger.info(
+                    f"\033[92m[{guild_name}] [{user.display_name}] : {transcribed_text}\033[0m")
+
+                soundboard_cog = self.bot.get_cog("Soundboard")
+                if not soundboard_cog:
+                    return
+
+                files = soundboard_cog.get_soundfiles_for_text(ctx.guild.id, user.id, transcribed_text)
+                valid_files = [f for f in files if os.path.isfile(f)]
+                if valid_files:
+                    async def queue_all():
+                        for f in valid_files:
+                            await self.queue_sound(ctx.guild.id, f, user)
+
+                    asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
+            except Exception as e:
+                logger.error(f"Error in text_callback: {e}", exc_info=True)
+
+        class SRListener(dsr.SpeechRecognitionSink):
+            def __init__(self):
+                super().__init__(default_recognizer="vosk", phrase_time_limit=10, text_cb=text_callback)
+
+            @voice_recv.AudioSink.listener()
+            def on_voice_member_speaking_start(self, member: discord.Member):
+                logger.info(f"🎤 {member.display_name} started speaking")
+
+            @voice_recv.AudioSink.listener()
+            def on_voice_member_speaking_stop(self, member: discord.Member):
+                logger.info(f"🔇 {member.display_name} stopped speaking")
+
+        return SRListener()
+
+    @commands.command(help="Join a voice channel (optional: channel name or ID)")
+    async def join(self, ctx, *, channel_input: str = None):
+        # If already connected
         if ctx.voice_client:
-            return await ctx.send("✅ Already connected.")
-        vc = await channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
-        await ctx.send(f"✅ Joined `{channel.name}` and ready to listen.")
-        if not self._keepalive_task:
-            self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
+            return await ctx.send("✅ Already connected to a voice channel.")
+
+        # Determine which channel to join
+        target_channel = None
+
+        if channel_input:
+            # Try to find channel by ID first
+            try:
+                channel_id = int(channel_input)
+                target_channel = ctx.guild.get_channel(channel_id)
+                if target_channel and not isinstance(target_channel, discord.VoiceChannel):
+                    return await ctx.send(f"❌ Channel with ID `{channel_id}` is not a voice channel.")
+            except ValueError:
+                # Not an ID, search by name (case-insensitive)
+                channel_name_lower = channel_input.lower()
+                for channel in ctx.guild.voice_channels:
+                    if channel.name.lower() == channel_name_lower:
+                        target_channel = channel
+                        break
+
+                # If exact match not found, try partial match
+                if not target_channel:
+                    for channel in ctx.guild.voice_channels:
+                        if channel_name_lower in channel.name.lower():
+                            target_channel = channel
+                            break
+
+            if not target_channel:
+                return await ctx.send(f"❌ Could not find voice channel: `{channel_input}`")
+        else:
+            # No argument provided, join caller's channel
+            if not ctx.author.voice or not ctx.author.voice.channel:
+                return await ctx.send("⚠️ You're not in a voice channel. Please specify a channel name or ID.")
+            target_channel = ctx.author.voice.channel
+
+        # Connect to the channel
+        try:
+            vc = await target_channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
+
+            # Start keepalive task if not already running
+            if not self._keepalive_task:
+                self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
+
+            # Auto-start listening ONLY if a channel was specified
+            if channel_input:
+                sink = self._create_speech_listener(ctx)
+                vc.listen(sink)
+                self.active_sinks[ctx.guild.id] = sink
+                await ctx.send(f"✅ Joined `{target_channel.name}` and started listening! 🎧")
+            else:
+                await ctx.send(f"✅ Joined `{target_channel.name}` and ready to listen.")
+        except Exception as e:
+            logger.error(f"Failed to join channel {target_channel.name}: {e}", exc_info=True)
+            await ctx.send(f"❌ Failed to join `{target_channel.name}`: {str(e)}")
 
     @commands.command(help="Leave the voice channel")
     async def leave(self, ctx):
@@ -197,47 +290,10 @@ class VoiceSpeechCog(BaseCog):
         else:
             vc = ctx.voice_client
 
-        def text_callback(user: discord.User, text: str):
-            try:
-                result = json.loads(text)
-                transcribed_text = result.get("text", "").strip()
-                if not transcribed_text:
-                    return
-
-                guild_name = ctx.guild.name
-                logger.info(
-                    f"\033[92m[{guild_name}] [{user.display_name}] : {transcribed_text}\033[0m")
-
-                soundboard_cog = self.bot.get_cog("Soundboard")
-                if not soundboard_cog:
-                    return
-
-                files = soundboard_cog.get_soundfiles_for_text(ctx.guild.id, user.id, transcribed_text)
-                valid_files = [f for f in files if os.path.isfile(f)]
-                if valid_files:
-                    async def queue_all():
-                        for f in valid_files:
-                            await self.queue_sound(ctx.guild.id, f, user)
-                    asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
-            except Exception as e:
-                logger.error(f"Error in text_callback: {e}", exc_info=True)
-
-        class SRListener(dsr.SpeechRecognitionSink):
-            def __init__(self):
-                super().__init__(default_recognizer="vosk", phrase_time_limit=10, text_cb=text_callback)
-
-            @voice_recv.AudioSink.listener()
-            def on_voice_member_speaking_start(self, member: discord.Member):
-                logger.debug(f"🎤 {member.display_name} started speaking")
-
-            @voice_recv.AudioSink.listener()
-            def on_voice_member_speaking_stop(self, member: discord.Member):
-                logger.debug(f"🔇 {member.display_name} stopped speaking")
-
-        sink = SRListener()
+        sink = self._create_speech_listener(ctx)
         vc.listen(sink)
         self.active_sinks[ctx.guild.id] = sink
-        await ctx.send("🎧 Listening and transcribing...")
+        await ctx.send("🎧 Listening...")
 
     @commands.command(help="Stop listening")
     async def stop(self, ctx):
@@ -248,7 +304,7 @@ class VoiceSpeechCog(BaseCog):
         self.active_sinks.pop(ctx.guild.id, None)
         await ctx.send("🛑 Stopped listening.")
 
-    @commands.command(help="Play a sound from a word/phrase")
+    @commands.command(help="Play a sound from a trigger word")
     async def play(self, ctx, *, input_text: str):
         vc: voice_recv.VoiceRecvClient = ctx.voice_client
         if not vc:
@@ -258,6 +314,7 @@ class VoiceSpeechCog(BaseCog):
         if not soundboard_cog:
             return await ctx.send("⚠️ Soundboard cog not loaded.")
 
+        # FIXED: Pass ctx.author.id as int (soundboard will convert internally)
         files = soundboard_cog.get_soundfiles_for_text(
             guild_id=ctx.guild.id,
             user_id=ctx.author.id,
@@ -275,14 +332,14 @@ class VoiceSpeechCog(BaseCog):
     async def queue(self, ctx):
         guild_id = ctx.guild.id
         if guild_id not in self.sound_queues or self.sound_queues[guild_id].empty():
-            return await ctx.send("📭 Queue is empty.")
+            return await ctx.send("🔭 Queue is empty.")
         await ctx.send(f"🎵 {self.sound_queues[guild_id].qsize()} sound(s) in queue")
 
     @commands.command(help="Clear the sound queue")
     async def clearqueue(self, ctx):
         guild_id = ctx.guild.id
         if guild_id not in self.sound_queues:
-            return await ctx.send("📭 No queue exists.")
+            return await ctx.send("🔭 No queue exists.")
         old_size = self.sound_queues[guild_id].qsize()
         self.sound_queues[guild_id] = asyncio.Queue()
         await ctx.send(f"🗑️ Cleared {old_size} sound(s) from queue")
