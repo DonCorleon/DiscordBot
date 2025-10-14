@@ -36,6 +36,7 @@ class TtsCog(BaseCog):
 
     def __init__(self, bot):
         self.bot = bot
+        self.volume = 1.5
 
     def _select_voice(self, name=None, gender=None, country=None):
         """Return pyttsx3 voice ID matching criteria."""
@@ -69,7 +70,7 @@ class TtsCog(BaseCog):
         def generate_tts():
             engine = pyttsx3.init()
             engine.setProperty("rate", rate)
-            engine.setProperty("volume", volume)
+            engine.setProperty("volume", self.volume)
             voice_id = self._select_voice(name=name, gender=gender, country=country)
             if voice_id:
                 engine.setProperty("voice", voice_id)

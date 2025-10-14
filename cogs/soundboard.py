@@ -50,6 +50,7 @@ class SoundEntry:
     added_date: str
     guild_id: str  # Guild where this sound was added
     last_edited_by: Optional[str] = None
+    last_edited_date: Optional[str] = None
     is_private: bool = False
     is_disabled: bool = False
     approved: bool = True
@@ -263,11 +264,12 @@ class SoundUploadView(View):
 
 
 class SoundEditView(View):
-    def __init__(self, cog, sound_key: str, sound: SoundEntry):
+    def __init__(self, cog, sound_key: str, sound: SoundEntry, message: discord.Message = None):
         super().__init__(timeout=300)
         self.cog = cog
         self.sound_key = sound_key
         self.sound = sound
+        self.message = message
         self._add_buttons()
 
     def _add_buttons(self):
@@ -281,6 +283,10 @@ class SoundEditView(View):
         edit_desc.callback = self.edit_description
         self.add_item(edit_desc)
 
+        edit_volume = Button(label="🔊 Edit Volume", style=discord.ButtonStyle.primary)
+        edit_volume.callback = self.edit_volume
+        self.add_item(edit_volume)
+
         status_label = "⚠️ Disabled" if self.sound.is_disabled else "✅ Available"
         status_style = discord.ButtonStyle.danger if self.sound.is_disabled else discord.ButtonStyle.success
         toggle_disabled = Button(label=status_label, style=status_style)
@@ -293,17 +299,99 @@ class SoundEditView(View):
         toggle_private.callback = self.toggle_private
         self.add_item(toggle_private)
 
+    def create_updated_embed(self) -> discord.Embed:
+        """Create an updated embed with current sound data."""
+        # Use last_edited_date for timestamp if available, otherwise added_date
+        timestamp_str = self.sound.last_edited_date if self.sound.last_edited_date else self.sound.added_date
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except:
+            timestamp = datetime.utcnow()
+
+        embed = discord.Embed(
+            title=f"🎵 {self.sound.title}",
+            description=self.sound.description or "No description provided.",
+            color=discord.Color.green(),
+            timestamp=timestamp
+        )
+
+        embed.add_field(
+            name="📋 Triggers",
+            value=", ".join(f"`{t}`" for t in self.sound.triggers) or "None",
+            inline=False
+        )
+
+        embed.add_field(
+            name="📊 Statistics",
+            value=f"**Total:** {self.sound.play_stats.total}\n**Week:** {self.sound.play_stats.week}\n**Month:** {self.sound.play_stats.month}",
+            inline=True
+        )
+
+        # Create volume bar (0-200% scale)
+        volume = self.sound.audio_metadata.volume_adjust
+        volume_percent = int(volume * 100)
+        bars = int((volume / 2.0) * 10)
+        volume_bar = "█" * bars + "░" * (10 - bars)
+
+        # Format added date as Discord timestamp for local conversion
+        try:
+            added_dt = datetime.fromisoformat(self.sound.added_date.replace('Z', '+00:00'))
+            added_timestamp = int(added_dt.timestamp())
+            added_display = f"<t:{added_timestamp}:d>"
+        except:
+            added_display = self.sound.added_date[:10]
+
+        info_value = f"**Added by:** {self.sound.added_by}\n**Added:** {added_display}"
+
+        if self.sound.last_edited_by:
+            try:
+                edited_dt = datetime.fromisoformat(self.sound.last_edited_date.replace('Z', '+00:00'))
+                edited_timestamp = int(edited_dt.timestamp())
+                edited_display = f"<t:{edited_timestamp}:R>"
+                info_value += f"\n**Last edited:** {edited_display}\n**Edited by:** {self.sound.last_edited_by}"
+            except:
+                info_value += f"\n**Last edited by:** {self.sound.last_edited_by}"
+
+        info_value += f"\n**File:** `{self.sound.soundfile}`"
+
+        embed.add_field(
+            name="ℹ️ Info",
+            value=info_value,
+            inline=True
+        )
+
+        embed.add_field(
+            name="🔊 Volume",
+            value=f"`{volume_bar}` **{volume_percent}%**",
+            inline=False
+        )
+
+        status = []
+        if self.sound.is_disabled:
+            status.append("⚠️ Disabled")
+        if self.sound.is_private:
+            status.append("🔒 Private")
+        if status:
+            embed.add_field(name="Status", value=" • ".join(status), inline=False)
+
+        return embed
+
     async def edit_triggers(self, interaction: discord.Interaction):
-        modal = TriggersModal(self.cog, self.sound_key, self.sound)
+        modal = TriggersModal(self.cog, self.sound_key, self.sound, self)
         await interaction.response.send_modal(modal)
 
     async def edit_description(self, interaction: discord.Interaction):
-        modal = DescriptionModal(self.cog, self.sound_key, self.sound)
+        modal = DescriptionModal(self.cog, self.sound_key, self.sound, self)
+        await interaction.response.send_modal(modal)
+
+    async def edit_volume(self, interaction: discord.Interaction):
+        modal = VolumeModal(self.cog, self.sound_key, self.sound, self)
         await interaction.response.send_modal(modal)
 
     async def toggle_disabled(self, interaction: discord.Interaction):
         try:
             self.sound.is_disabled = not self.sound.is_disabled
+            self.sound.last_edited_by = str(interaction.user)
             self.cog.soundboard.sounds[self.sound_key] = self.sound
             save_soundboard(SOUNDBOARD_FILE, self.cog.soundboard)
 
@@ -314,6 +402,14 @@ class SoundEditView(View):
             embed = interaction.message.embeds[0]
             embed.color = discord.Color.red() if self.sound.is_disabled else discord.Color.green()
 
+            # Update last edited info in embed
+            for i, field in enumerate(embed.fields):
+                if field.name == "ℹ️ Info":
+                    embed.set_field_at(i, name="ℹ️ Info",
+                                       value=f"**Added by:** {self.sound.added_by}\n**Date:** {self.sound.added_date[:10]}\n**File:** `{self.sound.soundfile}`\n**Last edited by:** {self.sound.last_edited_by}",
+                                       inline=True)
+                    break
+
             await interaction.response.edit_message(content=f"✅ Sound **{status}**!", embed=embed, view=self)
         except Exception as e:
             logger.error(f"Toggle disabled failed: {e}", exc_info=True)
@@ -322,6 +418,7 @@ class SoundEditView(View):
     async def toggle_private(self, interaction: discord.Interaction):
         try:
             self.sound.is_private = not self.sound.is_private
+            self.sound.last_edited_by = str(interaction.user)
             self.cog.soundboard.sounds[self.sound_key] = self.sound
             save_soundboard(SOUNDBOARD_FILE, self.cog.soundboard)
 
@@ -329,18 +426,29 @@ class SoundEditView(View):
             logger.info(f"Sound '{self.sound.title}' set to {status} by {interaction.user}")
 
             self._add_buttons()
-            await interaction.response.edit_message(content=f"✅ Sound set to **{status}**!", view=self)
+
+            # Update last edited info in embed
+            embed = interaction.message.embeds[0]
+            for i, field in enumerate(embed.fields):
+                if field.name == "ℹ️ Info":
+                    embed.set_field_at(i, name="ℹ️ Info",
+                                       value=f"**Added by:** {self.sound.added_by}\n**Date:** {self.sound.added_date[:10]}\n**File:** `{self.sound.soundfile}`\n**Last edited by:** {self.sound.last_edited_by}",
+                                       inline=True)
+                    break
+
+            await interaction.response.edit_message(content=f"✅ Sound set to **{status}**!", embed=embed, view=self)
         except Exception as e:
             logger.error(f"Toggle private failed: {e}", exc_info=True)
             await interaction.response.send_message("❌ Failed to update!", ephemeral=True)
 
 
 class TriggersModal(discord.ui.Modal, title="Edit Triggers"):
-    def __init__(self, cog, sound_key: str, sound: SoundEntry):
+    def __init__(self, cog, sound_key: str, sound: SoundEntry, parent_view: 'SoundEditView'):
         super().__init__()
         self.cog = cog
         self.sound_key = sound_key
         self.sound = sound
+        self.parent_view = parent_view
 
         self.triggers_input = discord.ui.TextInput(
             label="Triggers (comma-separated)",
@@ -358,10 +466,22 @@ class TriggersModal(discord.ui.Modal, title="Edit Triggers"):
                 return await interaction.response.send_message("❌ At least one trigger required!", ephemeral=True)
 
             self.sound.triggers = new_triggers
+            self.sound.last_edited_by = str(interaction.user)
+            self.sound.last_edited_date = datetime.utcnow().isoformat()
             self.cog.soundboard.sounds[self.sound_key] = self.sound
             save_soundboard(SOUNDBOARD_FILE, self.cog.soundboard)
 
-            logger.info(f"Updated triggers for '{self.sound.title}'")
+            logger.info(f"Updated triggers for '{self.sound.title}' by {interaction.user}")
+
+            # Update the parent view's sound reference
+            self.parent_view.sound = self.sound
+
+            # Update the embed with new data
+            updated_embed = self.parent_view.create_updated_embed()
+
+            # Edit the original message with updated embed
+            await self.parent_view.message.edit(embed=updated_embed, view=self.parent_view)
+
             await interaction.response.send_message(
                 f"✅ Updated triggers: {', '.join(f'`{t}`' for t in new_triggers)}", ephemeral=True
             )
@@ -371,11 +491,12 @@ class TriggersModal(discord.ui.Modal, title="Edit Triggers"):
 
 
 class DescriptionModal(discord.ui.Modal, title="Edit Description"):
-    def __init__(self, cog, sound_key: str, sound: SoundEntry):
+    def __init__(self, cog, sound_key: str, sound: SoundEntry, parent_view: 'SoundEditView'):
         super().__init__()
         self.cog = cog
         self.sound_key = sound_key
         self.sound = sound
+        self.parent_view = parent_view
 
         self.description_input = discord.ui.TextInput(
             label="Description",
@@ -389,13 +510,93 @@ class DescriptionModal(discord.ui.Modal, title="Edit Description"):
     async def on_submit(self, interaction: discord.Interaction):
         try:
             self.sound.description = self.description_input.value.strip()
+            self.sound.last_edited_by = str(interaction.user)
+            self.sound.last_edited_date = datetime.utcnow().isoformat()
             self.cog.soundboard.sounds[self.sound_key] = self.sound
             save_soundboard(SOUNDBOARD_FILE, self.cog.soundboard)
 
-            logger.info(f"Updated description for '{self.sound.title}'")
+            logger.info(f"Updated description for '{self.sound.title}' by {interaction.user}")
+
+            # Update the parent view's sound reference
+            self.parent_view.sound = self.sound
+
+            # Update the embed with new data
+            updated_embed = self.parent_view.create_updated_embed()
+
+            # Edit the original message with updated embed
+            await self.parent_view.message.edit(embed=updated_embed, view=self.parent_view)
+
             await interaction.response.send_message("✅ Description updated!", ephemeral=True)
         except Exception as e:
             logger.error(f"Update description failed: {e}", exc_info=True)
+            await interaction.response.send_message("❌ Failed to update!", ephemeral=True)
+
+
+class VolumeModal(discord.ui.Modal, title="Edit Volume"):
+    def __init__(self, cog, sound_key: str, sound: SoundEntry, parent_view: 'SoundEditView'):
+        super().__init__()
+        self.cog = cog
+        self.sound_key = sound_key
+        self.sound = sound
+        self.parent_view = parent_view
+
+        # Convert current volume to percentage for display
+        current_percent = int(sound.audio_metadata.volume_adjust * 100)
+
+        self.volume_input = discord.ui.TextInput(
+            label="Volume (0 to 200)",
+            default=str(current_percent),
+            style=discord.TextStyle.short,
+            placeholder="100 = normal, 50 = half, 200 = double",
+            max_length=3,
+            required=True
+        )
+        self.add_item(self.volume_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            volume_str = self.volume_input.value.strip()
+
+            # Parse and validate volume percentage
+            try:
+                volume_percent = int(volume_str)
+            except ValueError:
+                return await interaction.response.send_message("❌ Volume must be a whole number!", ephemeral=True)
+
+            if volume_percent < 0 or volume_percent > 200:
+                return await interaction.response.send_message("❌ Volume must be between 0 and 200!", ephemeral=True)
+
+            # Convert percentage to decimal (50 -> 0.5, 100 -> 1.0, 200 -> 2.0)
+            volume_decimal = volume_percent / 100.0
+
+            self.sound.audio_metadata.volume_adjust = volume_decimal
+            self.sound.last_edited_by = str(interaction.user)
+            self.sound.last_edited_date = datetime.utcnow().isoformat()
+            self.cog.soundboard.sounds[self.sound_key] = self.sound
+            save_soundboard(SOUNDBOARD_FILE, self.cog.soundboard)
+
+            logger.info(
+                f"Updated volume for '{self.sound.title}' to {volume_decimal} ({volume_percent}%) by {interaction.user}")
+
+            # Update the parent view's sound reference
+            self.parent_view.sound = self.sound
+
+            # Update the embed with new data
+            updated_embed = self.parent_view.create_updated_embed()
+
+            # Edit the original message with updated embed
+            await self.parent_view.message.edit(embed=updated_embed, view=self.parent_view)
+
+            # Create visual volume bar
+            bars = int((volume_percent / 200.0) * 10)
+            volume_bar = "█" * bars + "░" * (10 - bars)
+
+            await interaction.response.send_message(
+                f"✅ Volume updated to **{volume_percent}%**\n`{volume_bar}`",
+                ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Update volume failed: {e}", exc_info=True)
             await interaction.response.send_message("❌ Failed to update!", ephemeral=True)
 
 
@@ -472,8 +673,7 @@ class SoundboardView(View):
                 value = f"🔊 **Triggers:** {triggers}\n"
                 if sound.description:
                     value += f"📝 {sound.description[:100]}\n"
-                value += f"▶️ Played: {plays} times\n"
-                value += f"👤 Added by: {sound.added_by}"
+                value += f"▶️ Played: {plays} times"
 
                 if sound.is_disabled:
                     value = "⚠️ **[DISABLED]**\n" + value
@@ -494,11 +694,18 @@ class SoundboardView(View):
         if not sound:
             return await interaction.response.send_message("❌ Sound not found!", ephemeral=True)
 
+        # Use last_edited_date for timestamp if available, otherwise added_date
+        timestamp_str = sound.last_edited_date if sound.last_edited_date else sound.added_date
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except:
+            timestamp = datetime.utcnow()
+
         embed = discord.Embed(
             title=f"🎵 {sound.title}",
             description=sound.description or "No description provided.",
             color=discord.Color.green(),
-            timestamp=datetime.utcnow()
+            timestamp=timestamp  # This will show in user's local time at the bottom
         )
 
         embed.add_field(
@@ -513,10 +720,43 @@ class SoundboardView(View):
             inline=True
         )
 
+        # Create volume bar (0-200% scale)
+        volume = sound.audio_metadata.volume_adjust
+        volume_percent = int(volume * 100)
+        bars = int((volume / 2.0) * 10)
+        volume_bar = "█" * bars + "░" * (10 - bars)
+
+        # Format added date as Discord timestamp for local conversion
+        try:
+            added_dt = datetime.fromisoformat(sound.added_date.replace('Z', '+00:00'))
+            added_timestamp = int(added_dt.timestamp())
+            added_display = f"<t:{added_timestamp}:d>"  # Short date format
+        except:
+            added_display = sound.added_date[:10]
+
+        info_value = f"**Added by:** {sound.added_by}\n**Added:** {added_display}"
+
+        if sound.last_edited_by:
+            try:
+                edited_dt = datetime.fromisoformat(sound.last_edited_date.replace('Z', '+00:00'))
+                edited_timestamp = int(edited_dt.timestamp())
+                edited_display = f"<t:{edited_timestamp}:R>"  # Relative time (e.g., "5 minutes ago")
+                info_value += f"\n**Last edited:** {edited_display}\n**Edited by:** {sound.last_edited_by}"
+            except:
+                info_value += f"\n**Last edited by:** {sound.last_edited_by}"
+
+        info_value += f"\n**File:** `{sound.soundfile}`"
+
         embed.add_field(
             name="ℹ️ Info",
-            value=f"**Added by:** {sound.added_by}\n**Date:** {sound.added_date[:10]}\n**File:** `{sound.soundfile}`",
+            value=info_value,
             inline=True
+        )
+
+        embed.add_field(
+            name="🔊 Volume",
+            value=f"`{volume_bar}` **{volume_percent}%**",
+            inline=False
         )
 
         status = []
@@ -528,7 +768,10 @@ class SoundboardView(View):
             embed.add_field(name="Status", value=" • ".join(status), inline=False)
 
         edit_view = SoundEditView(self.cog, sound_key, sound)
-        await interaction.response.send_message(embed=embed, view=edit_view, ephemeral=True)
+        message = await interaction.response.send_message(embed=embed, view=edit_view, ephemeral=True)
+
+        # Store the message reference in the view for later updates
+        edit_view.message = await interaction.original_response()
 
     async def previous_page(self, interaction: discord.Interaction):
         self.page -= 1

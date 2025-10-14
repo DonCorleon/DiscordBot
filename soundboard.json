@@ -11,7 +11,8 @@
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
       "guild_id": "default_guild",
-      "last_edited_by": null,
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T07:39:21.967604",
       "is_private": false,
       "is_disabled": false,
       "approved": true,
@@ -30,7 +31,7 @@
       },
       "audio_metadata": {
         "duration": null,
-        "volume_adjust": 1.0
+        "volume_adjust": 1.25
       },
       "settings": {
         "cooldown": 0,
@@ -51,21 +52,22 @@
       "added_date": "2025-10-12T00:00:00",
       "guild_id": "default_guild",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 30,
-        "month": 30,
-        "total": 30,
+        "week": 31,
+        "month": 31,
+        "total": 31,
         "guild_play_count": {
           "default_guild": 11,
           "1410579846379081801": 8,
-          "1386497411278573652": 5
+          "1386497411278573652": 6
         },
-        "last_played": "2025-10-13T13:26:11.590600",
+        "last_played": "2025-10-14T08:20:38.599563",
         "played_by": [
-          "696940351977422878"
+          "541466211180085248"
         ]
       },
       "audio_metadata": {
@@ -89,20 +91,21 @@
       "added_by_id": "0",
       "added_date": "2025-01-01T00:00:00",
       "guild_id": "default_guild",
-      "last_edited_by": null,
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T07:37:27.914583",
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 146,
-        "month": 146,
-        "total": 146,
+        "week": 149,
+        "month": 149,
+        "total": 149,
         "guild_play_count": {
           "default_guild": 49,
-          "1410579846379081801": 6,
-          "1386497411278573652": 44
+          "1410579846379081801": 8,
+          "1386497411278573652": 45
         },
-        "last_played": "2025-10-13T13:26:14.996524",
+        "last_played": "2025-10-14T08:18:37.248083",
         "played_by": [
           "696940351977422878"
         ]
@@ -129,19 +132,20 @@
       "added_date": "2025-01-01T00:00:00",
       "guild_id": "default_guild",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 8,
-        "month": 8,
-        "total": 8,
+        "week": 10,
+        "month": 10,
+        "total": 10,
         "guild_play_count": {
           "default_guild": 1,
           "1386497411278573652": 5,
-          "1410579846379081801": 2
+          "1410579846379081801": 4
         },
-        "last_played": "2025-10-13T09:37:58.473185",
+        "last_played": "2025-10-14T07:13:53.072913",
         "played_by": [
           "696940351977422878"
         ]
@@ -167,6 +171,7 @@
       "added_date": "2025-01-01T00:00:00",
       "guild_id": "default_guild",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
@@ -206,21 +211,22 @@
       "added_date": "2025-01-01T00:00:00",
       "guild_id": "default_guild",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 27,
-        "month": 27,
-        "total": 27,
+        "week": 28,
+        "month": 28,
+        "total": 28,
         "guild_play_count": {
           "1410579846379081801": 3,
           "default_guild": 12,
-          "1386497411278573652": 2
+          "1386497411278573652": 3
         },
-        "last_played": "2025-10-13T09:29:03.535708",
+        "last_played": "2025-10-14T08:06:09.762955",
         "played_by": [
-          "696940351977422878"
+          "541466211180085248"
         ]
       },
       "audio_metadata": {
@@ -245,21 +251,22 @@
       "added_date": "2025-10-12T08:55:18.648574",
       "guild_id": "default_guild",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 126,
-        "month": 126,
-        "total": 126,
+        "week": 130,
+        "month": 130,
+        "total": 130,
         "guild_play_count": {
           "default_guild": 40,
           "1410579846379081801": 7,
-          "1386497411278573652": 41
+          "1386497411278573652": 45
         },
-        "last_played": "2025-10-13T13:26:49.043124",
+        "last_played": "2025-10-14T08:20:58.405838",
         "played_by": [
-          "696940351977422878"
+          "215475216409821184"
         ]
       },
       "audio_metadata": {
@@ -283,6 +290,7 @@
       "added_date": "2025-10-12T10:02:14.991445",
       "guild_id": "default_guild",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
@@ -322,20 +330,21 @@
       "added_date": "2025-10-12T10:58:55.886874",
       "guild_id": "1386497411278573652",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 31,
-        "month": 31,
-        "total": 31,
+        "week": 32,
+        "month": 32,
+        "total": 32,
         "guild_play_count": {
-          "1386497411278573652": 19,
+          "1386497411278573652": 20,
           "1410579846379081801": 12
         },
-        "last_played": "2025-10-13T13:26:59.618720",
+        "last_played": "2025-10-14T08:17:05.904611",
         "played_by": [
-          "696940351977422878"
+          "215475216409821184"
         ]
       },
       "audio_metadata": {
@@ -359,26 +368,27 @@
       "added_by_id": "696940351977422878",
       "added_date": "2025-10-13T10:37:06.580971",
       "guild_id": "1386497411278573652",
-      "last_edited_by": null,
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T08:03:48.994000",
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 20,
-        "month": 20,
-        "total": 20,
+        "week": 36,
+        "month": 36,
+        "total": 36,
         "guild_play_count": {
-          "1386497411278573652": 12,
-          "1410579846379081801": 8
+          "1386497411278573652": 25,
+          "1410579846379081801": 11
         },
-        "last_played": "2025-10-13T13:26:53.903490",
+        "last_played": "2025-10-14T08:37:44.347585",
         "played_by": [
           "696940351977422878"
         ]
       },
       "audio_metadata": {
         "duration": null,
-        "volume_adjust": 1.0
+        "volume_adjust": 1.25
       },
       "settings": {
         "cooldown": 0,
@@ -399,18 +409,172 @@
       "added_date": "2025-10-13T11:10:22.133852",
       "guild_id": "1410579846379081801",
       "last_edited_by": null,
+      "last_edited_date": null,
       "is_private": false,
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 18,
-        "month": 18,
-        "total": 18,
+        "week": 26,
+        "month": 26,
+        "total": 26,
         "guild_play_count": {
-          "1386497411278573652": 8,
+          "1386497411278573652": 16,
           "1410579846379081801": 10
         },
-        "last_played": "2025-10-13T13:28:27.443939",
+        "last_played": "2025-10-14T08:12:12.133643",
+        "played_by": [
+          "215475216409821184"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "quack_-_cowboy": {
+      "title": "Quack - Cowboy",
+      "triggers": [
+        "quack",
+        "duck"
+      ],
+      "soundfile": "soundboard/quack3.mp3",
+      "description": "cowboy quack",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:17:31.658090",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T08:19:30.149304",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 1,
+        "month": 1,
+        "total": 1,
+        "guild_play_count": {
+          "1386497411278573652": 1
+        },
+        "last_played": "2025-10-14T08:18:52.496833",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.5
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "angry_quack": {
+      "title": "Angry Quack",
+      "triggers": [
+        "quack",
+        "duck"
+      ],
+      "soundfile": "soundboard/Quack-angry.mp3",
+      "description": "Angry Quack",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:18:29.126281",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T08:19:46.120195",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 2,
+        "month": 2,
+        "total": 2,
+        "guild_play_count": {
+          "1386497411278573652": 2
+        },
+        "last_played": "2025-10-14T08:19:09.679365",
+        "played_by": [
+          "215475216409821184"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.5
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "dry_fart": {
+      "title": "Dry Fart",
+      "triggers": [
+        "shit",
+        "fart"
+      ],
+      "soundfile": "soundboard/dry-fart.mp3",
+      "description": "Dry Fart",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:23:39.127921",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 5,
+        "month": 5,
+        "total": 5,
+        "guild_play_count": {
+          "1386497411278573652": 3,
+          "1410579846379081801": 2
+        },
+        "last_played": "2025-10-14T08:37:33.633937",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "perfect_fart": {
+      "title": "Perfect Fart",
+      "triggers": [
+        "shit",
+        "fart"
+      ],
+      "soundfile": "soundboard/perfect-fart.mp3",
+      "description": "Perfect fart",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:24:12.124179",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 5,
+        "month": 5,
+        "total": 5,
+        "guild_play_count": {
+          "1410579846379081801": 5
+        },
+        "last_played": "2025-10-14T08:37:41.250828",
         "played_by": [
           "696940351977422878"
         ]
