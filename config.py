@@ -10,13 +10,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 @dataclass
 class BotConfig:
     """Main bot configuration."""
 
     # Discord Configuration
     token: str
-    command_prefix: str | list[str] = "~,^"
+    command_prefix: str | list[str] = "~"
 
     # Admin Interface Configuration
     # Set to False for headless servers (no pygame dashboard)
@@ -31,6 +32,11 @@ class BotConfig:
     default_volume: float = 0.5
     keepalive_interval: int = 30
     max_queue_size: int = 50
+
+    # Audio Ducking Configuration
+    ducking_enabled: bool = True  # Enable ducking by default
+    ducking_level: float = 0.5  # 50% volume when ducked
+    ducking_transition_ms: int = 50  # 50ms smooth transition
 
     # File Storage
     soundboard_dir: str = "soundboard"
@@ -47,9 +53,13 @@ class BotConfig:
     @classmethod
     def from_env(cls):
         """Create config from environment variables."""
-        # Handle command prefix - convert comma-separated string to list
-        prefix_str = os.getenv("COMMAND_PREFIX", "~,^")
-        command_prefix = [p.strip() for p in prefix_str.split(",") if p.strip()]
+        # Handle command prefix - support both single and multiple prefixes
+        prefix_str = os.getenv("COMMAND_PREFIX", "~")
+        # If comma-separated, split into list
+        if "," in prefix_str:
+            command_prefix = [p.strip() for p in prefix_str.split(",") if p.strip()]
+        else:
+            command_prefix = prefix_str
 
         return cls(
             token=os.getenv("DISCORD_TOKEN"),
@@ -60,6 +70,10 @@ class BotConfig:
             data_export_interval=int(os.getenv("DATA_EXPORT_INTERVAL", "10")),
             default_volume=float(os.getenv("DEFAULT_VOLUME", "0.5")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
+            # Audio ducking settings
+            ducking_enabled=os.getenv("DUCKING_ENABLED", "true").lower() == "true",
+            ducking_level=float(os.getenv("DUCKING_LEVEL", "0.5")),
+            ducking_transition_ms=int(os.getenv("DUCKING_TRANSITION_MS", "50")),
         )
 
     def display(self):
@@ -75,6 +89,7 @@ Max History: {self.max_history} entries
 Health Collection: Every {self.health_collection_interval}s
 Data Export: {'Every ' + str(self.data_export_interval) + 's' if self.enable_admin_dashboard else 'Disabled'}
 Default Volume: {self.default_volume}
+Audio Ducking: {'Enabled' if self.ducking_enabled else 'Disabled'} (Level: {int(self.ducking_level * 100)}%)
 Log Level: {self.log_level}
 Auto Disconnect: {self.enable_auto_disconnect}
 Speech Recognition: {self.enable_speech_recognition}
