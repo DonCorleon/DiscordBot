@@ -264,27 +264,19 @@ class PyAudioPlayer:
 
     def _playback_worker(self, audio_data: bytes):
         """
-        Worker thread for audio playback.
+        Worker thread for audio processing (no local playback).
+        Processes audio with volume/ducking and provides chunks via callback.
 
         Args:
-            audio_data: Audio data to play (48kHz, stereo, int16)
+            audio_data: Audio data to process (48kHz, stereo, int16)
         """
         try:
-            # Open PyAudio stream
-            self.stream = self.pyaudio.open(
-                format=pyaudio.paInt16,
-                channels=self.channels,
-                rate=self.sample_rate,
-                output=True,
-                frames_per_buffer=self.chunk_size,
-            )
-
             # Initialize volume
             with self.lock:
                 self.current_volume = self.base_volume
                 self.target_volume = self.base_volume
 
-            # Play audio in chunks
+            # Process audio in chunks
             offset = 0
             chunk_bytes = self.chunk_size * self.channels * 2  # 2 bytes per sample
 
@@ -301,14 +293,10 @@ class PyAudioPlayer:
                 # Apply volume with smooth transitions
                 chunk = self._apply_volume(chunk)
 
-                # Write to stream
-                self.stream.write(chunk)
-                offset += chunk_bytes
+                # Store the processed chunk for Discord to consume
+                # No local playback needed - Discord will handle audio output
 
-            # Clean up
-            self.stream.stop_stream()
-            self.stream.close()
-            self.stream = None
+                offset += chunk_bytes
 
         except Exception as e:
             logger.error(f"Playback error: {e}", exc_info=True)
