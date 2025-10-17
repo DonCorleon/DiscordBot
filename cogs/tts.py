@@ -1,6 +1,9 @@
+"""
+Updated TTS Cog with ducking support via queue system.
+"""
+
 import discord
 from discord.ext import commands
-from discord import FFmpegPCMAudio
 import pyttsx3
 import asyncio
 import tempfile
@@ -15,7 +18,7 @@ PREFERENCES_FILE = "tts_preferences.json"
 
 
 class TtsCog(BaseCog):
-    """Local TTS Cog using pyttsx3 for offline speech in VC with queue integration."""
+    """Local TTS Cog using pyttsx3 for offline speech in VC with queue integration and ducking support."""
 
     voices = [
         {"name": "James", "country": "Australia", "gender": "male", "voice": "Microsoft James - English (Australia)"},
@@ -197,49 +200,33 @@ class TtsCog(BaseCog):
         return temp_file.name
 
     async def queue_tts(self, ctx, text: str, name=None, gender=None, country=None, rate=150):
-        """Generate TTS and queue it for playback."""
+        """Generate TTS and queue it for playback WITH DUCKING SUPPORT."""
         voice_cog = self.bot.get_cog("VoiceSpeechCog")
         if not voice_cog:
             logger.error("VoiceSpeechCog not found!")
-            return await ctx.send("Voice system not available!")
+            return await ctx.send("❌ Voice system not available!")
 
         chunks = self.split_text(text)
 
         if len(chunks) > 1:
-            await ctx.send(f"Splitting message into {len(chunks)} parts...")
+            await ctx.send(f"📝 Splitting message into {len(chunks)} parts...")
 
         for i, chunk in enumerate(chunks):
             try:
                 filepath = await self.generate_tts_file(chunk, name=name, gender=gender, country=country, rate=rate)
+                # Use the queue_sound method which supports ducking!
                 await voice_cog.queue_sound(ctx.guild.id, filepath, ctx.author, None, 1.0)
                 logger.info(f"[{ctx.guild.name}] Queued TTS chunk {i + 1}/{len(chunks)}: '{chunk[:50]}...'")
             except Exception as e:
                 logger.error(f"Failed to queue TTS chunk {i + 1}: {e}", exc_info=True)
-                await ctx.send(f"Failed to queue part {i + 1}")
+                await ctx.send(f"❌ Failed to queue part {i + 1}")
 
-    @commands.command(name="say", help="Speak text in voice channel")
-    async def say(self, ctx, *, message: str = None):
-        """Speak text using TTS with optional voice settings."""
+    @commands.command(name="say", help="Speak text in voice channel with ducking support")
+    async def say(self, ctx, *, message: str):
+        """Speak text using TTS with optional voice settings. Now with ducking!"""
         vc = ctx.voice_client
         if not vc:
-            return await ctx.send("I'm not connected to a voice channel! Use ~join first.")
-
-        # Check for attachments if no message provided
-        if not message and ctx.message.attachments:
-            attachment = ctx.message.attachments[0]
-            if attachment.filename.endswith('.txt'):
-                try:
-                    content = await attachment.read()
-                    message = content.decode('utf-8')
-                    await ctx.send(f"Reading from attachment: {attachment.filename}")
-                except Exception as e:
-                    logger.error(f"Failed to read attachment: {e}", exc_info=True)
-                    return await ctx.send(f"Failed to read attachment: {e}")
-            else:
-                return await ctx.send("Please attach a .txt file!")
-
-        if not message:
-            return await ctx.send("Please provide text or attach a .txt file!")
+            return await ctx.send("⚠️ I'm not connected to a voice channel! Use ~join first.")
 
         prefs = self.get_user_preferences(ctx.author.id)
         gender = prefs["gender"]
@@ -265,7 +252,7 @@ class TtsCog(BaseCog):
                     try:
                         rate = int(value)
                     except ValueError:
-                        return await ctx.send("Rate must be a number!")
+                        return await ctx.send("❌ Rate must be a number!")
                 i += 2
             else:
                 text_parts.append(words[i])
@@ -273,49 +260,43 @@ class TtsCog(BaseCog):
 
         text = " ".join(text_parts)
         if not text:
-            return await ctx.send("No text to speak!")
+            return await ctx.send("⚠️ No text to speak!")
 
-        voice_info = []
-        if name:
-            voice_info.append(f"Name: {name}")
-        if gender:
-            voice_info.append(f"Gender: {gender}")
-        if country:
-            voice_info.append(f"Country: {country}")
-        if rate != 150:
-            voice_info.append(f"Rate: {rate}")
-
-        status_msg = f"Speaking: `{text[:100]}{'...' if len(text) > 100 else ''}`"
-        if voice_info:
-            status_msg += f"\nSettings: {' - '.join(voice_info)}"
-
-        await ctx.send(status_msg)
         await self.queue_tts(ctx, text, name=name, gender=gender, country=country, rate=rate)
+        await ctx.send(f"💬 Queued TTS message (with ducking support!)")
 
-    @commands.command(name="setvoice", help="Set your default TTS voice preferences")
-    async def setvoice(self, ctx, *, settings: str = None):
-        """Set your default TTS voice preferences."""
-        if settings and settings.lower() == "reset":
-            user_id_str = str(ctx.author.id)
-            if user_id_str in self.user_preferences:
-                del self.user_preferences[user_id_str]
-                self.save_preferences()
-                await ctx.send("Voice preferences reset to defaults!")
-            else:
-                await ctx.send("You don't have any saved preferences.")
-            return
+    @commands.command(name="voices", help="List available TTS voices")
+    async def list_voices(self, ctx):
+        """List all available TTS voices."""
+        voice_list = []
+        for v in self.voices:
+            voice_list.append(f"**{v['name']}** ({v['gender']}, {v['country']})")
 
-        if not settings:
+        chunks = [voice_list[i:i + 10] for i in range(0, len(voice_list), 10)]
+
+        for i, chunk in enumerate(chunks):
+            embed = discord.Embed(
+                title=f"🎙️ Available TTS Voices (Page {i + 1}/{len(chunks)})",
+                description="\n".join(chunk),
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Use ~setvoice to configure your preferences")
+            await ctx.send(embed=embed)
+
+    @commands.command(name="setvoice", help="Set your TTS voice preferences")
+    async def set_voice(self, ctx, *, args: str = None):
+        """Set TTS voice preferences. Example: ~setvoice --gender male --country australia --rate 150"""
+        if not args:
             prefs = self.get_user_preferences(ctx.author.id)
-            embed = discord.Embed(title="Your TTS Voice Preferences", color=discord.Color.blue())
-            embed.add_field(name="Name", value=prefs["name"] or "Not set", inline=True)
-            embed.add_field(name="Gender", value=prefs["gender"] or "Not set", inline=True)
-            embed.add_field(name="Country", value=prefs["country"] or "Not set", inline=True)
-            embed.add_field(name="Rate", value=str(prefs["rate"]), inline=True)
-            embed.set_footer(text="Use ~setvoice --name <n> --gender <g> --country <c> --rate <r> to update")
+            embed = discord.Embed(title="🎙️ Your TTS Preferences", color=discord.Color.green())
+            embed.add_field(name="Name", value=prefs["name"] or "Auto", inline=True)
+            embed.add_field(name="Gender", value=prefs["gender"] or "Auto", inline=True)
+            embed.add_field(name="Country", value=prefs["country"] or "Auto", inline=True)
+            embed.add_field(name="Rate", value=prefs["rate"], inline=True)
+            embed.set_footer(text="Use ~setvoice --gender male --country australia --rate 150")
             return await ctx.send(embed=embed)
 
-        words = settings.split()
+        words = args.split()
         updates = {}
         i = 0
 
@@ -323,55 +304,22 @@ class TtsCog(BaseCog):
             if words[i].startswith("--") and i + 1 < len(words):
                 key = words[i][2:].lower()
                 value = words[i + 1]
-                if key == "gender":
-                    updates["gender"] = value
-                elif key == "country":
-                    updates["country"] = value
-                elif key == "name":
-                    updates["name"] = value
+                if key in ["name", "gender", "country"]:
+                    updates[key] = value
                 elif key == "rate":
                     try:
                         updates["rate"] = int(value)
                     except ValueError:
-                        return await ctx.send("Rate must be a number!")
+                        return await ctx.send("❌ Rate must be a number!")
                 i += 2
             else:
                 i += 1
 
-        if not updates:
-            return await ctx.send("No valid settings provided! Use --name, --gender, --country, or --rate")
-
-        self.set_user_preferences(ctx.author.id, **updates)
-        prefs = self.get_user_preferences(ctx.author.id)
-
-        embed = discord.Embed(title="Voice Preferences Updated", color=discord.Color.green())
-        embed.add_field(name="Name", value=prefs["name"] or "Not set", inline=True)
-        embed.add_field(name="Gender", value=prefs["gender"] or "Not set", inline=True)
-        embed.add_field(name="Country", value=prefs["country"] or "Not set", inline=True)
-        embed.add_field(name="Rate", value=str(prefs["rate"]), inline=True)
-        await ctx.send(embed=embed)
-
-    @commands.command(name="voices", help="List available TTS voices")
-    async def list_voices(self, ctx):
-        """Show all available TTS voices grouped by country."""
-        embed = discord.Embed(
-            title="Available TTS Voices",
-            description="Use ~setvoice --name <n> to set your default voice",
-            color=discord.Color.blue()
-        )
-
-        by_country = {}
-        for voice in self.voices:
-            country = voice["country"]
-            if country not in by_country:
-                by_country[country] = []
-            by_country[country].append(f"**{voice['name']}** ({voice['gender']})")
-
-        for country, voices_list in sorted(by_country.items()):
-            embed.add_field(name=f"{country}", value="\n".join(voices_list), inline=False)
-
-        embed.set_footer(text="Tip: Use --rate to adjust speaking speed (default: 150)")
-        await ctx.send(embed=embed)
+        if updates:
+            self.set_user_preferences(ctx.author.id, **updates)
+            await ctx.send(f"✅ Updated your TTS preferences!")
+        else:
+            await ctx.send("⚠️ No valid preferences found. Use: ~setvoice --gender male --country australia")
 
 
 async def setup(bot):
