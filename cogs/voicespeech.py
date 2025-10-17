@@ -174,14 +174,24 @@ class VoiceSpeechCog(BaseCog):
                     return
 
                 guild_name = ctx.guild.name
+
+                # NEW FORMAT: Include user_id in the log
+                # Format: [timestamp] [guild] [user_id] [display_name] : text
                 logger.info(
-                    f"\033[92m[{guild_name}] [{user.display_name}] : {transcribed_text}\033[0m")
+                    f"\033[92m[{guild_name}] [{user.id}] [{user.display_name}] : {transcribed_text}\033[0m"
+                )
+
+                # Update user info in data collector
+                from utils.admin_data_collector import get_data_collector
+                data_collector = get_data_collector()
+                if data_collector:
+                    data_collector.update_user_info(user)
 
                 soundboard_cog = self.bot.get_cog("Soundboard")
                 if not soundboard_cog:
                     return
 
-                # Get list of (soundfile, sound_key, volume) tuples
+                # Rest of your existing code...
                 files = soundboard_cog.get_soundfiles_for_text(ctx.guild.id, user.id, transcribed_text)
                 if files:
                     async def queue_all():
@@ -190,6 +200,7 @@ class VoiceSpeechCog(BaseCog):
                                 await self.queue_sound(ctx.guild.id, soundfile, user, sound_key, volume)
 
                     asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
+
             except Exception as e:
                 logger.error(f"Error in text_callback: {e}", exc_info=True)
 
@@ -199,11 +210,11 @@ class VoiceSpeechCog(BaseCog):
 
             @voice_recv.AudioSink.listener()
             def on_voice_member_speaking_start(self, member: discord.Member):
-                logger.info(f"🎤 {member.display_name} started speaking")
+                logger.debug(f"🎤 {member.display_name} started speaking")
 
             @voice_recv.AudioSink.listener()
             def on_voice_member_speaking_stop(self, member: discord.Member):
-                logger.info(f"🔇 {member.display_name} stopped speaking")
+                logger.debug(f"🔇 {member.display_name} stopped speaking")
 
         return SRListener()
 

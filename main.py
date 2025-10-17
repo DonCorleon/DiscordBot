@@ -2,9 +2,10 @@ import discord
 from discord.ext import commands, voice_recv
 import os
 from datetime import datetime, UTC
-from bottoken import TOKEN
 import logging
 from logging.handlers import TimedRotatingFileHandler
+from config import config
+from utils.admin_data_collector import initialize_data_collector
 
 os.makedirs("logs", exist_ok=True)
 
@@ -65,43 +66,31 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
-bot = commands.Bot(command_prefix="~", intents=intents, help_command=None)
+bot = commands.Bot(command_prefix=config.command_prefix, intents=intents, help_command=None)
 bot.start_time = datetime.now(UTC)
+
+# Initialize data collector with config settings
+data_collector = initialize_data_collector(
+    bot,
+    max_history=config.max_history,
+    enable_export=config.enable_admin_dashboard
+)
 
 @bot.event
 async def on_ready():
     logger.info(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    # Start data collection
+    await data_collector.start()
 
     for filename in os.listdir("./cogs"):
         if filename.endswith(".py"):
             await bot.load_extension(f"cogs.{filename[:-3]}")
-'''
-@bot.event
-async def on_message(message):
-    # Ignore messages from bots
-    if message.author.bot:
-        return
-
-    if message.guild is None:
-        # Message is in a DM
-        logger.info(f"Received DM from {message.author}: {message.content}")
-
-        # Construct a context
-        ctx = await bot.get_context(message)
-
-        # Assign a dummy guild if commands rely on ctx.guild.id
-        if not ctx.guild:
-            ctx.guild = type("Guild", (), {"id": "DM"})()  # dummy guild object
-
-        # Process commands
-        await bot.process_commands(message)
+    if config.enable_admin_dashboard:
+        logger.info("📊 Admin dashboard enabled - Data exporting to admin_data/")
     else:
-        # Message is in a guild
-        logger.info(f"Guild {message.guild.id} - {message.author}: {message.content}")
-        await bot.process_commands(message)
-'''
+        logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
 
 # -----------------------
 # Run the bot
 # -----------------------
-bot.run(TOKEN)
+bot.run(config.token)

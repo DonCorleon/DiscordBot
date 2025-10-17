@@ -1,101 +1,73 @@
-import discord
+import os
 from discord.ext import commands
 from discord.ui import View, Select
-from datetime import datetime
-
-from cogs.soundboard import Soundboard  # your existing soundboard cog
-
-class TestSoundboardView(discord.ui.View):
-    def __init__(self, cog: Soundboard, guild_id: str, sounds: dict, page: int = 0):
-        super().__init__(timeout=300)
-        self.cog = cog
-        self.guild_id = guild_id
-        self.sounds = list(sounds.items())
-        self.page = page
-        self.sounds_per_page = 4
-        self.update_view()
-
-    def update_view(self):
-        self.clear_items()
-        start = self.page * self.sounds_per_page
-        end = start + self.sounds_per_page
-        page_sounds = self.sounds[start:end]
-
-        options = []
-
-        # Previous page at top
-        if self.page > 0:
-            options.append(discord.SelectOption(label="◀ Previous", value="__prev__"))
-
-        # Sound items
-        for key, sound in page_sounds:
-            triggers_text = ", ".join(sound.triggers[:3])
-            if len(sound.triggers) > 3:
-                triggers_text += "..."
-            options.append(discord.SelectOption(
-                label=sound.title[:100],
-                value=key,
-                description=(f"Triggers: {triggers_text}")[:100] if triggers_text else "No triggers",
-                emoji="🔊"
-            ))
-
-        # Next page at bottom
-        total_pages = (len(self.sounds) - 1) // self.sounds_per_page
-        if self.page < total_pages:
-            options.append(discord.SelectOption(label="Next ▶", value="__next__"))
-
-        select = Select(placeholder="Select a sound...", options=options)
-        select.callback = self.select_callback
-        self.add_item(select)
-
-    async def select_callback(self, interaction: discord.Interaction):
-        selected = interaction.data["values"][0]
-
-        if selected in ("__prev__", "__next__"):
-            if selected == "__prev__":
-                self.page -= 1
-            else:
-                self.page += 1
-
-            self.update_view()
-            await interaction.response.edit_message(view=self)  # refresh dropdown
-            return
-
-        # Normal sound selected
-        sound = dict(self.sounds)[selected]
-        embed = discord.Embed(
-            title=sound.title,
-            description=sound.description or "No description",
-            color=discord.Color.green(),
-            timestamp=datetime.utcnow()
-        )
-        embed.add_field(name="Triggers", value=", ".join(sound.triggers) or "None")
-        embed.add_field(name="File", value=sound.soundfile)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
+from discord import SelectOption
 
 class TestCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.per_page = 25  # items per page
 
-    @commands.command(name="test", help="Trial soundboard dropdown")
+    @commands.command()
     async def test(self, ctx):
-        soundboard_cog: Soundboard = self.bot.get_cog("Soundboard")
-        if not soundboard_cog:
-            return await ctx.send("❌ Soundboard cog not loaded!")
+        """Dynamic dropdown test for soundboard."""
+        # Example sounds, replace with your real sound file names
+        sounds = [f"Sound_{i}" for i in range(1, 101)]
+        view = SoundboardDropdown(sounds, ctx)
+        await ctx.send("Select a sound:", view=view)
 
-        guild_id = str(ctx.guild.id)
-        # Filter non-private sounds
-        filtered_sounds = {
-            k: s for k, s in soundboard_cog.soundboard.sounds.items()
-            if not s.is_private or s.guild_id == guild_id
-        }
 
-        if not filtered_sounds:
-            return await ctx.send("📭 No sounds available!")
+class SoundboardDropdown(View):
+    def __init__(self, sounds: list[str], ctx, page: int = 0):
+        super().__init__(timeout=300)
+        self.sounds = sounds
+        self.ctx = ctx
+        self.page = page
+        self.per_page = 25
+        self.update_dropdown()
 
-        view = TestSoundboardView(soundboard_cog, guild_id, filtered_sounds)
-        await ctx.send("🎵 Select a sound:", view=view)
+    def update_dropdown(self):
+        self.clear_items()
+        total_pages = (len(self.sounds) - 1) // self.per_page + 1
+        start = self.page * self.per_page
+        end = start + self.per_page
+        options = [SelectOption(label=s, value=s) for s in self.sounds[start:end]]
+
+        # Add pagination options
+        if self.page > 0:
+            options.insert(0, SelectOption(label="◀ Previous Page", value="prev_page"))
+        if self.page < total_pages - 1:
+            options.append(SelectOption(label="Next Page ▶", value="next_page"))
+
+        select = Select(placeholder=f"Page {self.page + 1}/{total_pages}", options=options)
+        select.callback = self.on_select
+        self.add_item(select)
+
+    async def on_select(self, interaction):
+        value = interaction.data["values"][0]
+
+        if value == "prev_page":
+            self.page -= 1
+            self.update_dropdown()
+            await interaction.response.edit_message(view=self)
+        elif value == "next_page":
+            self.page += 1
+            self.update_dropdown()
+            await interaction.response.edit_message(view=self)
+        else:
+            # Attempt to play the selected sound if user is in VC
+            vc = self.ctx.voice_client
+            sound_file = f"sounds/{value}.mp3"  # adjust path as needed
+
+            if vc and os.path.isfile(sound_file):
+                from discord import FFmpegPCMAudio
+                source = FFmpegPCMAudio(sound_file)
+                vc.play(source)
+                await interaction.response.send_message(f"▶ Playing: {value}", ephemeral=True)
+            else:
+                await interaction.response.send_message(
+                    f"⚠ Cannot play '{value}' (join VC first or file missing)", ephemeral=True
+                )
 
 
 async def setup(bot):

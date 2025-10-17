@@ -10,6 +10,7 @@ class EdgeTTS(commands.Cog):
         self.voices = []
         self.voice_map = {}
         self.user_last_voice = {}  # user_id -> voice shortname
+        self.volume = 1.5
 
     async def load_voices(self):
         if not self.voices:
@@ -21,7 +22,7 @@ class EdgeTTS(commands.Cog):
             ]]
             self.voice_map = {i + 1: v["ShortName"] for i, v in enumerate(common)}
 
-    @commands.command(name="voices", help="List available Edge TTS voices")
+    @commands.command(name="edgevoices", help="List available Edge TTS voices")
     async def list_voices(self, ctx):
         await self.load_voices()
         text = "\n".join([f"{i}. {name}" for i, name in self.voice_map.items()])
@@ -66,6 +67,7 @@ class EdgeTTS(commands.Cog):
         audio_data.seek(0)
 
         source = discord.FFmpegPCMAudio(audio_data, pipe=True)
+        source = discord.PCMVolumeTransformer(source, volume=self.volume)
         vc.play(source)
         await ctx.send(f"💬 Speaking in **{voice}**")
 
