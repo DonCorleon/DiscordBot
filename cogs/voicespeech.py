@@ -1,22 +1,17 @@
-"""
-Updated VoiceSpeechCog with PyAudio and audio ducking support.
-"""
-
+# voicespeech.py
 import json
 import discord
+from discord import FFmpegPCMAudio
 from discord.ext import commands, voice_recv
 from discord.ext.voice_recv.extras import speechrecognition as dsr
 import asyncio
 import os
+from datetime import datetime
 from base_cog import BaseCog, logger
-from utils.pyaudio_player import PyAudioPlayer
+from utils.discord_audio_source import DuckedAudioSource
 
 
 class VoiceSpeechCog(BaseCog):
-    """
-    Voice and speech recognition cog with audio ducking.
-    Automatically reduces volume when users speak.
-    """
 
     def __init__(self, bot):
         super().__init__(bot)
@@ -27,37 +22,14 @@ class VoiceSpeechCog(BaseCog):
         self.sound_queues = {}  # {guild_id: asyncio.Queue}
         self.queue_tasks = {}  # {guild_id: Task}
 
-        # PyAudio players per guild
-        self.audio_players = {}  # {guild_id: PyAudioPlayer}
+        # NEW: Track current audio sources for ducking control
+        self.current_sources = {}  # {guild_id: DuckedAudioSource}
 
-        # Ducking configuration per guild
+        # NEW: Ducking configuration per guild
         self.ducking_config = {}  # {guild_id: {"enabled": bool, "level": float}}
 
-        # Track speaking users per guild
+        # NEW: Track speaking users per guild
         self.speaking_users = {}  # {guild_id: set(user_ids)}
-
-    def _get_or_create_player(self, guild_id: int) -> PyAudioPlayer:
-        """Get or create a PyAudio player for a guild."""
-        if guild_id not in self.audio_players:
-            # Get ducking configuration
-            config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
-
-            player = PyAudioPlayer(
-                ducking_level=config["level"],
-                duck_transition_ms=50
-            )
-            self.audio_players[guild_id] = player
-            logger.info(
-                f"[Guild {guild_id}] Created PyAudio player (ducking: {config['enabled']}, level: {config['level'] * 100}%)")
-
-        return self.audio_players[guild_id]
-
-    def _cleanup_player(self, guild_id: int):
-        """Clean up PyAudio player for a guild."""
-        if guild_id in self.audio_players:
-            self.audio_players[guild_id].cleanup()
-            del self.audio_players[guild_id]
-            logger.debug(f"[Guild {guild_id}] Cleaned up PyAudio player")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
@@ -89,8 +61,13 @@ class VoiceSpeechCog(BaseCog):
                     logger.error(f"[{member.guild.name}] Error stopping listener: {e}")
                 del self.active_sinks[guild_id]
 
-            # Clean up audio player
-            self._cleanup_player(guild_id)
+            # Clean up current source
+            if guild_id in self.current_sources:
+                try:
+                    self.current_sources[guild_id].cleanup()
+                except:
+                    pass
+                del self.current_sources[guild_id]
 
             # Clear speaking users
             if guild_id in self.speaking_users:
@@ -131,6 +108,13 @@ class VoiceSpeechCog(BaseCog):
                 except Exception as e:
                     logger.error(f"Error stopping sink for guild {guild_id}: {e}")
 
+        # Clean up audio sources
+        for guild_id in list(self.current_sources.keys()):
+            try:
+                self.current_sources[guild_id].cleanup()
+            except:
+                pass
+
         # Disconnect from voice
         for guild in self.bot.guilds:
             if guild.voice_client:
@@ -139,20 +123,16 @@ class VoiceSpeechCog(BaseCog):
                 except Exception as e:
                     logger.error(f"Error disconnecting from guild {guild.id}: {e}")
 
-        # Clean up all audio players
-        for guild_id in list(self.audio_players.keys()):
-            self._cleanup_player(guild_id)
-
         self.active_sinks.clear()
         self.sound_queues.clear()
         self.queue_tasks.clear()
+        self.current_sources.clear()
         self.speaking_users.clear()
         logger.info("VoiceSpeechCog cleanup complete.")
 
     async def _process_sound_queue(self, guild_id: int, default_volume: float = 0.5):
-        """Process the sound queue for a guild."""
+        """Process sound queue with ducking support."""
         queue = self.sound_queues[guild_id]
-        player = self._get_or_create_player(guild_id)
 
         try:
             while True:
@@ -168,44 +148,69 @@ class VoiceSpeechCog(BaseCog):
                     queue.task_done()
                     continue
 
+                event = asyncio.Event()
+
+                def after_callback(error):
+                    if error:
+                        logger.error(f"[Guild {guild_id}] Playback error for '{soundfile}': {error}",
+                                     exc_info=error)
+                    else:
+                        logger.debug(f"[Guild {guild_id}] Finished playing '{soundfile}'")
+
+                    # Clean up source
+                    if guild_id in self.current_sources:
+                        try:
+                            self.current_sources[guild_id].cleanup()
+                        except:
+                            pass
+                        del self.current_sources[guild_id]
+
+                    self.bot.loop.call_soon_threadsafe(event.set)
+
                 # Calculate effective volume
                 effective_volume = volume * default_volume
 
-                # Set up playback completion event
-                event = asyncio.Event()
+                # Get ducking config
+                config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
 
-                def on_playback_finished():
-                    """Callback when playback finishes."""
-                    logger.debug(f"[Guild {guild_id}] Finished playing '{soundfile}'")
-                    self.bot.loop.call_soon_threadsafe(event.set)
-
+                # Create ducked audio source
                 try:
-                    # Play using PyAudio with ducking support
-                    player.play(
+                    source = DuckedAudioSource(
                         soundfile,
                         volume=effective_volume,
-                        on_finished=on_playback_finished
+                        ducking_level=config["level"],
+                        duck_transition_ms=50
                     )
-
-                    logger.info(f"[Guild {guild_id}] ▶️ Playing '{soundfile}' (volume: {effective_volume:.2f})")
-
-                    # Update soundboard play stats
-                    soundboard_cog = self.bot.get_cog("Soundboard")
-                    if soundboard_cog and sound_key:
-                        soundboard_cog.increment_play_stats(guild_id, soundfile, str(user_id))
-
-                    # Wait for playback to finish
-                    try:
-                        await asyncio.wait_for(event.wait(), timeout=30.0)
-                    except asyncio.TimeoutError:
-                        logger.error(f"[Guild {guild_id}] Playback timeout for '{soundfile}'")
-                        player.stop()
-
                 except Exception as e:
-                    logger.error(f"[Guild {guild_id}] Error playing '{soundfile}': {e}", exc_info=True)
-
-                finally:
+                    logger.error(f"[Guild {guild_id}] Failed to create audio source for '{soundfile}': {e}", exc_info=True)
                     queue.task_done()
+                    continue
+
+                # Store for ducking control
+                self.current_sources[guild_id] = source
+
+                # If users are currently speaking, start ducked
+                if guild_id in self.speaking_users and self.speaking_users[guild_id] and config["enabled"]:
+                    source.duck()
+                    logger.debug(f"[Guild {guild_id}] Starting playback ducked (users speaking)")
+
+                # Play through Discord
+                vc.play(source, after=after_callback)
+                logger.info(f"[Guild {guild_id}] ▶️ Playing '{soundfile}' (volume: {effective_volume:.2f})")
+
+                # Update soundboard play stats
+                soundboard_cog = self.bot.get_cog("Soundboard")
+                if soundboard_cog and sound_key:
+                    soundboard_cog.increment_play_stats(guild_id, soundfile, str(user_id))
+
+                try:
+                    await asyncio.wait_for(event.wait(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    logger.error(f"[Guild {guild_id}] Playback timeout for '{soundfile}'")
+                    if vc.is_playing():
+                        vc.stop()
+
+                queue.task_done()
 
         except asyncio.CancelledError:
             logger.info(f"[Guild {guild_id}] Queue processor cancelled")
@@ -224,47 +229,6 @@ class VoiceSpeechCog(BaseCog):
         logger.debug(
             f"[Guild {guild_id}] Queued '{soundfile}' (volume: {volume:.2f}, queue size: {self.sound_queues[guild_id].qsize()})")
 
-    def _handle_user_speaking_start(self, guild_id: int, user_id: int):
-        """Handle when a user starts speaking."""
-        # Initialize speaking users set if needed
-        if guild_id not in self.speaking_users:
-            self.speaking_users[guild_id] = set()
-
-        # Add user to speaking set
-        self.speaking_users[guild_id].add(user_id)
-
-        # Check if ducking is enabled
-        config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
-        if not config["enabled"]:
-            return
-
-        # Duck the audio if player exists and is playing
-        if guild_id in self.audio_players:
-            player = self.audio_players[guild_id]
-            if player.is_playing:
-                player.duck()
-                logger.debug(f"[Guild {guild_id}] Ducking audio (user {user_id} speaking)")
-
-    def _handle_user_speaking_stop(self, guild_id: int, user_id: int):
-        """Handle when a user stops speaking."""
-        if guild_id not in self.speaking_users:
-            return
-
-        # Remove user from speaking set
-        self.speaking_users[guild_id].discard(user_id)
-
-        # Check if ducking is enabled
-        config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
-        if not config["enabled"]:
-            return
-
-        # Unduck only if no one else is speaking
-        if not self.speaking_users[guild_id] and guild_id in self.audio_players:
-            player = self.audio_players[guild_id]
-            if player.is_playing:
-                player.unduck()
-                logger.debug(f"[Guild {guild_id}] Unducking audio (no users speaking)")
-
     async def _keepalive_loop(self):
         """Keepalive loop to prevent voice disconnection."""
         await self.bot.wait_until_ready()
@@ -279,10 +243,8 @@ class VoiceSpeechCog(BaseCog):
                         vc = guild.voice_client
 
                         # Only send silence if not playing
-                        if guild_id in self.audio_players:
-                            player = self.audio_players[guild_id]
-                            if player.is_playing:
-                                continue
+                        if vc.is_playing():
+                            continue
 
                         silence = b'\xf8\xff\xfe'
                         vc.send_audio_packet(silence, encode=False)
@@ -306,6 +268,17 @@ class VoiceSpeechCog(BaseCog):
 
                 guild_name = ctx.guild.name
 
+                transcription_data = {
+                    "timestamp": datetime.now().isoformat(),
+                    "guild_id": guild_id,
+                    "guild": guild_name,
+                    "user_id": str(user.id),
+                    "user": user.display_name,
+                    "text": transcribed_text,
+                    "triggers": []
+                }
+
+                # Colored console output
                 logger.info(
                     f"\033[92m[{guild_name}] [{user.id}] [{user.display_name}] : {transcribed_text}\033[0m"
                 )
@@ -318,16 +291,29 @@ class VoiceSpeechCog(BaseCog):
 
                 soundboard_cog = self.bot.get_cog("Soundboard")
                 if not soundboard_cog:
+                    # Log transcription even if no soundboard triggers
+                    logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
                     return
 
-                files = soundboard_cog.get_soundfiles_for_text(ctx.guild.id, user.id, transcribed_text)
+                # Check for soundboard triggers
+                files = soundboard_cog.get_soundfiles_for_text(guild_id, user.id, transcribed_text)
                 if files:
                     async def queue_all():
                         for soundfile, sound_key, volume in files:
                             if os.path.isfile(soundfile):
-                                await self.queue_sound(ctx.guild.id, soundfile, user, sound_key, volume)
+                                # Add trigger info to transcription data
+                                transcription_data["triggers"].append({
+                                    "word": sound_key,
+                                    "sound": os.path.basename(soundfile),
+                                    "volume": volume
+                                })
+                                # Queue sound for THIS guild only
+                                await self.queue_sound(guild_id, soundfile, user, sound_key, volume)
 
                     asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
+
+                # Log transcription with guild_id and triggers
+                logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
 
             except Exception as e:
                 logger.error(f"Error in text_callback: {e}", exc_info=True)
@@ -350,6 +336,43 @@ class VoiceSpeechCog(BaseCog):
                 self.parent_cog._handle_user_speaking_stop(guild_id, member.id)
 
         return SRListener(self)
+
+    def _handle_user_speaking_start(self, guild_id: int, user_id: int):
+        """Handle when a user starts speaking - duck the audio."""
+        # Initialize speaking users set if needed
+        if guild_id not in self.speaking_users:
+            self.speaking_users[guild_id] = set()
+
+        # Add user to speaking set
+        self.speaking_users[guild_id].add(user_id)
+
+        # Check if ducking is enabled
+        config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
+        if not config["enabled"]:
+            return
+
+        # Duck current audio if playing
+        if guild_id in self.current_sources:
+            self.current_sources[guild_id].duck()
+            logger.debug(f"[Guild {guild_id}] 🔉 Ducking audio (user {user_id} speaking)")
+
+    def _handle_user_speaking_stop(self, guild_id: int, user_id: int):
+        """Handle when a user stops speaking - unduck if no one else speaking."""
+        if guild_id not in self.speaking_users:
+            return
+
+        # Remove user from speaking set
+        self.speaking_users[guild_id].discard(user_id)
+
+        # Check if ducking is enabled
+        config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
+        if not config["enabled"]:
+            return
+
+        # Unduck only if no one else is speaking
+        if not self.speaking_users[guild_id] and guild_id in self.current_sources:
+            self.current_sources[guild_id].unduck()
+            logger.debug(f"[Guild {guild_id}] 🔊 Unducking audio (no users speaking)")
 
     @commands.command(help="Configure audio ducking settings")
     async def ducking(self, ctx, setting: str = None, value: str = None):
@@ -397,11 +420,6 @@ class VoiceSpeechCog(BaseCog):
         # Handle on/off
         if setting.lower() in ["on", "enable", "enabled", "yes"]:
             config["enabled"] = True
-
-            # Update player if exists
-            if guild_id in self.audio_players:
-                self.audio_players[guild_id].set_ducking_level(config["level"])
-
             await ctx.send(f"✅ Audio ducking **enabled** (level: {int(config['level'] * 100)}%)")
             return
 
@@ -409,8 +427,8 @@ class VoiceSpeechCog(BaseCog):
             config["enabled"] = False
 
             # Unduck if currently ducked
-            if guild_id in self.audio_players:
-                self.audio_players[guild_id].unduck()
+            if guild_id in self.current_sources:
+                self.current_sources[guild_id].unduck()
 
             await ctx.send("❌ Audio ducking **disabled**")
             return
@@ -426,11 +444,6 @@ class VoiceSpeechCog(BaseCog):
                     return await ctx.send("❌ Level must be between 0 and 100")
 
                 config["level"] = level_percent / 100.0
-
-                # Update player if exists
-                if guild_id in self.audio_players:
-                    self.audio_players[guild_id].set_ducking_level(config["level"])
-
                 await ctx.send(f"🔊 Ducking level set to **{level_percent}%**")
 
             except ValueError:
@@ -513,8 +526,13 @@ class VoiceSpeechCog(BaseCog):
         if guild_id in self.sound_queues:
             del self.sound_queues[guild_id]
 
-        # Clean up audio player
-        self._cleanup_player(guild_id)
+        # Clean up audio source
+        if guild_id in self.current_sources:
+            try:
+                self.current_sources[guild_id].cleanup()
+            except:
+                pass
+            del self.current_sources[guild_id]
 
         await vc.disconnect()
         await ctx.send("👋 Left the voice channel.")

@@ -26,7 +26,7 @@ class EdgeTTS(commands.Cog):
             ]]
             self.voice_map = {i + 1: v["ShortName"] for i, v in enumerate(common)}
 
-    @commands.command(name="voices", help="List available Edge TTS voices")
+    @commands.command(name="edgevoices", help="List available Edge TTS voices")
     async def list_voices(self, ctx):
         """List the quick-select voices."""
         await self.load_voices()
