@@ -449,6 +449,10 @@ class FullDashboard:
 
         trigger_ranges.sort()
 
+        if not trigger_ranges:
+            self.draw_text(text, (x, y), self.text_font)
+            return
+
         current_x = x
         pos = 0
 
@@ -463,9 +467,7 @@ class FullDashboard:
                                        self.text_font.size(trigger_text)[0] + 4,
                                        self.text_font.get_height() + 4)
 
-            pygame.draw.rect(self.screen, self.TRIGGER_HIGHLIGHT_COLOR, trigger_rect, border_radius=3)
-
-            width = self.draw_text(trigger_text, (current_x, y), self.text_font, (0, 0, 0))
+            width = self.draw_text(trigger_text, (current_x, y), self.text_font, self.TRIGGER_HIGHLIGHT_COLOR)
             current_x += width
 
             if trigger_rect.collidepoint(self.mouse_pos):

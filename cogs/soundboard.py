@@ -23,6 +23,7 @@ class PlayStats:
     month: int = 0
     total: int = 0
     guild_play_count: Dict[str, int] = field(default_factory=dict)
+    trigger_word_stats: Dict[str, int] = field(default_factory=dict)  # {trigger_word: count}
     last_played: Optional[str] = None
     played_by: List[str] = field(default_factory=list)
 
@@ -829,8 +830,8 @@ class Soundboard(BaseCog):
         self.soundboard.sounds.clear()
         logger.info("Soundboard cog cleanup complete")
 
-    def increment_play_stats(self, guild_id: int, soundfile: str, user_id: str):
-        """Increment play statistics for a sound."""
+    def increment_play_stats(self, guild_id: int, soundfile: str, user_id: str, trigger_word: str = None):
+        """Increment play statistics for a sound and track trigger word usage."""
         guild_id_str = str(guild_id)
         user_id_str = str(user_id)
 
@@ -855,9 +856,13 @@ class Soundboard(BaseCog):
         stats.last_played = datetime.utcnow().isoformat()
         stats.played_by = [user_id_str]
 
+        # Track trigger word usage
+        if trigger_word:
+            stats.trigger_word_stats[trigger_word] = stats.trigger_word_stats.get(trigger_word, 0) + 1
+
         try:
             save_soundboard(SOUNDBOARD_FILE, self.soundboard)
-            logger.debug(f"Updated stats for '{sound_entry.title}'")
+            logger.debug(f"Updated stats for '{sound_entry.title}'" + (f" (trigger: '{trigger_word}')" if trigger_word else ""))
         except Exception as e:
             logger.error(f"Failed to save stats: {e}", exc_info=True)
 
@@ -883,11 +888,11 @@ class Soundboard(BaseCog):
 
         return count
 
-    def get_soundfiles_for_text(self, guild_id: int, user_id: int, text: str) -> list[tuple[str, str, float]]:
-        """Return list of (soundfile, sound_key, volume) tuples for matching words in text.
+    def get_soundfiles_for_text(self, guild_id: int, user_id: int, text: str) -> list[tuple[str, str, float, str]]:
+        """Return list of (soundfile, sound_key, volume, trigger_word) tuples for matching words in text.
 
         If multiple sounds share the same trigger, randomly selects one.
-        Returns the sound_key and volume along with soundfile so stats can be tracked properly.
+        Returns the sound_key, volume, and trigger_word along with soundfile so stats can be tracked properly.
         """
         guild_id_str = str(guild_id)
         words = text.lower().split()
@@ -922,7 +927,7 @@ class Soundboard(BaseCog):
             if candidates:
                 chosen_key, chosen_entry = random.choice(candidates)
                 volume = chosen_entry.audio_metadata.volume_adjust
-                matched_files.append((chosen_entry.soundfile, chosen_key, volume))
+                matched_files.append((chosen_entry.soundfile, chosen_key, volume, word_lower))
                 seen_triggers.add(word_lower)
 
                 if len(candidates) > 1:
@@ -1012,6 +1017,42 @@ class Soundboard(BaseCog):
             f"✅ I have the file `{attachment.filename}`. Click the button to add details!",
             view=view
         )
+
+    @commands.command(name="leaderboard", help="Show sound and trigger word leaderboard")
+    async def leaderboard(self, ctx, mode: str = "sounds"):
+        """Show top sounds or trigger words by play count."""
+        if mode.lower() == "triggers":
+            # Collect all trigger word stats
+            trigger_counts = {}
+            for sound_entry in self.soundboard.sounds.values():
+                for trigger_word, count in sound_entry.play_stats.trigger_word_stats.items():
+                    trigger_counts[trigger_word] = trigger_counts.get(trigger_word, 0) + count
+
+            # Sort and get top 10
+            top_triggers = sorted(trigger_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+
+            embed = discord.Embed(title="🏆 Top Trigger Words", color=discord.Color.gold())
+            if top_triggers:
+                for i, (trigger, count) in enumerate(top_triggers, 1):
+                    embed.add_field(name=f"{i}. {trigger}", value=f"{count} plays", inline=False)
+            else:
+                embed.description = "No trigger word stats yet!"
+
+            await ctx.send(embed=embed)
+        else:
+            # Show top sounds
+            sounds_with_counts = [(key, entry, entry.play_stats.total)
+                                  for key, entry in self.soundboard.sounds.items()]
+            top_sounds = sorted(sounds_with_counts, key=lambda x: x[2], reverse=True)[:10]
+
+            embed = discord.Embed(title="🏆 Top Sounds", color=discord.Color.gold())
+            if top_sounds:
+                for i, (key, entry, count) in enumerate(top_sounds, 1):
+                    embed.add_field(name=f"{i}. {entry.title}", value=f"{count} plays", inline=False)
+            else:
+                embed.description = "No sounds played yet!"
+
+            await ctx.send(embed=embed)
 
     @commands.command(name="resetstats", help="Reset play statistics (week or month)")
     @commands.has_permissions(administrator=True)
