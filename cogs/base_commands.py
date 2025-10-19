@@ -19,7 +19,7 @@ class GeneralCog(BaseCog):
         since_reload = datetime.now(UTC) - self.reload_time
         embed = discord.Embed(
             title="🤖 Bot Status",
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=(
                 f"**Online and operational...kinda!**\n"
                 f"📅 **Started:** `{local_start}\n`"
@@ -27,7 +27,6 @@ class GeneralCog(BaseCog):
                 f"♻️ **Last Reload:** `{str(since_reload).split('.')[0]}`"
             ),
         )
-        embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         await ctx.send(embed=embed)
 
     @commands.command(name="help", help="show this sucker")
@@ -58,7 +57,6 @@ class GeneralCog(BaseCog):
                 value_lines.append(f"{usage} — {desc}")
             embed.add_field(name=cog_name, value="\n".join(value_lines), inline=False)
 
-        embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         await ctx.send(embed=embed)
 
     @commands.command(name="info", help="Project information")
@@ -100,7 +98,6 @@ class GeneralCog(BaseCog):
         embed.add_field(name="Developer", value="Don Corleon", inline=False)
         embed.add_field(name="Library", value=deps_str, inline=False)
         embed.add_field(name="Python", value="3.13+", inline=False)
-        embed.set_footer(text=f"Requested by {ctx.author.display_name}")
         await ctx.send(embed=embed)
 
     @commands.command(name="reload", help="Reloads  specified cog/s or all cogs modules")

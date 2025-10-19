@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from base_cog import BaseCog, logger
 from utils.discord_audio_source import DuckedAudioSource
+from utils.error_handler import UserFeedback
 from config import config
 
 
@@ -476,7 +477,7 @@ class VoiceSpeechCog(BaseCog):
         # Handle on/off
         if setting.lower() in ["on", "enable", "enabled", "yes"]:
             config["enabled"] = True
-            await ctx.send(f"✅ Audio ducking **enabled** (level: {int(config['level'] * 100)}%)")
+            await UserFeedback.success(ctx, f"Audio ducking **enabled** (level: {int(config['level'] * 100)}%)")
             return
 
         if setting.lower() in ["off", "disable", "disabled", "no"]:
@@ -486,33 +487,33 @@ class VoiceSpeechCog(BaseCog):
             if guild_id in self.current_sources:
                 self.current_sources[guild_id].unduck()
 
-            await ctx.send("❌ Audio ducking **disabled**")
+            await UserFeedback.info(ctx, "Audio ducking **disabled**")
             return
 
         # Handle level setting
         if setting.lower() in ["level", "amount", "volume"]:
             if value is None:
-                return await ctx.send("❌ Please specify a level between 0-100. Example: `~ducking level 50`")
+                return await UserFeedback.error(ctx, "Please specify a level between 0-100. Example: `~ducking level 50`")
 
             try:
                 level_percent = int(value)
                 if not 0 <= level_percent <= 100:
-                    return await ctx.send("❌ Level must be between 0 and 100")
+                    return await UserFeedback.error(ctx, "Level must be between 0 and 100")
 
                 config["level"] = level_percent / 100.0
-                await ctx.send(f"🔊 Ducking level set to **{level_percent}%**")
+                await UserFeedback.success(ctx, f"Ducking level set to **{level_percent}%**")
 
             except ValueError:
-                await ctx.send("❌ Invalid level. Please use a number between 0-100")
+                await UserFeedback.error(ctx, "Invalid level. Please use a number between 0-100")
             return
 
-        await ctx.send("❌ Invalid setting. Use: `~ducking on/off` or `~ducking level <0-100>`")
+        await UserFeedback.error(ctx, "Invalid setting. Use: `~ducking on/off` or `~ducking level <0-100>`")
 
     @commands.command(help="Join a voice channel (optional: channel name or ID)")
     async def join(self, ctx, *, channel_input: str = None):
         # If already connected
         if ctx.voice_client:
-            return await ctx.send("✅ Already connected to a voice channel.")
+            return await UserFeedback.info(ctx, "Already connected to a voice channel.")
 
         # Determine which channel to join
         target_channel = None
@@ -523,7 +524,7 @@ class VoiceSpeechCog(BaseCog):
                 channel_id = int(channel_input)
                 target_channel = ctx.guild.get_channel(channel_id)
                 if target_channel and not isinstance(target_channel, discord.VoiceChannel):
-                    return await ctx.send(f"❌ Channel with ID `{channel_id}` is not a voice channel.")
+                    return await UserFeedback.error(ctx, f"Channel with ID `{channel_id}` is not a voice channel.")
             except ValueError:
                 # Not an ID, search by name (case-insensitive)
                 channel_name_lower = channel_input.lower()
@@ -540,11 +541,11 @@ class VoiceSpeechCog(BaseCog):
                             break
 
             if not target_channel:
-                return await ctx.send(f"❌ Could not find voice channel: `{channel_input}`")
+                return await UserFeedback.error(ctx, f"Could not find voice channel: `{channel_input}`")
         else:
             # No argument provided, join caller's channel
             if not ctx.author.voice or not ctx.author.voice.channel:
-                return await ctx.send("⚠️ You're not in a voice channel. Please specify a channel name or ID.")
+                return await UserFeedback.warning(ctx, "You're not in a voice channel. Please specify a channel name or ID.")
             target_channel = ctx.author.voice.channel
 
         # Connect to the channel
@@ -560,18 +561,18 @@ class VoiceSpeechCog(BaseCog):
                 sink = self._create_speech_listener(ctx)
                 vc.listen(sink)
                 self.active_sinks[ctx.guild.id] = sink
-                await ctx.send(f"✅ Joined `{target_channel.name}` and started listening! 🎧")
+                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧")
             else:
-                await ctx.send(f"✅ Joined `{target_channel.name}` and ready to listen.")
+                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and ready to listen.")
         except Exception as e:
             logger.error(f"Failed to join channel {target_channel.name}: {e}", exc_info=True)
-            await ctx.send(f"❌ Failed to join `{target_channel.name}`: {str(e)}")
+            await UserFeedback.error(ctx, f"Failed to join `{target_channel.name}`: {str(e)}")
 
     @commands.command(help="Leave the voice channel")
     async def leave(self, ctx):
         vc = ctx.voice_client
         if not vc:
-            return await ctx.send("⚠️ Not currently connected.")
+            return await UserFeedback.warning(ctx, "Not currently connected.")
 
         guild_id = ctx.guild.id
 
@@ -591,7 +592,7 @@ class VoiceSpeechCog(BaseCog):
             del self.current_sources[guild_id]
 
         await vc.disconnect()
-        await ctx.send("👋 Left the voice channel.")
+        await UserFeedback.success(ctx, "Left the voice channel.")
 
         if self._keepalive_task:
             self._keepalive_task.cancel()
@@ -601,7 +602,7 @@ class VoiceSpeechCog(BaseCog):
     async def start(self, ctx):
         if not ctx.voice_client:
             if not ctx.author.voice or not ctx.author.voice.channel:
-                return await ctx.send("⚠️ You're not in a voice channel!")
+                return await UserFeedback.warning(ctx, "You're not in a voice channel!")
             channel = ctx.author.voice.channel
             vc = await channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
             if not self._keepalive_task:
@@ -612,26 +613,26 @@ class VoiceSpeechCog(BaseCog):
         sink = self._create_speech_listener(ctx)
         vc.listen(sink)
         self.active_sinks[ctx.guild.id] = sink
-        await ctx.send("🎧 Listening...")
+        await UserFeedback.success(ctx, "Listening...")
 
     @commands.command(help="Stop listening")
     async def stop(self, ctx):
         vc = ctx.voice_client
         if not vc or ctx.guild.id not in self.active_sinks:
-            return await ctx.send("⚠️ Not currently listening.")
+            return await UserFeedback.warning(ctx, "Not currently listening.")
         vc.stop_listening()
         self.active_sinks.pop(ctx.guild.id, None)
-        await ctx.send("🛑 Stopped listening.")
+        await UserFeedback.success(ctx, "Stopped listening.")
 
     @commands.command(help="Play a sound from a trigger word")
     async def play(self, ctx, *, input_text: str):
         vc: voice_recv.VoiceRecvClient = ctx.voice_client
         if not vc:
-            return await ctx.send("⚠️ Join a voice channel first!")
+            return await UserFeedback.warning(ctx, "Join a voice channel first!")
 
         soundboard_cog = self.bot.get_cog("Soundboard")
         if not soundboard_cog:
-            return await ctx.send("⚠️ Soundboard cog not loaded.")
+            return await UserFeedback.warning(ctx, "Soundboard cog not loaded.")
 
         # Get list of (soundfile, sound_key, volume) tuples
         files = soundboard_cog.get_soundfiles_for_text(
@@ -644,25 +645,25 @@ class VoiceSpeechCog(BaseCog):
             for soundfile, sound_key, volume in files:
                 if os.path.isfile(soundfile):
                     await self.queue_sound(ctx.guild.id, soundfile, ctx.author, sound_key, volume)
-            await ctx.send(f"▶️ Queued {len(files)} sound(s).")
+            await UserFeedback.success(ctx, f"Queued {len(files)} sound(s).")
         else:
-            await ctx.send(f"⚠️ No sounds found for: `{input_text}`")
+            await UserFeedback.info(ctx, f"No sounds found for: `{input_text}`")
 
     @commands.command(help="Show current sound queue")
     async def queue(self, ctx):
         guild_id = ctx.guild.id
         if guild_id not in self.sound_queues or self.sound_queues[guild_id].empty():
-            return await ctx.send("🔭 Queue is empty.")
-        await ctx.send(f"🎵 {self.sound_queues[guild_id].qsize()} sound(s) in queue")
+            return await UserFeedback.info(ctx, "Queue is empty.")
+        await UserFeedback.info(ctx, f"{self.sound_queues[guild_id].qsize()} sound(s) in queue")
 
     @commands.command(help="Clear the sound queue")
     async def clearqueue(self, ctx):
         guild_id = ctx.guild.id
         if guild_id not in self.sound_queues:
-            return await ctx.send("🔭 No queue exists.")
+            return await UserFeedback.info(ctx, "No queue exists.")
         old_size = self.sound_queues[guild_id].qsize()
         self.sound_queues[guild_id] = asyncio.Queue()
-        await ctx.send(f"🗑️ Cleared {old_size} sound(s) from queue")
+        await UserFeedback.success(ctx, f"Cleared {old_size} sound(s) from queue")
 
 
 async def setup(bot):
