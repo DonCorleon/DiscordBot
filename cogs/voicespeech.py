@@ -11,6 +11,28 @@ from base_cog import BaseCog, logger
 from utils.discord_audio_source import DuckedAudioSource
 
 
+# Monkey patch for discord-ext-voice-recv bug
+def _patched_remove_ssrc(self, *, user_id: int):
+    """Patched version of _remove_ssrc that handles missing reader gracefully."""
+    try:
+        ssrc = self._ssrcs.pop(user_id, None)
+        if ssrc is not None and hasattr(self, '_reader') and self._reader is not discord.utils.MISSING:
+            if hasattr(self._reader, 'speaking_timer') and self._reader.speaking_timer is not None:
+                self._reader.speaking_timer.drop_ssrc(ssrc)
+    except Exception as e:
+        logger.debug(f"Error in _remove_ssrc for user {user_id}: {e}")
+
+
+# Apply the patch
+try:
+    from discord.ext.voice_recv import VoiceRecvClient
+
+    VoiceRecvClient._remove_ssrc = _patched_remove_ssrc
+    logger.info("Applied voice_recv _remove_ssrc patch")
+except Exception as e:
+    logger.warning(f"Could not apply voice_recv patch: {e}")
+
+
 class VoiceSpeechCog(BaseCog):
 
     def __init__(self, bot):
@@ -22,13 +44,13 @@ class VoiceSpeechCog(BaseCog):
         self.sound_queues = {}  # {guild_id: asyncio.Queue}
         self.queue_tasks = {}  # {guild_id: Task}
 
-        # NEW: Track current audio sources for ducking control
+        # Track current audio sources for ducking control
         self.current_sources = {}  # {guild_id: DuckedAudioSource}
 
-        # NEW: Ducking configuration per guild
+        # Ducking configuration per guild
         self.ducking_config = {}  # {guild_id: {"enabled": bool, "level": float}}
 
-        # NEW: Track speaking users per guild
+        # Track speaking users per guild
         self.speaking_users = {}  # {guild_id: set(user_ids)}
 
     @commands.Cog.listener()
@@ -182,7 +204,8 @@ class VoiceSpeechCog(BaseCog):
                         duck_transition_ms=50
                     )
                 except Exception as e:
-                    logger.error(f"[Guild {guild_id}] Failed to create audio source for '{soundfile}': {e}", exc_info=True)
+                    logger.error(f"[Guild {guild_id}] Failed to create audio source for '{soundfile}': {e}",
+                                 exc_info=True)
                     queue.task_done()
                     continue
 
@@ -256,7 +279,7 @@ class VoiceSpeechCog(BaseCog):
             raise
 
     def _create_speech_listener(self, ctx):
-        """Create a speech recognition listener with ducking support."""
+        """Create a speech recognition listener with ducking support and error handling."""
         guild_id = ctx.guild.id
 
         def text_callback(user: discord.User, text: str):
@@ -322,18 +345,50 @@ class VoiceSpeechCog(BaseCog):
             def __init__(self, parent_cog):
                 super().__init__(default_recognizer="vosk", phrase_time_limit=10, text_cb=text_callback)
                 self.parent_cog = parent_cog
+                self.error_count = 0
+                self.max_errors = 10
+
+            def write(self, user, data):
+                """Override write to add error handling for corrupted audio data."""
+                try:
+                    super().write(user, data)
+                    # Reset error count on successful write
+                    self.error_count = 0
+                except Exception as e:
+                    self.error_count += 1
+
+                    # Log first error and every 10th error to avoid spam
+                    if self.error_count == 1 or self.error_count % 10 == 0:
+                        logger.warning(
+                            f"[Guild {guild_id}] Audio write error (count: {self.error_count}): {type(e).__name__}"
+                        )
+
+                    # If too many consecutive errors, log warning
+                    if self.error_count >= self.max_errors:
+                        logger.error(
+                            f"[Guild {guild_id}] Excessive audio errors ({self.error_count}). "
+                            "Voice connection may be unstable."
+                        )
+                        # Reset counter to avoid spam
+                        self.error_count = 0
 
             @voice_recv.AudioSink.listener()
             def on_voice_member_speaking_start(self, member: discord.Member):
-                logger.debug(f"🎤 {member.display_name} started speaking")
-                # Trigger ducking
-                self.parent_cog._handle_user_speaking_start(guild_id, member.id)
+                try:
+                    logger.debug(f"🎤 {member.display_name} started speaking")
+                    # Trigger ducking
+                    self.parent_cog._handle_user_speaking_start(guild_id, member.id)
+                except Exception as e:
+                    logger.error(f"Error in speaking_start: {e}", exc_info=True)
 
             @voice_recv.AudioSink.listener()
             def on_voice_member_speaking_stop(self, member: discord.Member):
-                logger.debug(f"🔇 {member.display_name} stopped speaking")
-                # Stop ducking
-                self.parent_cog._handle_user_speaking_stop(guild_id, member.id)
+                try:
+                    logger.debug(f"🔇 {member.display_name} stopped speaking")
+                    # Stop ducking
+                    self.parent_cog._handle_user_speaking_stop(guild_id, member.id)
+                except Exception as e:
+                    logger.error(f"Error in speaking_stop: {e}", exc_info=True)
 
         return SRListener(self)
 
