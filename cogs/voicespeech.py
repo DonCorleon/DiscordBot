@@ -9,6 +9,7 @@ import os
 from datetime import datetime
 from base_cog import BaseCog, logger
 from utils.discord_audio_source import DuckedAudioSource
+from config import config
 
 
 # Monkey patch for discord-ext-voice-recv bug
@@ -39,7 +40,7 @@ class VoiceSpeechCog(BaseCog):
         super().__init__(bot)
         self.bot = bot
         self.active_sinks = {}
-        self._keepalive_interval = 30
+        self._keepalive_interval = config.keepalive_interval
         self._keepalive_task = None
         self.sound_queues = {}  # {guild_id: asyncio.Queue}
         self.queue_tasks = {}  # {guild_id: Task}

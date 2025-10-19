@@ -14,6 +14,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 import psutil
 import logging
+from config import config
 
 logger = logging.getLogger("discordbot.admin_data")
 
@@ -83,9 +84,9 @@ class AdminDataCollector:
         # Data export path
         self.export_dir = None
         if self.enable_export:
-            self.export_dir = Path("admin_data")
+            self.export_dir = Path(config.admin_data_dir)
             self.export_dir.mkdir(exist_ok=True)
-            logger.info("Data export enabled - admin_data directory created")
+            logger.info(f"Data export enabled - {config.admin_data_dir} directory created")
         else:
             logger.info("Data export disabled - running in headless mode")
 

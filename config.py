@@ -31,7 +31,6 @@ class BotConfig:
     # Voice Configuration
     default_volume: float = 0.5
     keepalive_interval: int = 30
-    max_queue_size: int = 50
 
     # Audio Ducking Configuration
     ducking_enabled: bool = True  # Enable ducking by default
@@ -69,11 +68,15 @@ class BotConfig:
             health_collection_interval=int(os.getenv("HEALTH_COLLECTION_INTERVAL", "5")),
             data_export_interval=int(os.getenv("DATA_EXPORT_INTERVAL", "10")),
             default_volume=float(os.getenv("DEFAULT_VOLUME", "0.5")),
+            keepalive_interval=int(os.getenv("KEEPALIVE_INTERVAL", "30")),
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             # Audio ducking settings
             ducking_enabled=os.getenv("DUCKING_ENABLED", "true").lower() == "true",
             ducking_level=float(os.getenv("DUCKING_LEVEL", "0.5")),
             ducking_transition_ms=int(os.getenv("DUCKING_TRANSITION_MS", "50")),
+            # Feature flags
+            enable_auto_disconnect=os.getenv("ENABLE_AUTO_DISCONNECT", "true").lower() == "true",
+            enable_speech_recognition=os.getenv("ENABLE_SPEECH_RECOGNITION", "true").lower() == "true",
         )
 
     def display(self):
