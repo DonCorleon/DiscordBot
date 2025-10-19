@@ -11,7 +11,7 @@ from typing import Optional
 
 from base_cog import BaseCog, logger
 from utils.error_handler import handle_errors, ErrorCategory, UserFeedback
-from utils.admin_data_collector import get_data_collector, initialize_data_collector
+from utils.admin_data_collector import get_data_collector
 
 
 class MonitoringCog(BaseCog):
@@ -21,8 +21,8 @@ class MonitoringCog(BaseCog):
         super().__init__(bot)
         self.bot = bot
 
-        # Initialize data collector
-        self.data_collector = initialize_data_collector(bot)
+        # Get the existing data collector instance
+        self.data_collector = get_data_collector()
 
         # Start monitoring tasks
         self.monitor_health.start()
