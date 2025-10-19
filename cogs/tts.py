@@ -10,6 +10,7 @@ import re
 import json
 from pathlib import Path
 from base_cog import BaseCog, logger
+from utils.error_handler import UserFeedback
 
 # Preferences file
 PREFERENCES_FILE = "tts_preferences.json"
@@ -202,12 +203,12 @@ class TtsCog(BaseCog):
         voice_cog = self.bot.get_cog("VoiceSpeechCog")
         if not voice_cog:
             logger.error("VoiceSpeechCog not found!")
-            return await ctx.send("Voice system not available!")
+            return await UserFeedback.error(ctx, "Voice system not available!")
 
         chunks = self.split_text(text)
 
         if len(chunks) > 1:
-            await ctx.send(f"Splitting message into {len(chunks)} parts...")
+            await UserFeedback.info(ctx, f"Splitting message into {len(chunks)} parts...")
 
         for i, chunk in enumerate(chunks):
             try:
@@ -220,14 +221,14 @@ class TtsCog(BaseCog):
                     f"[Guild {ctx.guild.id}:{ctx.guild.name}] Queued TTS chunk {i + 1}/{len(chunks)}: '{chunk[:50]}...'")
             except Exception as e:
                 logger.error(f"[Guild {ctx.guild.id}] Failed to queue TTS chunk {i + 1}: {e}", exc_info=True)
-                await ctx.send(f"Failed to queue part {i + 1}")
+                await UserFeedback.error(ctx, f"Failed to queue part {i + 1}")
 
     @commands.command(name="say", help="Speak text in voice channel")
     async def say(self, ctx, *, message: str):
         """Speak text using TTS with optional voice settings."""
         vc = ctx.voice_client
         if not vc:
-            return await ctx.send("I'm not connected to a voice channel! Use ~join first.")
+            return await UserFeedback.warning(ctx, "I'm not connected to a voice channel! Use ~join first.")
 
         prefs = self.get_user_preferences(ctx.author.id)
         gender = prefs["gender"]
@@ -253,7 +254,7 @@ class TtsCog(BaseCog):
                     try:
                         rate = int(value)
                     except ValueError:
-                        return await ctx.send("Rate must be a number!")
+                        return await UserFeedback.error(ctx, "Rate must be a number!")
                 i += 2
             else:
                 text_parts.append(words[i])
@@ -261,7 +262,7 @@ class TtsCog(BaseCog):
 
         text = " ".join(text_parts)
         if not text:
-            return await ctx.send("No text to speak!")
+            return await UserFeedback.error(ctx, "No text to speak!")
 
         voice_info = []
         if name:
@@ -288,9 +289,9 @@ class TtsCog(BaseCog):
             if user_id_str in self.user_preferences:
                 del self.user_preferences[user_id_str]
                 self.save_preferences()
-                await ctx.send("Voice preferences reset to defaults!")
+                await UserFeedback.success(ctx, "Voice preferences reset to defaults!")
             else:
-                await ctx.send("You don't have any saved preferences.")
+                await UserFeedback.info(ctx, "You don't have any saved preferences.")
             return
 
         if not settings:
@@ -321,13 +322,13 @@ class TtsCog(BaseCog):
                     try:
                         updates["rate"] = int(value)
                     except ValueError:
-                        return await ctx.send("Rate must be a number!")
+                        return await UserFeedback.error(ctx, "Rate must be a number!")
                 i += 2
             else:
                 i += 1
 
         if not updates:
-            return await ctx.send("No valid settings provided! Use --name, --gender, --country, or --rate")
+            return await UserFeedback.error(ctx, "No valid settings provided! Use --name, --gender, --country, or --rate")
 
         self.set_user_preferences(ctx.author.id, **updates)
         prefs = self.get_user_preferences(ctx.author.id)
