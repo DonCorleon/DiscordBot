@@ -960,3 +960,24 @@ def get_voice_time_display(
         # Fallback to ranges
         time_range = format_voice_time_ranges(minutes)
         return f"**{type_label}:** {time_range}"
+
+
+def render_bar_chart(value: int, max_value: int, bar_length: int = 20) -> str:
+    """
+    Render an ASCII bar chart.
+
+    Args:
+        value: Current value
+        max_value: Maximum value (for scaling)
+        bar_length: Total length of the bar in characters
+
+    Returns:
+        String representation of the bar
+    """
+    if max_value == 0:
+        filled = 0
+    else:
+        filled = int((value / max_value) * bar_length)
+
+    empty = bar_length - filled
+    return "█" * filled + "░" * empty
