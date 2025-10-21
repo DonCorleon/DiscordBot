@@ -62,7 +62,6 @@ class VoiceSpeechCog(BaseCog):
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
                                     after: discord.VoiceState):
         from utils.auto_join_manager import is_auto_join_channel
-        import voice_recv
 
         guild_id = member.guild.id
 
