@@ -1018,10 +1018,142 @@ class Soundboard(BaseCog):
             view=view
         )
 
-    @commands.command(name="leaderboard", help="Show sound and trigger word leaderboard")
-    async def leaderboard(self, ctx, mode: str = "sounds"):
-        """Show top sounds or trigger words by play count."""
-        if mode.lower() == "triggers":
+    @commands.command(name="leaderboard", help="Show sound, trigger word, or member leaderboard")
+    async def leaderboard(self, ctx, mode: str = "triggers", *args):
+        """
+        Show top sounds, trigger words, or members by play count (guild-isolated).
+
+        Usage:
+            ~leaderboard triggers - Show top trigger words
+            ~leaderboard sounds - Show top sounds
+            ~leaderboard members - Show all-time top members in this guild
+            ~leaderboard members week - Show weekly top members
+            ~leaderboard members month - Show monthly top members
+            ~leaderboard members pubg - Show all-time stats for "pubg" channel
+            ~leaderboard members pubg week - Show weekly stats for "pubg" channel
+            ~leaderboard members actual - Show with admin indicator (admin only)
+        """
+        if mode.lower() == "members":
+            # Import user stats utilities
+            from utils.user_stats import load_user_stats, get_leaderboard, render_bar_chart, USER_STATS_FILE
+            from utils.admin_manager import is_admin
+
+            try:
+                user_stats = load_user_stats(USER_STATS_FILE)
+                guild_id_str = str(ctx.guild.id)
+
+                # Parse arguments: could be [period], [channel], [channel period], or [... actual]
+                period = "total"  # default
+                channel_name = None
+                show_exact = False
+
+                # Check for "actual" keyword
+                args_list = list(args)
+                if args_list and args_list[-1].lower() == "actual":
+                    # Check if user is admin
+                    user_roles = [role.id for role in ctx.author.roles]
+                    if is_admin(ctx.author.id, user_roles):
+                        show_exact = True
+                    # Remove "actual" from args either way
+                    args_list = args_list[:-1]
+
+                # Check arguments
+                if args_list:
+                    # Check if last arg is a period
+                    if args_list[-1].lower() in ["week", "month", "total"]:
+                        period = args_list[-1].lower()
+                        # Everything before is channel name
+                        if len(args_list) > 1:
+                            channel_name = " ".join(args_list[:-1])
+                    else:
+                        # All args are channel name
+                        channel_name = " ".join(args_list)
+
+                # Determine channel if specified
+                voice_channel = None
+                channel_id_str = None
+                if channel_name:
+                    for channel in ctx.guild.voice_channels:
+                        if channel.name.lower() == channel_name.lower():
+                            voice_channel = channel
+                            channel_id_str = str(voice_channel.id)
+                            break
+
+                    if not voice_channel:
+                        return await ctx.send(f"❌ Voice channel `{channel_name}` not found in this guild!")
+
+                # Get leaderboard data
+                leaderboard_data = get_leaderboard(
+                    user_stats,
+                    guild_id=guild_id_str,
+                    period=period,
+                    channel_id=channel_id_str,
+                    limit=10
+                )
+
+                # Build title
+                period_text = {"week": "Weekly", "month": "Monthly", "total": "All-Time"}[period]
+                if voice_channel:
+                    title = f"🏆 {period_text} Top Members in #{voice_channel.name}"
+                else:
+                    title = f"🏆 {period_text} Top Members in {ctx.guild.name}"
+
+                # Add admin indicator if showing exact stats
+                if show_exact:
+                    title += " (Admin View)"
+
+                embed = discord.Embed(title=title, color=discord.Color.gold())
+
+                # Set guild icon as thumbnail
+                if ctx.guild.icon:
+                    embed.set_thumbnail(url=ctx.guild.icon.url)
+
+                if leaderboard_data:
+                    max_count = leaderboard_data[0][2]  # Highest count for bar scaling
+
+                    for i, (user_id, username, count) in enumerate(leaderboard_data, 1):
+                        # Get member info
+                        try:
+                            member = ctx.guild.get_member(int(user_id))
+                            display_name = member.display_name if member else username
+                            avatar_url = member.avatar.url if member and member.avatar else None
+                        except:
+                            display_name = username
+                            avatar_url = None
+
+                        # Add medal for top 3
+                        medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+                        medal = medals.get(i, "")
+
+                        # Render bar chart
+                        bar = render_bar_chart(count, max_count, bar_length=15)
+
+                        # Format value
+                        value_text = f"{bar} **{count}** trigger{'s' if count != 1 else ''}"
+
+                        # Add avatar as field thumbnail for #1
+                        field_name = f"{medal} {i}. {display_name}"
+
+                        embed.add_field(
+                            name=field_name,
+                            value=value_text,
+                            inline=False
+                        )
+
+                        # Set #1 user's avatar as embed author icon
+                        if i == 1 and avatar_url:
+                            embed.set_author(name=f"👑 {display_name} is leading!", icon_url=avatar_url)
+
+                else:
+                    embed.description = "No member stats yet!"
+
+                await ctx.send(embed=embed)
+
+            except Exception as e:
+                logger.error(f"Failed to load member leaderboard: {e}", exc_info=True)
+                await ctx.send("❌ Failed to load member leaderboard!")
+
+        elif mode.lower() == "triggers":
             # Collect all trigger word stats
             trigger_counts = {}
             for sound_entry in self.soundboard.sounds.values():
@@ -1054,19 +1186,558 @@ class Soundboard(BaseCog):
 
             await ctx.send(embed=embed)
 
-    @commands.command(name="resetstats", help="Reset play statistics (week or month)")
+    @commands.command(name="mystats", help="Show your personal trigger statistics")
+    async def mystats(self, ctx, member: discord.Member = None, show_actual: str = None):
+        """
+        Show personal trigger and activity statistics for yourself or another user.
+
+        Usage:
+            ~mystats - Show your own stats (ambiguous)
+            ~mystats @User - Show another user's stats (ambiguous)
+            ~mystats actual - Show your exact stats (admin only)
+            ~mystats @User actual - Show exact stats for user (admin only)
+        """
+        from utils.user_stats import (
+            load_user_stats, get_user_rank, get_user_channel_breakdown,
+            get_user_top_triggers, render_progress_bar, USER_STATS_FILE
+        )
+        from utils.activity_stats import (
+            load_activity_stats, get_user_activity_rank, get_activity_tier,
+            ACTIVITY_STATS_FILE
+        )
+        from utils.admin_manager import is_admin
+
+        try:
+            # Check for "actual" keyword in arguments
+            show_exact = False
+            target_member = member if member else ctx.author
+
+            # Handle "actual" keyword
+            if show_actual and show_actual.lower() == "actual":
+                # Check if user is admin
+                user_roles = [role.id for role in ctx.author.roles]
+                if not is_admin(ctx.author.id, user_roles):
+                    return await ctx.send("❌ Only admins can view exact stats!")
+                show_exact = True
+            elif member and not isinstance(member, discord.Member):
+                # If member parameter is actually the "actual" keyword
+                if isinstance(member, str) and member.lower() == "actual":
+                    user_roles = [role.id for role in ctx.author.roles]
+                    if not is_admin(ctx.author.id, user_roles):
+                        return await ctx.send("❌ Only admins can view exact stats!")
+                    show_exact = True
+                    target_member = ctx.author
+
+            # Load stats
+            user_stats = load_user_stats(USER_STATS_FILE)
+            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            guild_id_str = str(ctx.guild.id)
+            user_id_str = str(target_member.id)
+
+            # Check if guild and user exist in trigger stats
+            has_trigger_stats = (
+                guild_id_str in user_stats.guilds and
+                user_id_str in user_stats.guilds[guild_id_str].users
+            )
+
+            # Check if guild and user exist in activity stats
+            has_activity_stats = (
+                guild_id_str in activity_stats.guilds and
+                user_id_str in activity_stats.guilds[guild_id_str].users
+            )
+
+            # Must have at least one type of stats
+            if not has_trigger_stats and not has_activity_stats:
+                return await ctx.send(f"❌ {target_member.display_name} has no stats yet!")
+
+            user_stat = user_stats.guilds[guild_id_str].users[user_id_str] if has_trigger_stats else None
+
+            # Create embed
+            embed = discord.Embed(
+                title=f"📊 Stats for {target_member.display_name}",
+                color=discord.Color.blue()
+            )
+
+            # Set user's avatar
+            if target_member.avatar:
+                embed.set_thumbnail(url=target_member.avatar.url)
+
+            # Add trigger stats if available
+            if has_trigger_stats:
+                # Get rank for different periods
+                rank_total, count_total, total_users = get_user_rank(user_stats, guild_id_str, user_id_str, "total")
+                rank_week, count_week, _ = get_user_rank(user_stats, guild_id_str, user_id_str, "week")
+                rank_month, count_month, _ = get_user_rank(user_stats, guild_id_str, user_id_str, "month")
+
+                # Add rank information
+                rank_value = (
+                    f"**All-Time:** #{rank_total} of {total_users} ({count_total} triggers)\n"
+                    f"**This Week:** #{rank_week} ({count_week} triggers)\n"
+                    f"**This Month:** #{rank_month} ({count_month} triggers)"
+                )
+                embed.add_field(name="🏆 Trigger Rankings", value=rank_value, inline=False)
+
+                # Add progress to next milestone
+                milestones = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+                next_milestone = None
+                for milestone in milestones:
+                    if count_total < milestone:
+                        next_milestone = milestone
+                        break
+
+                if next_milestone:
+                    progress_bar = render_progress_bar(count_total, next_milestone)
+                    embed.add_field(
+                        name=f"📈 Progress to {next_milestone} Triggers",
+                        value=f"{progress_bar} ({count_total}/{next_milestone})",
+                        inline=False
+                    )
+
+                # Get channel breakdown
+                channel_breakdown = get_user_channel_breakdown(user_stats, guild_id_str, user_id_str, limit=5)
+                if channel_breakdown:
+                    channel_lines = []
+                    for ch_id, ch_count in channel_breakdown:
+                        ch_obj = ctx.guild.get_channel(int(ch_id))
+                        ch_name = ch_obj.name if ch_obj else f"Unknown"
+                        channel_lines.append(f"**#{ch_name}:** {ch_count}")
+
+                    channel_value = "\n".join(channel_lines)
+                    embed.add_field(name="📍 Most Active Channels (Triggers)", value=channel_value, inline=False)
+
+                # Add most used trigger words
+                top_triggers = get_user_top_triggers(user_stats, guild_id_str, user_id_str, limit=5)
+                if top_triggers:
+                    trigger_lines = []
+                    for trigger_word, trig_count in top_triggers:
+                        trigger_lines.append(f"**`{trigger_word}`:** {trig_count}")
+
+                    trigger_value = "\n".join(trigger_lines)
+                    embed.add_field(name="🎯 Favorite Triggers", value=trigger_value, inline=False)
+
+            # Add activity stats if available
+            if has_activity_stats:
+                activity_guild_stats = activity_stats.guilds[guild_id_str]
+                user_activity_stat = activity_guild_stats.users[user_id_str]
+
+                # Get activity rank
+                activity_rank, activity_score, total_activity_users = get_user_activity_rank(
+                    activity_stats, guild_id_str, user_id_str, "total", target_member.bot
+                )
+
+                if show_exact:
+                    # Show exact stats for admins
+                    activity_value = (
+                        f"**Rank:** #{activity_rank} of {total_activity_users}\n"
+                        f"**Activity Score:** {activity_score:.1f}\n\n"
+                        f"**📝 Messages:** {user_activity_stat.activity_stats._message_count}\n"
+                        f"**👍 Reactions Given:** {user_activity_stat.activity_stats._reaction_given} | "
+                        f"**Received:** {user_activity_stat.activity_stats._reaction_received}\n"
+                        f"**💬 Replies Given:** {user_activity_stat.activity_stats._replies_given} | "
+                        f"**Received:** {user_activity_stat.activity_stats._replies_received}\n\n"
+                        f"**🎤 Voice (Total):** {user_activity_stat.activity_stats._voice_total_minutes} min\n"
+                        f"**🔊 Voice (Unmuted):** {user_activity_stat.activity_stats._voice_unmuted_minutes} min\n"
+                        f"**🗣️ Voice (Speaking):** {user_activity_stat.activity_stats._voice_speaking_minutes} min"
+                    )
+                    embed.add_field(name="⚡ Activity Stats (Exact)", value=activity_value, inline=False)
+                else:
+                    # Show ambiguous stats for regular users
+                    tier_name, tier_emoji, tier_desc = get_activity_tier(activity_score)
+                    from utils.activity_stats import render_bar_chart, get_voice_time_display
+                    from config import config
+
+                    # Find max score for bar chart
+                    max_score = 0
+                    for u_id, u_stat in activity_guild_stats.users.items():
+                        if u_stat.is_bot == target_member.bot:
+                            if u_stat.activity_stats.activity_score > max_score:
+                                max_score = u_stat.activity_stats.activity_score
+
+                    bar = render_bar_chart(int(activity_score), int(max_score))
+
+                    # Get voice time based on configured tracking type
+                    voice_minutes = 0
+                    if config.voice_tracking_type == "total":
+                        voice_minutes = user_activity_stat.activity_stats._voice_total_minutes
+                    elif config.voice_tracking_type == "unmuted":
+                        voice_minutes = user_activity_stat.activity_stats._voice_unmuted_minutes
+                    elif config.voice_tracking_type == "speaking":
+                        voice_minutes = user_activity_stat.activity_stats._voice_speaking_minutes
+
+                    voice_display = get_voice_time_display(
+                        voice_minutes,
+                        display_mode=config.voice_time_display_mode,
+                        tracking_type=config.voice_tracking_type
+                    )
+
+                    activity_value = (
+                        f"**Rank:** #{activity_rank} of {total_activity_users}\n"
+                        f"**Activity Score:** {activity_score:.1f}\n"
+                        f"{bar} {tier_emoji}\n"
+                        f"**{tier_name}** - {tier_desc}"
+                    )
+
+                    # Add voice time if not in points_only mode
+                    if voice_display:
+                        activity_value += f"\n\n{voice_display}"
+
+                    embed.add_field(name="⚡ Activity Stats", value=activity_value, inline=False)
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Failed to load personal stats: {e}", exc_info=True)
+            await ctx.send("❌ Failed to load personal stats!")
+
+    @commands.command(name="weeklyrecap", help="Show weekly recap of trigger usage (admin only)")
     @commands.has_permissions(administrator=True)
-    async def resetstats(self, ctx, period: str):
-        """Reset play statistics for all sounds."""
+    async def weeklyrecap(self, ctx):
+        """
+        Display a weekly recap of trigger usage in the guild.
+
+        Shows:
+        - Top user of the week
+        - Most active channel
+        - Total triggers used
+        - Average triggers per user
+        """
+        from utils.user_stats import load_user_stats, get_weekly_recap_data, USER_STATS_FILE
+
+        try:
+            user_stats = load_user_stats(USER_STATS_FILE)
+            guild_id_str = str(ctx.guild.id)
+
+            recap_data = get_weekly_recap_data(user_stats, guild_id_str)
+
+            embed = discord.Embed(
+                title=f"📅 Weekly Recap for {ctx.guild.name}",
+                description="Here's what happened this week!",
+                color=discord.Color.purple()
+            )
+
+            if ctx.guild.icon:
+                embed.set_thumbnail(url=ctx.guild.icon.url)
+
+            # Top user
+            if recap_data["top_user"]:
+                user_id, username, count = recap_data["top_user"]
+                try:
+                    member = ctx.guild.get_member(int(user_id))
+                    display_name = member.display_name if member else username
+                    avatar_url = member.avatar.url if member and member.avatar else None
+                except:
+                    display_name = username
+                    avatar_url = None
+
+                top_user_text = f"🥇 **{display_name}** with **{count}** triggers!"
+                embed.add_field(name="👑 Top User", value=top_user_text, inline=False)
+
+                if avatar_url:
+                    embed.set_author(name=f"{display_name} dominated this week!", icon_url=avatar_url)
+            else:
+                embed.add_field(name="👑 Top User", value="No activity this week", inline=False)
+
+            # Most active channel
+            if recap_data["most_active_channel"]:
+                channel_id, count = recap_data["most_active_channel"]
+                channel_obj = ctx.guild.get_channel(int(channel_id))
+                channel_name = channel_obj.name if channel_obj else "Unknown"
+
+                channel_text = f"📍 **#{channel_name}** with **{count}** triggers"
+                embed.add_field(name="🔥 Hottest Channel", value=channel_text, inline=False)
+            else:
+                embed.add_field(name="🔥 Hottest Channel", value="No activity", inline=False)
+
+            # Stats summary
+            stats_text = (
+                f"**Total Triggers:** {recap_data['total_triggers']}\n"
+                f"**Active Users:** {recap_data['total_users']}\n"
+                f"**Avg Per User:** {recap_data['avg_per_user']:.1f}"
+            )
+            embed.add_field(name="📊 Week Summary", value=stats_text, inline=False)
+
+            embed.set_footer(text="Use ~resetstats week members to reset weekly stats")
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Failed to generate weekly recap: {e}", exc_info=True)
+            await ctx.send("❌ Failed to generate weekly recap!")
+
+    @commands.command(name="activityleaderboard", help="Show activity leaderboard")
+    async def activityleaderboard(self, ctx, *args):
+        """
+        Show activity leaderboard (ambiguous by default, exact for admins with 'actual').
+
+        Usage:
+            ~activityleaderboard               # All-time human activity (ambiguous)
+            ~activityleaderboard week          # Weekly human activity
+            ~activityleaderboard bots          # Bot leaderboard
+            ~activityleaderboard actual        # All-time with exact counts (admin only)
+            ~activityleaderboard week actual   # Weekly exact counts (admin only)
+            ~activityleaderboard bots actual   # Bot exact counts (admin only)
+        """
+        from utils.activity_stats import (
+            load_activity_stats, get_activity_leaderboard, get_activity_tier,
+            render_bar_chart, ACTIVITY_STATS_FILE
+        )
+        from utils.admin_manager import is_admin
+
+        try:
+            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            guild_id_str = str(ctx.guild.id)
+
+            # Parse arguments
+            period = "total"
+            show_bots = False
+            show_actual = False
+
+            for arg in args:
+                arg_lower = arg.lower()
+                if arg_lower in ["daily", "weekly", "monthly", "total"]:
+                    period = arg_lower
+                elif arg_lower == "bots":
+                    show_bots = True
+                elif arg_lower == "actual":
+                    # Check if user is admin
+                    user_roles = [role.id for role in ctx.author.roles] if hasattr(ctx.author, 'roles') else []
+                    if not is_admin(ctx.author.id, user_roles):
+                        return await ctx.send("❌ Only admins can view actual stats!", delete_after=5)
+                    show_actual = True
+
+            # Get leaderboard data
+            leaderboard_data = get_activity_leaderboard(
+                activity_stats,
+                guild_id=guild_id_str,
+                period=period,
+                include_bots=show_bots,
+                limit=10
+            )
+
+            # Build title
+            period_text = {"daily": "Daily", "weekly": "Weekly", "monthly": "Monthly", "total": "All-Time"}[period]
+            bot_text = " (Bots)" if show_bots else ""
+            actual_text = " - Exact Data" if show_actual else ""
+            title = f"📊 {period_text} Activity Leaderboard{bot_text}{actual_text}"
+
+            embed = discord.Embed(title=title, color=discord.Color.green())
+
+            # Set guild icon
+            if ctx.guild.icon:
+                embed.set_thumbnail(url=ctx.guild.icon.url)
+
+            if leaderboard_data:
+                max_score = leaderboard_data[0][2]  # Highest score for bar scaling
+
+                for i, (user_id, username, score, is_bot) in enumerate(leaderboard_data, 1):
+                    # Get member info
+                    try:
+                        member = ctx.guild.get_member(int(user_id))
+                        display_name = member.display_name if member else username
+                        avatar_url = member.avatar.url if member and member.avatar else None
+                    except:
+                        display_name = username
+                        avatar_url = None
+
+                    # Add medal for top 3
+                    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+                    medal = medals.get(i, "")
+
+                    if show_actual:
+                        # Show exact internal stats (admin only)
+                        user_stat = activity_stats.guilds[guild_id_str].users.get(str(user_id))
+                        if user_stat:
+                            stats = user_stat.activity_stats
+                            value_text = (
+                                f"**Messages:** {stats._message_count}\n"
+                                f"**Reactions Given:** {stats._reaction_given} | **Received:** {stats._reaction_received}\n"
+                                f"**Replies Given:** {stats._replies_given} | **Received:** {stats._replies_received}\n"
+                                f"**Voice (Total/Unmuted/Speaking):** {stats._voice_total_minutes}/{stats._voice_unmuted_minutes}/{stats._voice_speaking_minutes} min\n"
+                                f"**Activity Score:** {score:.1f}"
+                            )
+                        else:
+                            value_text = f"Score: {score:.1f}"
+                    else:
+                        # Show ambiguous data
+                        from utils.activity_stats import get_voice_time_display
+                        from config import config
+
+                        tier_name, tier_emoji, tier_desc = get_activity_tier(score)
+                        bar = render_bar_chart(int(score), int(max_score), bar_length=15)
+                        value_text = f"{bar} {tier_emoji} **{tier_name}**\n{tier_desc} (Score: {int(score)})"
+
+                        # Add voice time if enabled
+                        user_stat = activity_stats.guilds[guild_id_str].users.get(str(user_id))
+                        if user_stat:
+                            voice_minutes = 0
+                            if config.voice_tracking_type == "total":
+                                voice_minutes = user_stat.activity_stats._voice_total_minutes
+                            elif config.voice_tracking_type == "unmuted":
+                                voice_minutes = user_stat.activity_stats._voice_unmuted_minutes
+                            elif config.voice_tracking_type == "speaking":
+                                voice_minutes = user_stat.activity_stats._voice_speaking_minutes
+
+                            if voice_minutes > 0:
+                                voice_display = get_voice_time_display(
+                                    voice_minutes,
+                                    display_mode=config.voice_time_display_mode,
+                                    tracking_type=config.voice_tracking_type
+                                )
+                                if voice_display:
+                                    value_text += f"\n{voice_display}"
+
+                    field_name = f"{medal} {i}. {display_name}"
+                    embed.add_field(name=field_name, value=value_text, inline=False)
+
+                    # Set #1 user's avatar
+                    if i == 1 and avatar_url:
+                        embed.set_author(name=f"👑 {display_name} is most active!", icon_url=avatar_url)
+
+            else:
+                embed.description = "No activity stats yet!"
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            logger.error(f"Failed to load activity leaderboard: {e}", exc_info=True)
+            await ctx.send("❌ Failed to load activity leaderboard!")
+
+    @commands.command(name="admincontrol", hidden=True)
+    async def admincontrol(self, ctx, action: str = None, target: discord.Member = None):
+        """
+        Hidden command to manage bot admins (owner only).
+        Not listed in help.
+
+        Usage:
+            ~admincontrol add @User       - Add user as admin
+            ~admincontrol remove @User    - Remove user from admins
+            ~admincontrol list            - List current admins
+        """
+        from utils.admin_manager import (
+            is_owner, add_admin_user, remove_admin_user,
+            get_admin_users, get_admin_roles
+        )
+
+        # Only owner can use this command
+        if not is_owner(ctx.author.id):
+            return  # Silently ignore non-owners
+
+        if not action:
+            return await ctx.send("❌ Usage: `~admincontrol [add|remove|list] [@User]`", delete_after=10)
+
+        action = action.lower()
+
+        if action == "list":
+            admin_users = get_admin_users()
+            admin_roles = get_admin_roles()
+
+            embed = discord.Embed(
+                title="🔐 Bot Admins",
+                color=discord.Color.blue()
+            )
+
+            # List admin users
+            if admin_users:
+                user_lines = []
+                for user_id in admin_users:
+                    user = self.bot.get_user(user_id)
+                    if user:
+                        user_lines.append(f"• {user.mention} ({user.name})")
+                    else:
+                        user_lines.append(f"• Unknown User (ID: {user_id})")
+
+                embed.add_field(
+                    name="👥 Admin Users",
+                    value="\n".join(user_lines),
+                    inline=False
+                )
+            else:
+                embed.add_field(name="👥 Admin Users", value="None", inline=False)
+
+            # List admin roles
+            if admin_roles:
+                role_lines = []
+                for role_id in admin_roles:
+                    role = ctx.guild.get_role(role_id) if ctx.guild else None
+                    if role:
+                        role_lines.append(f"• {role.mention} ({role.name})")
+                    else:
+                        role_lines.append(f"• Unknown Role (ID: {role_id})")
+
+                embed.add_field(
+                    name="🎭 Admin Roles",
+                    value="\n".join(role_lines),
+                    inline=False
+                )
+            else:
+                embed.add_field(name="🎭 Admin Roles", value="None", inline=False)
+
+            await ctx.send(embed=embed, delete_after=30)
+
+        elif action == "add":
+            if not target:
+                return await ctx.send("❌ Please mention a user to add as admin.", delete_after=10)
+
+            if add_admin_user(target.id):
+                await ctx.send(f"✅ Added {target.mention} as an admin.", delete_after=10)
+                logger.info(f"[Admin] {ctx.author} added {target} as admin")
+            else:
+                await ctx.send(f"ℹ️ {target.mention} is already an admin.", delete_after=10)
+
+        elif action == "remove":
+            if not target:
+                return await ctx.send("❌ Please mention a user to remove from admins.", delete_after=10)
+
+            if remove_admin_user(target.id):
+                await ctx.send(f"✅ Removed {target.mention} from admins.", delete_after=10)
+                logger.info(f"[Admin] {ctx.author} removed {target} from admins")
+            else:
+                await ctx.send(f"❌ {target.mention} is not an admin or is the bot owner (cannot be removed).", delete_after=10)
+
+        else:
+            await ctx.send("❌ Invalid action. Use: `add`, `remove`, or `list`", delete_after=10)
+
+    @commands.command(name="resetstats", help="Reset play statistics (week or month) [sounds|members|all]")
+    @commands.has_permissions(administrator=True)
+    async def resetstats(self, ctx, period: str, stat_type: str = "all"):
+        """
+        Reset play statistics for sounds and/or members.
+
+        Usage:
+            ~resetstats week sounds - Reset weekly sound stats
+            ~resetstats month members - Reset monthly member trigger stats
+            ~resetstats week all - Reset both sound and member stats
+        """
         period_lower = period.lower()
+        stat_type_lower = stat_type.lower()
 
         if period_lower not in ["week", "month"]:
             return await ctx.send("❌ Period must be either `week` or `month`")
 
+        if stat_type_lower not in ["sounds", "members", "all"]:
+            return await ctx.send("❌ Type must be either `sounds`, `members`, or `all`")
+
+        results = []
+
         try:
-            count = self.reset_play_stats(period_lower)
-            await ctx.send(f"✅ Reset {period_lower} statistics for {count} sound(s)!")
-            logger.info(f"[{ctx.guild.name}] {ctx.author} reset {period_lower} stats")
+            # Reset sound stats
+            if stat_type_lower in ["sounds", "all"]:
+                count = self.reset_play_stats(period_lower)
+                results.append(f"sound(s): {count}")
+                logger.info(f"[{ctx.guild.name}] {ctx.author} reset {period_lower} sound stats")
+
+            # Reset member stats (guild-specific)
+            if stat_type_lower in ["members", "all"]:
+                from utils.user_stats import load_user_stats, save_user_stats, reset_user_stats, USER_STATS_FILE
+                user_stats = load_user_stats(USER_STATS_FILE)
+                count = reset_user_stats(user_stats, period_lower, guild_id=str(ctx.guild.id))
+                save_user_stats(USER_STATS_FILE, user_stats)
+                results.append(f"member(s): {count}")
+                logger.info(f"[{ctx.guild.name}] {ctx.author} reset {period_lower} member stats")
+
+            result_text = ", ".join(results)
+            await ctx.send(f"✅ Reset {period_lower} statistics for {result_text}!")
+
         except Exception as e:
             logger.error(f"Reset stats failed: {e}", exc_info=True)
             await ctx.send(f"❌ Failed to reset {period_lower} statistics!")

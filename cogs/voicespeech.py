@@ -160,7 +160,7 @@ class VoiceSpeechCog(BaseCog):
 
         try:
             while True:
-                soundfile, sound_key, volume, vc, user_id, trigger_word = await queue.get()
+                soundfile, sound_key, volume, vc, user_id, trigger_word, channel_id, username = await queue.get()
 
                 if not vc or not vc.is_connected():
                     logger.warning(f"[Guild {guild_id}] Voice client disconnected, skipping {soundfile}")
@@ -228,6 +228,26 @@ class VoiceSpeechCog(BaseCog):
                 if soundboard_cog and sound_key:
                     soundboard_cog.increment_play_stats(guild_id, soundfile, str(user_id), trigger_word)
 
+                # Track user trigger stats
+                if trigger_word and channel_id:
+                    try:
+                        from utils.user_stats import (
+                            load_user_stats, save_user_stats, increment_user_trigger_stat, USER_STATS_FILE
+                        )
+                        user_stats = load_user_stats(USER_STATS_FILE)
+                        user_stats = increment_user_trigger_stat(
+                            user_stats,
+                            user_id,
+                            username,
+                            guild_id,
+                            channel_id,
+                            trigger_word
+                        )
+                        save_user_stats(USER_STATS_FILE, user_stats)
+                        logger.debug(f"[Guild {guild_id}] Tracked trigger '{trigger_word}' by user {username} (ID: {user_id})")
+                    except Exception as e:
+                        logger.error(f"[Guild {guild_id}] Failed to track user trigger stats: {e}", exc_info=True)
+
                 try:
                     await asyncio.wait_for(event.wait(), timeout=30.0)
                 except asyncio.TimeoutError:
@@ -244,13 +264,13 @@ class VoiceSpeechCog(BaseCog):
             logger.critical(f"[Guild {guild_id}] Unexpected error: {e}", exc_info=True)
 
     async def queue_sound(self, guild_id: int, soundfile: str, user: discord.User, sound_key: str = None,
-                          volume: float = 1.0, trigger_word: str = None):
+                          volume: float = 1.0, trigger_word: str = None, channel_id: int = None):
         """Queue a sound for playback."""
         if guild_id not in self.sound_queues:
             self.sound_queues[guild_id] = asyncio.Queue()
             self.queue_tasks[guild_id] = asyncio.create_task(self._process_sound_queue(guild_id))
 
-        await self.sound_queues[guild_id].put((soundfile, sound_key, volume, user.guild.voice_client, user.id, trigger_word))
+        await self.sound_queues[guild_id].put((soundfile, sound_key, volume, user.guild.voice_client, user.id, trigger_word, channel_id, user.display_name))
         logger.debug(
             f"[Guild {guild_id}] Queued '{soundfile}' (volume: {volume:.2f}, queue size: {self.sound_queues[guild_id].qsize()})")
 
@@ -283,6 +303,8 @@ class VoiceSpeechCog(BaseCog):
     def _create_speech_listener(self, ctx):
         """Create a speech recognition listener with ducking support and error handling."""
         guild_id = ctx.guild.id
+        # Get the voice channel ID from the bot's voice client
+        voice_channel_id = ctx.guild.voice_client.channel.id if ctx.guild.voice_client else None
 
         def text_callback(user: discord.User, text: str):
             try:
@@ -333,7 +355,7 @@ class VoiceSpeechCog(BaseCog):
                                     "volume": volume
                                 })
                                 # Queue sound for THIS guild only
-                                await self.queue_sound(guild_id, soundfile, user, sound_key, volume, trigger_word)
+                                await self.queue_sound(guild_id, soundfile, user, sound_key, volume, trigger_word, voice_channel_id)
 
                         # Log transcription with guild_id and triggers after adding them
                         logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
@@ -645,9 +667,10 @@ class VoiceSpeechCog(BaseCog):
         )
 
         if files:
+            voice_channel_id = vc.channel.id if vc and vc.channel else None
             for soundfile, sound_key, volume, trigger_word in files:
                 if os.path.isfile(soundfile):
-                    await self.queue_sound(ctx.guild.id, soundfile, ctx.author, sound_key, volume, trigger_word)
+                    await self.queue_sound(ctx.guild.id, soundfile, ctx.author, sound_key, volume, trigger_word, voice_channel_id)
             await UserFeedback.success(ctx, f"Queued {len(files)} sound(s).")
         else:
             await UserFeedback.info(ctx, f"No sounds found for: `{input_text}`")

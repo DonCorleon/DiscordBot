@@ -49,6 +49,23 @@ class BotConfig:
     enable_auto_disconnect: bool = True
     enable_speech_recognition: bool = True
 
+    # Weekly Recap Configuration
+    enable_weekly_recap: bool = False  # Disabled by default
+    weekly_recap_channel_id: int = None  # Channel ID to post recaps
+    weekly_recap_day: int = 0  # Day of week (0=Monday, 6=Sunday)
+    weekly_recap_hour: int = 9  # Hour to post (24-hour format)
+
+    # Admin System Configuration
+    bot_owner_id: int = 696940351977422878  # Bot owner (can manage admins)
+    admin_user_ids: list[int] = None  # User IDs with admin access
+    admin_role_ids: list[int] = None  # Role IDs with admin access
+
+    # Voice Time Tracking Configuration
+    voice_tracking_enabled: bool = True  # Track voice channel time
+    voice_points_per_minute: float = 0.0  # Points awarded per minute in voice (0 = disabled)
+    voice_time_display_mode: str = "ranges"  # "ranges", "descriptions", or "points_only"
+    voice_tracking_type: str = "total"  # "total", "unmuted", or "speaking"
+
     @classmethod
     def from_env(cls):
         """Create config from environment variables."""
@@ -77,6 +94,19 @@ class BotConfig:
             # Feature flags
             enable_auto_disconnect=os.getenv("ENABLE_AUTO_DISCONNECT", "true").lower() == "true",
             enable_speech_recognition=os.getenv("ENABLE_SPEECH_RECOGNITION", "true").lower() == "true",
+            # Weekly recap settings
+            enable_weekly_recap=os.getenv("ENABLE_WEEKLY_RECAP", "false").lower() == "true",
+            weekly_recap_channel_id=int(os.getenv("WEEKLY_RECAP_CHANNEL_ID")) if os.getenv("WEEKLY_RECAP_CHANNEL_ID") else None,
+            weekly_recap_day=int(os.getenv("WEEKLY_RECAP_DAY", "0")),  # Default Monday
+            weekly_recap_hour=int(os.getenv("WEEKLY_RECAP_HOUR", "9")),  # Default 9 AM
+            # Admin system - owner ID is hardcoded, admins loaded from file
+            admin_user_ids=[696940351977422878],  # Start with owner as admin
+            admin_role_ids=[],
+            # Voice tracking settings
+            voice_tracking_enabled=os.getenv("VOICE_TRACKING_ENABLED", "true").lower() == "true",
+            voice_points_per_minute=float(os.getenv("VOICE_POINTS_PER_MINUTE", "0.0")),
+            voice_time_display_mode=os.getenv("VOICE_TIME_DISPLAY_MODE", "ranges"),
+            voice_tracking_type=os.getenv("VOICE_TRACKING_TYPE", "total"),
         )
 
     def display(self):
