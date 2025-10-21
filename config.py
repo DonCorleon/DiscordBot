@@ -66,6 +66,10 @@ class BotConfig:
     voice_time_display_mode: str = "ranges"  # "ranges", "descriptions", or "points_only"
     voice_tracking_type: str = "total"  # "total", "unmuted", or "speaking"
 
+    # Auto-Join Configuration
+    auto_join_enabled: bool = True  # Enable auto-join for voice channels
+    auto_join_timeout: int = 300  # Seconds to wait before leaving empty channel (default: 5 minutes)
+
     @classmethod
     def from_env(cls):
         """Create config from environment variables."""
@@ -107,6 +111,9 @@ class BotConfig:
             voice_points_per_minute=float(os.getenv("VOICE_POINTS_PER_MINUTE", "0.0")),
             voice_time_display_mode=os.getenv("VOICE_TIME_DISPLAY_MODE", "ranges"),
             voice_tracking_type=os.getenv("VOICE_TRACKING_TYPE", "total"),
+            # Auto-join settings
+            auto_join_enabled=os.getenv("AUTO_JOIN_ENABLED", "true").lower() == "true",
+            auto_join_timeout=int(os.getenv("AUTO_JOIN_TIMEOUT", "300")),
         )
 
     def display(self):

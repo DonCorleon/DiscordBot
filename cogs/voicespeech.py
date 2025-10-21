@@ -55,53 +55,113 @@ class VoiceSpeechCog(BaseCog):
         # Track speaking users per guild
         self.speaking_users = {}  # {guild_id: set(user_ids)}
 
+        # Auto-disconnect timeout tasks
+        self.disconnect_tasks = {}  # {guild_id: Task}
+
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
                                     after: discord.VoiceState):
-        if before.channel is None:
-            return
-        if not member.guild.voice_client:
-            return
-        bot_channel = member.guild.voice_client.channel
-        if before.channel.id != bot_channel.id:
-            return
-        members_in_channel = [m for m in bot_channel.members if not m.bot]
-        if len(members_in_channel) == 0:
-            logger.info(f"[{member.guild.name}] All users left, auto-disconnecting")
-            guild_id = member.guild.id
+        from utils.auto_join_manager import is_auto_join_channel
+        import voice_recv
 
-            # Cancel queue processor
-            if guild_id in self.queue_tasks:
-                self.queue_tasks[guild_id].cancel()
-                del self.queue_tasks[guild_id]
-            if guild_id in self.sound_queues:
-                del self.sound_queues[guild_id]
+        guild_id = member.guild.id
 
-            # Stop listening
-            if guild_id in self.active_sinks:
-                try:
-                    member.guild.voice_client.stop_listening()
-                except Exception as e:
-                    logger.error(f"[{member.guild.name}] Error stopping listener: {e}")
-                del self.active_sinks[guild_id]
+        # Handle auto-join when someone joins an enabled channel
+        if config.auto_join_enabled and not member.bot:
+            # User joined a channel
+            if before.channel is None and after.channel is not None:
+                # Check if this channel has auto-join enabled
+                if is_auto_join_channel(guild_id, after.channel.id):
+                    # Check if bot is not already connected
+                    if not member.guild.voice_client:
+                        try:
+                            vc = await after.channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
+                            logger.info(f"[{member.guild.name}] Auto-joined {after.channel.name} (triggered by {member.name})")
 
-            # Clean up current source
-            if guild_id in self.current_sources:
-                try:
-                    self.current_sources[guild_id].cleanup()
-                except:
-                    pass
-                del self.current_sources[guild_id]
+                            # Start keepalive if needed
+                            if not self._keepalive_task:
+                                self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
 
-            # Clear speaking users
-            if guild_id in self.speaking_users:
-                del self.speaking_users[guild_id]
+                            # Cancel any pending disconnect
+                            if guild_id in self.disconnect_tasks:
+                                self.disconnect_tasks[guild_id].cancel()
+                                del self.disconnect_tasks[guild_id]
 
-            try:
-                await member.guild.voice_client.disconnect()
-                logger.info(f"[{member.guild.name}] Auto-disconnected")
-            except Exception as e:
-                logger.error(f"[{member.guild.name}] Error disconnecting: {e}")
+                        except Exception as e:
+                            logger.error(f"Failed to auto-join {after.channel.name}: {e}")
+
+        # Handle disconnect when channel becomes empty
+        if before.channel is not None:
+            if not member.guild.voice_client:
+                return
+
+            bot_channel = member.guild.voice_client.channel
+
+            if before.channel.id != bot_channel.id:
+                return
+
+            members_in_channel = [m for m in bot_channel.members if not m.bot]
+
+            if len(members_in_channel) == 0:
+                # Cancel any existing disconnect task
+                if guild_id in self.disconnect_tasks:
+                    self.disconnect_tasks[guild_id].cancel()
+
+                # Start timeout before disconnecting
+                async def disconnect_after_timeout():
+                    try:
+                        await asyncio.sleep(config.auto_join_timeout)
+                        logger.info(f"[{member.guild.name}] Timeout reached, disconnecting from {bot_channel.name}")
+
+                        # Cancel queue processor
+                        if guild_id in self.queue_tasks:
+                            self.queue_tasks[guild_id].cancel()
+                            del self.queue_tasks[guild_id]
+                        if guild_id in self.sound_queues:
+                            del self.sound_queues[guild_id]
+
+                        # Stop listening
+                        if guild_id in self.active_sinks:
+                            try:
+                                member.guild.voice_client.stop_listening()
+                            except Exception as e:
+                                logger.error(f"[{member.guild.name}] Error stopping listener: {e}")
+                            del self.active_sinks[guild_id]
+
+                        # Clean up current source
+                        if guild_id in self.current_sources:
+                            try:
+                                self.current_sources[guild_id].cleanup()
+                            except:
+                                pass
+                            del self.current_sources[guild_id]
+
+                        # Clear speaking users
+                        if guild_id in self.speaking_users:
+                            del self.speaking_users[guild_id]
+
+                        try:
+                            await member.guild.voice_client.disconnect()
+                            logger.info(f"[{member.guild.name}] Disconnected after timeout")
+                        except Exception as e:
+                            logger.error(f"[{member.guild.name}] Error disconnecting: {e}")
+
+                        # Clean up task reference
+                        if guild_id in self.disconnect_tasks:
+                            del self.disconnect_tasks[guild_id]
+
+                    except asyncio.CancelledError:
+                        logger.debug(f"[{member.guild.name}] Disconnect timeout cancelled")
+
+                self.disconnect_tasks[guild_id] = self.bot.loop.create_task(disconnect_after_timeout())
+                logger.info(f"[{member.guild.name}] All users left, starting {config.auto_join_timeout}s disconnect timer")
+
+            elif len(members_in_channel) > 0:
+                # Someone is back, cancel disconnect if scheduled
+                if guild_id in self.disconnect_tasks:
+                    self.disconnect_tasks[guild_id].cancel()
+                    del self.disconnect_tasks[guild_id]
+                    logger.debug(f"[{member.guild.name}] User rejoined, cancelled disconnect timer")
 
     async def cog_unload(self):
         logger.info("Unloading VoiceSpeechCog...")
@@ -116,6 +176,15 @@ class VoiceSpeechCog(BaseCog):
 
         # Cancel queue tasks
         for guild_id, task in list(self.queue_tasks.items()):
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        # Cancel disconnect tasks
+        for guild_id, task in list(self.disconnect_tasks.items()):
             if not task.done():
                 task.cancel()
                 try:
@@ -536,6 +605,9 @@ class VoiceSpeechCog(BaseCog):
 
     @commands.command(help="Join a voice channel (optional: channel name or ID)")
     async def join(self, ctx, *, channel_input: str = None):
+        from utils.auto_join_manager import add_auto_join_channel
+        from config import config
+
         # If already connected
         if ctx.voice_client:
             return await UserFeedback.info(ctx, "Already connected to a voice channel.")
@@ -581,14 +653,19 @@ class VoiceSpeechCog(BaseCog):
             if not self._keepalive_task:
                 self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
 
+            # Enable auto-join for this channel
+            if config.auto_join_enabled:
+                add_auto_join_channel(ctx.guild.id, target_channel.id)
+                logger.info(f"Auto-join enabled for {target_channel.name} in guild {ctx.guild.id}")
+
             # Auto-start listening ONLY if a channel was specified
             if channel_input:
                 sink = self._create_speech_listener(ctx)
                 vc.listen(sink)
                 self.active_sinks[ctx.guild.id] = sink
-                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧")
+                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧\n*Auto-join enabled for this channel.*")
             else:
-                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and ready to listen.")
+                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and ready to listen.\n*Auto-join enabled for this channel.*")
         except Exception as e:
             logger.error(f"Failed to join channel {target_channel.name}: {e}", exc_info=True)
             await UserFeedback.error(ctx, f"Failed to join `{target_channel.name}`: {str(e)}")
@@ -622,6 +699,86 @@ class VoiceSpeechCog(BaseCog):
         if self._keepalive_task:
             self._keepalive_task.cancel()
             self._keepalive_task = None
+
+    @commands.command(help="Disable auto-join for a voice channel")
+    async def unjoin(self, ctx, *, channel_input: str = None):
+        """
+        Disable auto-join for a voice channel.
+
+        Usage:
+            ~unjoin              - Disable auto-join for your current voice channel
+            ~unjoin pubg         - Disable auto-join for channel named 'pubg'
+        """
+        from utils.auto_join_manager import remove_auto_join_channel, get_guild_auto_join_channels
+
+        target_channel = None
+
+        if channel_input:
+            # Search for channel by name
+            channel_name_lower = channel_input.lower()
+            for channel in ctx.guild.voice_channels:
+                if channel.name.lower() == channel_name_lower:
+                    target_channel = channel
+                    break
+
+            # Try partial match if exact match not found
+            if not target_channel:
+                for channel in ctx.guild.voice_channels:
+                    if channel_name_lower in channel.name.lower():
+                        target_channel = channel
+                        break
+
+            if not target_channel:
+                return await UserFeedback.error(ctx, f"Could not find voice channel: `{channel_input}`")
+        else:
+            # No argument provided, use caller's current channel
+            if not ctx.author.voice or not ctx.author.voice.channel:
+                return await UserFeedback.warning(ctx, "You're not in a voice channel. Please specify a channel name.")
+            target_channel = ctx.author.voice.channel
+
+        # Remove auto-join
+        removed = remove_auto_join_channel(ctx.guild.id, target_channel.id)
+
+        if removed:
+            await UserFeedback.success(ctx, f"Auto-join disabled for `{target_channel.name}`")
+        else:
+            await UserFeedback.info(ctx, f"`{target_channel.name}` didn't have auto-join enabled")
+
+    @commands.command(name="autojoin", help="Manage auto-join channels")
+    async def autojoin_cmd(self, ctx, action: str = None):
+        """
+        Manage auto-join channels.
+
+        Usage:
+            ~autojoin list       - Show all auto-join enabled channels
+        """
+        from utils.auto_join_manager import get_guild_auto_join_channels
+
+        if action and action.lower() == "list":
+            channel_ids = get_guild_auto_join_channels(ctx.guild.id)
+
+            if not channel_ids:
+                return await UserFeedback.info(ctx, "No auto-join channels configured")
+
+            # Build channel list
+            channel_names = []
+            for channel_id in channel_ids:
+                channel = ctx.guild.get_channel(int(channel_id))
+                if channel:
+                    channel_names.append(f"• {channel.name}")
+                else:
+                    channel_names.append(f"• Unknown channel (ID: {channel_id})")
+
+            embed = discord.Embed(
+                title="🎤 Auto-Join Channels",
+                description="\n".join(channel_names),
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text=f"{len(channel_ids)} channel(s) configured")
+
+            await ctx.send(embed=embed)
+        else:
+            await UserFeedback.info(ctx, "Usage: `~autojoin list` - Show all auto-join channels")
 
     @commands.command(help="Start listening")
     async def start(self, ctx):
