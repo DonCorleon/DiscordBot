@@ -218,15 +218,16 @@ DiscordBot/
 - [ ] Test: Error handling, base commands (will test after data migration)
 
 ### Phase 4: Move Data
-- [ ] Move soundboard/ → data/soundboard/
-- [ ] Move model/ → models/vosk/
-- [ ] Move soundboard.json → data/config/soundboard.json
-- [ ] Move tts_preferences.json → data/config/tts_preferences.json
-- [ ] Move activity_stats.json → data/stats/activity_stats.json
-- [ ] Move user_stats.json → data/stats/user_stats.json
-- [ ] Move admin_data/ → data/admin/
-- [ ] Move logs/ → data/logs/
-- [ ] Update all file path references in code
+- [x] Move soundboard/ → data/soundboard/
+- [ ] Move model/ → models/vosk/ (SKIPPED - keeping model/ as is, no config needed)
+- [x] Move soundboard.json → data/config/soundboard.json
+- [x] Move tts_preferences.json → data/config/tts_preferences.json
+- [x] Move auto_join_channels.json → data/config/auto_join_channels.json
+- [ ] Move activity_stats.json → data/stats/activity_stats.json (runtime data - will be created)
+- [ ] Move user_stats.json → data/stats/user_stats.json (runtime data - will be created)
+- [ ] Move admin_data/ → data/admin/ (runtime data - will be created)
+- [ ] Move logs/ → data/logs/ (runtime data - will be created)
+- [x] Update all file path references in code (done in Phase 3)
 
 ### Phase 5: Documentation
 - [ ] Move CLAUDE.md → docs/CLAUDE.md
