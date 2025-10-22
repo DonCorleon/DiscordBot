@@ -8,8 +8,11 @@ from pathlib import Path
 from bot.config import config
 from bot.core.admin.data_collector import initialize_data_collector
 
-# Create data directories (relative to project root)
+# IMPORTANT: Change to project root so model/ directory can be found
 project_root = Path(__file__).parent.parent
+os.chdir(project_root)
+
+# Create data directories (relative to project root)
 (project_root / "data" / "logs").mkdir(parents=True, exist_ok=True)
 
 formatter = logging.Formatter(
