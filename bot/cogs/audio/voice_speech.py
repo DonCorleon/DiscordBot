@@ -81,6 +81,20 @@ class VoiceSpeechCog(BaseCog):
                             if not self._keepalive_task:
                                 self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
 
+                            # Auto-start listening
+                            if guild_id not in self.active_sinks:
+                                # Create a minimal context object for speech listener
+                                class AutoJoinContext:
+                                    def __init__(self, guild, voice_client):
+                                        self.guild = guild
+                                        self.voice_client = voice_client
+
+                                ctx = AutoJoinContext(member.guild, vc)
+                                sink = self._create_speech_listener(ctx)
+                                vc.listen(sink)
+                                self.active_sinks[guild_id] = sink
+                                logger.info(f"[{member.guild.name}] Auto-started listening in {after.channel.name}")
+
                             # Cancel any pending disconnect
                             if guild_id in self.disconnect_tasks:
                                 self.disconnect_tasks[guild_id].cancel()
@@ -657,14 +671,11 @@ class VoiceSpeechCog(BaseCog):
                 add_auto_join_channel(ctx.guild.id, target_channel.id)
                 logger.info(f"Auto-join enabled for {target_channel.name} in guild {ctx.guild.id}")
 
-            # Auto-start listening ONLY if a channel was specified
-            if channel_input:
-                sink = self._create_speech_listener(ctx)
-                vc.listen(sink)
-                self.active_sinks[ctx.guild.id] = sink
-                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧\n*Auto-join enabled for this channel.*")
-            else:
-                await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and ready to listen.\n*Auto-join enabled for this channel.*")
+            # Auto-start listening (always)
+            sink = self._create_speech_listener(ctx)
+            vc.listen(sink)
+            self.active_sinks[ctx.guild.id] = sink
+            await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧\n*Auto-join enabled for this channel.*")
         except Exception as e:
             logger.error(f"Failed to join channel {target_channel.name}: {e}", exc_info=True)
             await UserFeedback.error(ctx, f"Failed to join `{target_channel.name}`: {str(e)}")

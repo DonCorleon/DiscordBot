@@ -9,7 +9,7 @@
 
 # VOICE
 
-- ~join should auto start listening (make "~start" redundant) should also apply to autojoined channels
+- ✅ ~join should auto start listening (make "~start" redundant) should also apply to autojoined channels
 - if in empty voice channel, check if other channels are empty. leave empty channel and autojoin, if allowed, channels with other members
 
 # GENERAL
