@@ -808,17 +808,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 35,
-        "month": 35,
-        "total": 35,
+        "week": 36,
+        "month": 36,
+        "total": 36,
         "guild_play_count": {
           "1386497411278573652": 25,
-          "1410579846379081801": 10
+          "1410579846379081801": 11
         },
         "trigger_word_stats": {
-          "hello": 7
+          "hello": 8
         },
-        "last_played": "2025-10-21T11:33:03.704812",
+        "last_played": "2025-10-22T10:11:38.874766",
         "played_by": [
           "696940351977422878"
         ]
