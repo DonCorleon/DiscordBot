@@ -38,9 +38,9 @@ class BotConfig:
     ducking_transition_ms: int = 50  # 50ms smooth transition
 
     # File Storage
-    soundboard_dir: str = "soundboard"
-    log_dir: str = "logs"
-    admin_data_dir: str = "admin_data"
+    soundboard_dir: str = "data/soundboard"
+    log_dir: str = "data/logs"
+    admin_data_dir: str = "data/admin"
 
     # Logging Configuration
     log_level: str = "INFO"
