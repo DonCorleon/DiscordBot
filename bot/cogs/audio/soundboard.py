@@ -1323,7 +1323,7 @@ class Soundboard(BaseCog):
 
                 # Get activity rank
                 activity_rank, activity_score, total_activity_users = get_user_activity_rank(
-                    activity_stats, guild_id_str, user_id_str, "total", target_member.bot
+                    activity_stats, guild_id_str, user_id_str, # "total", target_member.bot
                 )
 
                 if show_exact:

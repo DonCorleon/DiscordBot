@@ -24,11 +24,16 @@ ENV/
 .env
 
 # Runtime Data (don't track)
-data/stats/*.json
-data/admin/*.json
-data/logs/*.log
+data/stats/
+data/admin/
+data/logs/
 *.backup
 *.bak
+uv.lock
+
+# Session tracking
+docs/WHERE_WE_ARE_AT.md
+TODO.md
 
 # Current structure data files (will move to data/ during restructure)
 activity_stats.json

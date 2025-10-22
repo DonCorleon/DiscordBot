@@ -5,7 +5,7 @@
       "triggers": [
         "swamp"
       ],
-      "soundfile": "soundboard/what-are-you-doing-in-my-swamp.mp3",
+      "soundfile": "data/soundboard/what-are-you-doing-in-my-swamp.mp3",
       "description": "What are you doing in my swamp?",
       "added_by": "System",
       "added_by_id": "0",
@@ -47,7 +47,7 @@
         "boom",
         "bang"
       ],
-      "soundfile": "soundboard/bomb-has-been-planted-sound-effect-cs-go.mp3",
+      "soundfile": "data/soundboard/bomb-has-been-planted-sound-effect-cs-go.mp3",
       "description": "The bomb has been planted",
       "added_by": "System",
       "added_by_id": "0",
@@ -91,7 +91,7 @@
         "quack",
         "duck"
       ],
-      "soundfile": "soundboard/quack1.mp3",
+      "soundfile": "data/soundboard/quack1.mp3",
       "description": "Duck quacking sound",
       "added_by": "System",
       "added_by_id": "0",
@@ -135,7 +135,7 @@
         "america",
         "usa"
       ],
-      "soundfile": "soundboard/merica.ogg",
+      "soundfile": "data/soundboard/merica.ogg",
       "description": "America sound effect",
       "added_by": "System",
       "added_by_id": "0",
@@ -177,7 +177,7 @@
       "triggers": [
         "jihad"
       ],
-      "soundfile": "soundboard/dirka_dirka.ogg",
+      "soundfile": "data/soundboard/dirka_dirka.ogg",
       "description": "Team America reference",
       "added_by": "System",
       "added_by_id": "0",
@@ -218,7 +218,7 @@
         "ding",
         "ring"
       ],
-      "soundfile": "soundboard/ring-a-ding.ogg",
+      "soundfile": "data/soundboard/ring-a-ding.ogg",
       "description": "India's favorite driving music!!",
       "added_by": "System",
       "added_by_id": "0",
@@ -259,7 +259,7 @@
         "cum",
         "come"
       ],
-      "soundfile": "soundboard/Fuck_i_love_cum.ogg",
+      "soundfile": "data/soundboard/Fuck_i_love_cum.ogg",
       "description": "Cum",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -301,7 +301,7 @@
       "triggers": [
         "surprise"
       ],
-      "soundfile": "soundboard/surprise.ogg",
+      "soundfile": "data/soundboard/surprise.ogg",
       "description": "MGS Surprise",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -342,7 +342,7 @@
         "cock",
         "suck"
       ],
-      "soundfile": "soundboard/suck_a_cock.ogg",
+      "soundfile": "data/soundboard/suck_a_cock.ogg",
       "description": "Cocks",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -385,7 +385,7 @@
         "shit",
         "fart"
       ],
-      "soundfile": "soundboard/fart-meme-sound.mp3",
+      "soundfile": "data/soundboard/fart-meme-sound.mp3",
       "description": "Requested by Mr Duck",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -428,7 +428,7 @@
         "faggot",
         "fag"
       ],
-      "soundfile": "soundboard/mike-tyson-i-bang-you.mp3",
+      "soundfile": "data/soundboard/mike-tyson-i-bang-you.mp3",
       "description": "Please dont Big Mike, i love my ass!!",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -471,7 +471,7 @@
         "quack",
         "duck"
       ],
-      "soundfile": "soundboard/quack3.mp3",
+      "soundfile": "data/soundboard/quack3.mp3",
       "description": "cowboy quack",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -513,7 +513,7 @@
         "quack",
         "duck"
       ],
-      "soundfile": "soundboard/Quack-angry.mp3",
+      "soundfile": "data/soundboard/Quack-angry.mp3",
       "description": "Angry Quack",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -555,7 +555,7 @@
         "shit",
         "fart"
       ],
-      "soundfile": "soundboard/dry-fart.mp3",
+      "soundfile": "data/soundboard/dry-fart.mp3",
       "description": "Dry Fart",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -597,7 +597,7 @@
         "shit",
         "fart"
       ],
-      "soundfile": "soundboard/perfect-fart.mp3",
+      "soundfile": "data/soundboard/perfect-fart.mp3",
       "description": "Perfect fart",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -638,7 +638,7 @@
       "triggers": [
         "angle"
       ],
-      "soundfile": "soundboard/funny_angle.ogg",
+      "soundfile": "data/soundboard/funny_angle.ogg",
       "description": "It was a funny angle (Snatch)",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -676,7 +676,7 @@
       "triggers": [
         "mike"
       ],
-      "soundfile": "soundboard/no-mikey.mp3",
+      "soundfile": "data/soundboard/no-mikey.mp3",
       "description": "That was so not right",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -717,7 +717,7 @@
       "triggers": [
         "nigga"
       ],
-      "soundfile": "soundboard/200_nigga.mp3",
+      "soundfile": "data/soundboard/200_nigga.mp3",
       "description": "I'm 200% Nigga!!",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -758,7 +758,7 @@
       "triggers": [
         "quit"
       ],
-      "soundfile": "soundboard/buttfucking-quitter.mp3",
+      "soundfile": "data/soundboard/buttfucking-quitter.mp3",
       "description": "But Quit",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -796,7 +796,7 @@
       "triggers": [
         "hello"
       ],
-      "soundfile": "soundboard/oh-herro.mp3",
+      "soundfile": "data/soundboard/oh-herro.mp3",
       "description": "Kim Jong kong",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -808,17 +808,17 @@
       "is_disabled": false,
       "approved": true,
       "play_stats": {
-        "week": 36,
-        "month": 36,
-        "total": 36,
+        "week": 38,
+        "month": 38,
+        "total": 38,
         "guild_play_count": {
           "1386497411278573652": 25,
-          "1410579846379081801": 11
+          "1410579846379081801": 13
         },
         "trigger_word_stats": {
-          "hello": 8
+          "hello": 10
         },
-        "last_played": "2025-10-22T10:11:38.874766",
+        "last_played": "2025-10-22T12:17:31.580281",
         "played_by": [
           "696940351977422878"
         ]
@@ -839,7 +839,7 @@
         "leroy",
         "jenkins"
       ],
-      "soundfile": "soundboard/224470-33a9f640-d998-45a3-b0c1-31c1687c2ae4.mp3",
+      "soundfile": "data/soundboard/224470-33a9f640-d998-45a3-b0c1-31c1687c2ae4.mp3",
       "description": "Leroy Jenkins",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -881,7 +881,7 @@
       "triggers": [
         "bloody"
       ],
-      "soundfile": "soundboard/bloody_fuck_you.ogg",
+      "soundfile": "data/soundboard/bloody_fuck_you.ogg",
       "description": "Bloody Fuck you, Bloody!",
       "added_by": "don_corleon1979",
       "added_by_id": "696940351977422878",
@@ -905,6 +905,46 @@
         "last_played": "2025-10-21T10:21:14.150050",
         "played_by": [
           "460072954651475970"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "looking_at_a_bitch": {
+      "title": "Looking at a bitch",
+      "triggers": [
+        "bitch"
+      ],
+      "soundfile": "data/soundboard/I_know_a_bitch_when_i_see_one.ogg",
+      "description": "I know a bitch when I see one!",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-22T11:17:59.733555",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 1,
+        "month": 1,
+        "total": 1,
+        "guild_play_count": {
+          "1410579846379081801": 1
+        },
+        "trigger_word_stats": {
+          "bitch": 1
+        },
+        "last_played": "2025-10-22T11:18:43.870399",
+        "played_by": [
+          "696940351977422878"
         ]
       },
       "audio_metadata": {
