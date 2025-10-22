@@ -230,11 +230,12 @@ DiscordBot/
 - [x] Update all file path references in code (done in Phase 3)
 
 ### Phase 5: Documentation
-- [ ] Move CLAUDE.md → docs/CLAUDE.md
-- [ ] Create docs/setup.md
-- [ ] Create docs/commands.md
-- [ ] Create docs/architecture.md
-- [ ] Update README.md with new structure
+- [x] Move CLAUDE.md → docs/CLAUDE.md
+- [x] Update CLAUDE.md with new paths
+- [ ] Create docs/setup.md (OPTIONAL - can be done later)
+- [ ] Create docs/commands.md (OPTIONAL - can be done later)
+- [ ] Create docs/architecture.md (OPTIONAL - can be done later)
+- [ ] Update README.md with new structure (OPTIONAL - can be done later)
 
 ### Phase 6: Testing & Cleanup
 - [ ] Create basic tests in tests/

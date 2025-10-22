@@ -84,19 +84,22 @@ async def on_ready():
 
     # Load cogs from new structure
     cog_domains = ["activity", "audio", "admin", "utility"]
+    cogs_base = os.path.join(os.path.dirname(__file__), "cogs")
+
     for domain in cog_domains:
-        domain_path = f"./cogs/{domain}"
+        domain_path = os.path.join(cogs_base, domain)
         if os.path.exists(domain_path):
             for filename in os.listdir(domain_path):
                 if filename.endswith(".py") and not filename.startswith("__"):
                     await bot.load_extension(f"bot.cogs.{domain}.{filename[:-3]}")
 
     # Load top-level cog files (like errors.py)
-    for filename in os.listdir("./cogs"):
-        if filename.endswith(".py") and not filename.startswith("__"):
-            await bot.load_extension(f"bot.cogs.{filename[:-3]}")
+    if os.path.exists(cogs_base):
+        for filename in os.listdir(cogs_base):
+            if filename.endswith(".py") and not filename.startswith("__"):
+                await bot.load_extension(f"bot.cogs.{filename[:-3]}")
     if config.enable_admin_dashboard:
-        logger.info("📊 Admin dashboard enabled - Data exporting to admin_data/")
+        logger.info("📊 Admin dashboard enabled - Data exporting to data/admin/")
     else:
         logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
 
