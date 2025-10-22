@@ -248,10 +248,10 @@ class ActivityTracker(BaseCog):
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState):
         """Track voice channel join/leave and state changes."""
-        from utils.activity_stats import (
+        from bot.core.stats.activity import (
             start_voice_session, end_voice_session, update_voice_state
         )
-        from config import config
+        from bot.config import config
 
         # Skip if voice tracking is disabled
         if not config.voice_tracking_enabled:

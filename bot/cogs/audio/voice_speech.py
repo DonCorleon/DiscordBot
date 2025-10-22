@@ -299,7 +299,7 @@ class VoiceSpeechCog(BaseCog):
                 # Track user trigger stats
                 if trigger_word and channel_id:
                     try:
-                        from utils.user_stats import (
+                        from bot.core.stats.user_triggers import (
                             load_user_stats, save_user_stats, increment_user_trigger_stat, USER_STATS_FILE
                         )
                         user_stats = load_user_stats(USER_STATS_FILE)
@@ -399,7 +399,7 @@ class VoiceSpeechCog(BaseCog):
                 )
 
                 # Update user info in data collector
-                from utils.admin_data_collector import get_data_collector
+                from bot.core.admin.data_collector import get_data_collector
                 data_collector = get_data_collector()
                 if data_collector:
                     data_collector.update_user_info(user)
@@ -605,7 +605,7 @@ class VoiceSpeechCog(BaseCog):
     @commands.command(help="Join a voice channel (optional: channel name or ID)")
     async def join(self, ctx, *, channel_input: str = None):
         from bot.core.audio.auto_join import add_auto_join_channel
-        from config import config
+        from bot.config import config
 
         # If already connected
         if ctx.voice_client:

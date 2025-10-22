@@ -13,6 +13,7 @@ from discord.ui import View, Button, Select
 from bot.base_cog import BaseCog, logger
 
 SOUNDBOARD_FILE = "data/config/soundboard.json"
+SOUNDBOARD_PATH = "data/soundboard"
 
 
 # -------- Dataclasses --------
@@ -218,8 +219,8 @@ class SoundUploadModal(discord.ui.Modal, title="Upload Sound"):
             if not triggers:
                 return await interaction.response.send_message("❌ At least one trigger required!", ephemeral=True)
 
-            Path("soundboard").mkdir(exist_ok=True)
-            save_path = f"soundboard/{self.attachment.filename}"
+            Path(SOUNDBOARD_PATH).mkdir(exist_ok=True)
+            save_path = f"{SOUNDBOARD_PATH}/{self.attachment.filename}"
             await self.attachment.save(save_path)
 
             await self.cog.add_sound(
