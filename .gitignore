@@ -1,0 +1,61 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# Environment Variables
+.env
+
+# Runtime Data (don't track)
+data/stats/*.json
+data/admin/*.json
+data/logs/*.log
+*.backup
+*.bak
+
+# Current structure data files (will move to data/ during restructure)
+activity_stats.json
+activity_stats.json.backup
+user_stats.json
+user_stats.json.backup
+admin_data/*.json
+logs/*.log
+soundboard.json.backup
+soundboard2.json
+auto_join_channels.json
+tts_preferences.json
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Models (too large for git)
+models/vosk/
+model/
+
+# Keep these
+!data/config/
+!data/soundboard/.gitkeep
