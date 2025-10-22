@@ -102,6 +102,9 @@ def save_user_stats(file_path: str, user_stats: UserStatsData):
 
     try:
         # Create backup if file exists
+        # Create parent directories if needed
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
         if Path(file_path).exists():
             import shutil
             shutil.copy2(file_path, f"{file_path}.backup")

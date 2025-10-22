@@ -122,6 +122,9 @@ def save_activity_stats(file_path: str, activity_stats: ActivityStatsData):
     logger.debug(f"Saving activity stats to '{file_path}'...")
 
     try:
+        # Create parent directories if needed
+        Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+
         # Create backup if file exists
         if Path(file_path).exists():
             import shutil

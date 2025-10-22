@@ -4,7 +4,7 @@ Discord audio source with ducking support.
 
 import discord
 import numpy as np
-from .pyaudio_player import PyAudioPlayer
+from bot.core.audio.player import PyAudioPlayer
 import logging
 
 logger = logging.getLogger("discordbot.discord_audio_source")

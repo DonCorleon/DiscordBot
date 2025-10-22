@@ -85,7 +85,7 @@ class AdminDataCollector:
         self.export_dir = None
         if self.enable_export:
             self.export_dir = Path(config.admin_data_dir)
-            self.export_dir.mkdir(exist_ok=True)
+            self.export_dir.mkdir(parents=True, exist_ok=True)
             logger.info(f"Data export enabled - {config.admin_data_dir} directory created")
         else:
             logger.info("Data export disabled - running in headless mode")

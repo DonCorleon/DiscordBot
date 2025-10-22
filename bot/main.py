@@ -4,10 +4,13 @@ import os
 from datetime import datetime, UTC
 import logging
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 from bot.config import config
 from bot.core.admin.data_collector import initialize_data_collector
 
-os.makedirs("../data/logs", exist_ok=True)
+# Create data directories (relative to project root)
+project_root = Path(__file__).parent.parent
+(project_root / "data" / "logs").mkdir(parents=True, exist_ok=True)
 
 formatter = logging.Formatter(
     "[%(asctime)s] [%(levelname)-8s] %(name)s: %(message)s",
@@ -15,7 +18,7 @@ formatter = logging.Formatter(
 )
 
 file_handler = TimedRotatingFileHandler(
-    "../data/logs/discordbot.log",
+    str(project_root / "data" / "logs" / "discordbot.log"),
     when="midnight",
     interval=1,
     backupCount=7,
