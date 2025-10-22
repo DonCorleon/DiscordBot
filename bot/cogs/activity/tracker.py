@@ -23,10 +23,30 @@ class ActivityTracker(BaseCog):
         self.bot = bot
         # Track processed reactions to prevent duplicates: {(message_id, user_id, emoji): True}
         self.processed_reactions = {}
+        # Cache activity stats in memory to avoid repeated file loads
+        self._cached_stats = None
+        self._stats_dirty = False  # Track if cache needs to be saved
         # Start voice time background task
         if config.voice_tracking_enabled:
             self.voice_time_task.start()
             logger.info("[ActivityTracker] Voice time tracking task started")
+
+    def _get_stats(self):
+        """Get cached stats or load from disk if not cached."""
+        if self._cached_stats is None:
+            self._cached_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+        return self._cached_stats
+
+    def _save_stats(self, force=False):
+        """Save cached stats to disk if dirty or forced."""
+        if self._cached_stats and (self._stats_dirty or force):
+            save_activity_stats(ACTIVITY_STATS_FILE, self._cached_stats)
+            self._stats_dirty = False
+            logger.debug("[ActivityTracker] Saved activity stats to disk")
+
+    def _mark_dirty(self):
+        """Mark stats as needing to be saved."""
+        self._stats_dirty = True
 
     def _has_link(self, content: str) -> bool:
         """Check if message contains a URL."""
@@ -49,7 +69,7 @@ class ActivityTracker(BaseCog):
             return
 
         try:
-            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            activity_stats = self._get_stats()
 
             # Check for links and attachments
             has_link = self._has_link(message.content)
@@ -90,7 +110,8 @@ class ActivityTracker(BaseCog):
                 except:
                     pass  # Original message might be deleted
 
-            save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+            self._mark_dirty()
+            self._save_stats()
 
             logger.debug(
                 f"[Activity] Message tracked: {message.author} in #{message.channel.name} "
@@ -123,7 +144,7 @@ class ActivityTracker(BaseCog):
 
             # Only award points if something new was added
             if new_link or new_attachment:
-                activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+                activity_stats = self._get_stats()
 
                 # Calculate bonus points for what was added
                 bonus_points = 0.0
@@ -152,7 +173,8 @@ class ActivityTracker(BaseCog):
                         if message_id_str in user_stat.activity_stats.message_points:
                             user_stat.activity_stats.message_points[message_id_str] += bonus_points
 
-                        save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+                        self._mark_dirty()
+                        self._save_stats()
 
                         logger.debug(
                             f"[Activity] Edit bonus: {after.author} added "
@@ -171,7 +193,7 @@ class ActivityTracker(BaseCog):
             return
 
         try:
-            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            activity_stats = self._get_stats()
 
             # Remove message activity
             activity_stats = remove_message_activity(
@@ -181,7 +203,8 @@ class ActivityTracker(BaseCog):
                 message_id=message.id
             )
 
-            save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+            self._mark_dirty()
+            self._save_stats()
 
             logger.debug(f"[Activity] Message deleted: removed points for {message.author}")
 
@@ -210,7 +233,7 @@ class ActivityTracker(BaseCog):
             # Mark as processed
             self.processed_reactions[reaction_key] = True
 
-            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            activity_stats = self._get_stats()
 
             # Add reaction activity
             activity_stats = add_reaction_activity(
@@ -224,7 +247,8 @@ class ActivityTracker(BaseCog):
                 author_is_bot=reaction.message.author.bot
             )
 
-            save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+            self._mark_dirty()
+            self._save_stats()
 
             logger.debug(
                 f"[Activity] Reaction tracked: {user} -> {reaction.message.author} "
@@ -258,7 +282,7 @@ class ActivityTracker(BaseCog):
             return
 
         try:
-            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            activity_stats = self._get_stats()
 
             # User joined a voice channel
             if before.channel is None and after.channel is not None:
@@ -272,7 +296,8 @@ class ActivityTracker(BaseCog):
                     is_deafened=after.self_deaf or after.deaf,
                     is_bot=member.bot
                 )
-                save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+                self._mark_dirty()
+                self._save_stats()
                 logger.debug(f"[Activity] {member} joined voice channel {after.channel.name}")
 
             # User left a voice channel
@@ -283,7 +308,8 @@ class ActivityTracker(BaseCog):
                     guild_id=member.guild.id,
                     channel_id=before.channel.id
                 )
-                save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+                self._mark_dirty()
+                self._save_stats()
                 logger.debug(f"[Activity] {member} left voice channel {before.channel.name}")
 
             # User switched voice channels
@@ -306,7 +332,8 @@ class ActivityTracker(BaseCog):
                     is_deafened=after.self_deaf or after.deaf,
                     is_bot=member.bot
                 )
-                save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+                self._mark_dirty()
+                self._save_stats()
                 logger.debug(f"[Activity] {member} switched from {before.channel.name} to {after.channel.name}")
 
             # User changed state (mute/unmute/deaf) in same channel
@@ -324,7 +351,8 @@ class ActivityTracker(BaseCog):
                         is_deafened=after.self_deaf or after.deaf,
                         is_speaking=False  # We'll detect speaking separately
                     )
-                    save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
+                    self._mark_dirty()
+                    self._save_stats()
                     logger.debug(f"[Activity] {member} changed voice state (muted={after.self_mute or after.mute})")
 
         except Exception as e:
@@ -334,18 +362,53 @@ class ActivityTracker(BaseCog):
     async def voice_time_task(self):
         """Background task that runs every minute to update voice time for all active sessions."""
         try:
-            activity_stats = load_activity_stats(ACTIVITY_STATS_FILE)
+            # Check if anyone is in voice channels first
+            has_active_sessions = False
+            for guild in self.bot.guilds:
+                for voice_channel in guild.voice_channels:
+                    # Check if any non-bot members are in the channel
+                    if any(not member.bot for member in voice_channel.members):
+                        has_active_sessions = True
+                        break
+                if has_active_sessions:
+                    break
+
+            # Skip processing if no one is in voice
+            if not has_active_sessions:
+                logger.debug("[ActivityTracker] No active voice sessions, skipping tick")
+                return
+
+            # Get cached stats (loads only once)
+            activity_stats = self._get_stats()
+            changes_made = False
 
             # Process voice time for each guild
             for guild in self.bot.guilds:
-                activity_stats = process_voice_minute_tick(
-                    activity_stats,
-                    guild_id=str(guild.id),
-                    points_per_minute=config.voice_points_per_minute
-                )
+                guild_id_str = str(guild.id)
 
-            save_activity_stats(ACTIVITY_STATS_FILE, activity_stats)
-            logger.debug("[ActivityTracker] Voice time tick processed for all guilds")
+                # Check if this guild has any active sessions
+                if guild_id_str in activity_stats.guilds:
+                    guild_stats = activity_stats.guilds[guild_id_str]
+                    has_sessions = any(
+                        user_stat.activity_stats.voice_sessions
+                        for user_stat in guild_stats.users.values()
+                    )
+
+                    if has_sessions:
+                        activity_stats = process_voice_minute_tick(
+                            activity_stats,
+                            guild_id=guild_id_str,
+                            points_per_minute=config.voice_points_per_minute
+                        )
+                        changes_made = True
+
+            # Only save if changes were actually made
+            if changes_made:
+                self._mark_dirty()
+                self._save_stats()
+                logger.debug("[ActivityTracker] Voice time tick processed and saved")
+            else:
+                logger.debug("[ActivityTracker] No voice sessions to process")
 
         except Exception as e:
             logger.error(f"Failed to process voice time tick: {e}", exc_info=True)
@@ -358,6 +421,9 @@ class ActivityTracker(BaseCog):
 
     def cog_unload(self):
         """Cancel background tasks when cog is unloaded."""
+        # Save any pending changes before unloading
+        self._save_stats(force=True)
+
         if self.voice_time_task.is_running():
             self.voice_time_task.cancel()
             logger.info("[ActivityTracker] Voice time tracking task cancelled")
