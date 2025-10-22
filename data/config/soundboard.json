@@ -1,0 +1,920 @@
+{
+  "sounds": {
+    "swamp": {
+      "title": "Shrek Swamp",
+      "triggers": [
+        "swamp"
+      ],
+      "soundfile": "soundboard/what-are-you-doing-in-my-swamp.mp3",
+      "description": "What are you doing in my swamp?",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T07:39:21.967604",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 18,
+        "month": 18,
+        "total": 18,
+        "guild_play_count": {
+          "default_guild": 7,
+          "1410579846379081801": 6,
+          "1386497411278573652": 5
+        },
+        "trigger_word_stats": {},
+        "last_played": "2025-10-17T09:29:00.508852",
+        "played_by": [
+          "187884767113379840"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.25
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "bomb": {
+      "title": "CS:Bomb",
+      "triggers": [
+        "bomb",
+        "boom",
+        "bang"
+      ],
+      "soundfile": "soundboard/bomb-has-been-planted-sound-effect-cs-go.mp3",
+      "description": "The bomb has been planted",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-10-12T00:00:00",
+      "guild_id": "default_guild",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 60,
+        "month": 60,
+        "total": 60,
+        "guild_play_count": {
+          "default_guild": 11,
+          "1410579846379081801": 8,
+          "1386497411278573652": 35
+        },
+        "trigger_word_stats": {
+          "bomb": 1,
+          "bang": 1
+        },
+        "last_played": "2025-10-21T11:32:43.517522",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "quack": {
+      "title": "Duck Quack",
+      "triggers": [
+        "quack",
+        "duck"
+      ],
+      "soundfile": "soundboard/quack1.mp3",
+      "description": "Duck quacking sound",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T07:37:27.914583",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 165,
+        "month": 165,
+        "total": 165,
+        "guild_play_count": {
+          "default_guild": 49,
+          "1410579846379081801": 11,
+          "1386497411278573652": 58
+        },
+        "trigger_word_stats": {
+          "quack": 2,
+          "duck": 1
+        },
+        "last_played": "2025-10-21T10:30:19.367759",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "america": {
+      "title": "America",
+      "triggers": [
+        "america",
+        "usa"
+      ],
+      "soundfile": "soundboard/merica.ogg",
+      "description": "America sound effect",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 22,
+        "month": 22,
+        "total": 22,
+        "guild_play_count": {
+          "default_guild": 1,
+          "1386497411278573652": 16,
+          "1410579846379081801": 5
+        },
+        "trigger_word_stats": {
+          "america": 1
+        },
+        "last_played": "2025-10-20T11:32:21.594330",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "jihad": {
+      "title": "Dirka Dirka",
+      "triggers": [
+        "jihad"
+      ],
+      "soundfile": "soundboard/dirka_dirka.ogg",
+      "description": "Team America reference",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 21,
+        "month": 21,
+        "total": 21,
+        "guild_play_count": {
+          "1410579846379081801": 8,
+          "default_guild": 3,
+          "1386497411278573652": 8
+        },
+        "trigger_word_stats": {},
+        "last_played": "2025-10-17T12:47:39.230219",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "ding": {
+      "title": "Ring a Ding",
+      "triggers": [
+        "ding",
+        "ring"
+      ],
+      "soundfile": "soundboard/ring-a-ding.ogg",
+      "description": "India's favorite driving music!!",
+      "added_by": "System",
+      "added_by_id": "0",
+      "added_date": "2025-01-01T00:00:00",
+      "guild_id": "default_guild",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 54,
+        "month": 54,
+        "total": 54,
+        "guild_play_count": {
+          "1410579846379081801": 5,
+          "default_guild": 12,
+          "1386497411278573652": 27
+        },
+        "trigger_word_stats": {},
+        "last_played": "2025-10-18T12:36:52.813058",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "fuck_i_love_cum!!": {
+      "title": "Fuck I love cum!!",
+      "triggers": [
+        "cum",
+        "come"
+      ],
+      "soundfile": "soundboard/Fuck_i_love_cum.ogg",
+      "description": "Cum",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-12T08:55:18.648574",
+      "guild_id": "default_guild",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 316,
+        "month": 316,
+        "total": 316,
+        "guild_play_count": {
+          "default_guild": 40,
+          "1410579846379081801": 17,
+          "1386497411278573652": 221
+        },
+        "trigger_word_stats": {
+          "come": 18
+        },
+        "last_played": "2025-10-21T11:42:30.484215",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "surprise": {
+      "title": "Surprise",
+      "triggers": [
+        "surprise"
+      ],
+      "soundfile": "soundboard/surprise.ogg",
+      "description": "MGS Surprise",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-12T10:02:14.991445",
+      "guild_id": "default_guild",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 19,
+        "month": 19,
+        "total": 19,
+        "guild_play_count": {
+          "default_guild": 3,
+          "1386497411278573652": 4,
+          "1410579846379081801": 7
+        },
+        "trigger_word_stats": {},
+        "last_played": "2025-10-17T10:32:26.804740",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "1386497411278573652_oh_yes_suck_a_cock": {
+      "title": "Oh yes suck a cock",
+      "triggers": [
+        "cock",
+        "suck"
+      ],
+      "soundfile": "soundboard/suck_a_cock.ogg",
+      "description": "Cocks",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-12T10:58:55.886874",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 70,
+        "month": 70,
+        "total": 70,
+        "guild_play_count": {
+          "1386497411278573652": 56,
+          "1410579846379081801": 14
+        },
+        "trigger_word_stats": {
+          "suck": 4,
+          "cock": 2
+        },
+        "last_played": "2025-10-21T11:31:29.566758",
+        "played_by": [
+          "460072954651475970"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "wet_fart": {
+      "title": "Wet Fart",
+      "triggers": [
+        "shit",
+        "fart"
+      ],
+      "soundfile": "soundboard/fart-meme-sound.mp3",
+      "description": "Requested by Mr Duck",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-13T10:37:06.580971",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T08:44:42.619004",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 147,
+        "month": 147,
+        "total": 147,
+        "guild_play_count": {
+          "1386497411278573652": 131,
+          "1410579846379081801": 16
+        },
+        "trigger_word_stats": {
+          "shit": 6
+        },
+        "last_played": "2025-10-21T11:14:58.196030",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.3
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "big_mike": {
+      "title": "Big Mike",
+      "triggers": [
+        "mike",
+        "faggot",
+        "fag"
+      ],
+      "soundfile": "soundboard/mike-tyson-i-bang-you.mp3",
+      "description": "Please dont Big Mike, i love my ass!!",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-13T11:10:22.133852",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 94,
+        "month": 94,
+        "total": 94,
+        "guild_play_count": {
+          "1386497411278573652": 76,
+          "1410579846379081801": 18
+        },
+        "trigger_word_stats": {
+          "mike": 1,
+          "faggot": 1
+        },
+        "last_played": "2025-10-21T11:04:19.893806",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "quack_-_cowboy": {
+      "title": "Quack - Cowboy",
+      "triggers": [
+        "quack",
+        "duck"
+      ],
+      "soundfile": "soundboard/quack3.mp3",
+      "description": "cowboy quack",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:17:31.658090",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T08:19:30.149304",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 14,
+        "month": 14,
+        "total": 14,
+        "guild_play_count": {
+          "1386497411278573652": 13,
+          "1410579846379081801": 1
+        },
+        "trigger_word_stats": {
+          "quack": 1
+        },
+        "last_played": "2025-10-21T10:25:35.138096",
+        "played_by": [
+          "1106135032185233440"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.5
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "angry_quack": {
+      "title": "Angry Quack",
+      "triggers": [
+        "quack",
+        "duck"
+      ],
+      "soundfile": "soundboard/Quack-angry.mp3",
+      "description": "Angry Quack",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:18:29.126281",
+      "guild_id": "1386497411278573652",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-14T08:19:46.120195",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 14,
+        "month": 14,
+        "total": 14,
+        "guild_play_count": {
+          "1386497411278573652": 13,
+          "1410579846379081801": 1
+        },
+        "trigger_word_stats": {
+          "duck": 1
+        },
+        "last_played": "2025-10-21T11:25:57.405277",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.5
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "dry_fart": {
+      "title": "Dry Fart",
+      "triggers": [
+        "shit",
+        "fart"
+      ],
+      "soundfile": "soundboard/dry-fart.mp3",
+      "description": "Dry Fart",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:23:39.127921",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 122,
+        "month": 122,
+        "total": 122,
+        "guild_play_count": {
+          "1386497411278573652": 113,
+          "1410579846379081801": 9
+        },
+        "trigger_word_stats": {
+          "shit": 5
+        },
+        "last_played": "2025-10-21T11:29:07.564390",
+        "played_by": [
+          "460072954651475970"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "perfect_fart": {
+      "title": "Perfect Fart",
+      "triggers": [
+        "shit",
+        "fart"
+      ],
+      "soundfile": "soundboard/perfect-fart.mp3",
+      "description": "Perfect fart",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-14T08:24:12.124179",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 164,
+        "month": 164,
+        "total": 164,
+        "guild_play_count": {
+          "1410579846379081801": 14,
+          "1386497411278573652": 150
+        },
+        "trigger_word_stats": {
+          "shit": 6
+        },
+        "last_played": "2025-10-21T11:42:56.729939",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "funny_angle": {
+      "title": "Funny angle",
+      "triggers": [
+        "angle"
+      ],
+      "soundfile": "soundboard/funny_angle.ogg",
+      "description": "It was a funny angle (Snatch)",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T08:21:09.044572",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 5,
+        "month": 5,
+        "total": 5,
+        "guild_play_count": {
+          "1386497411278573652": 5
+        },
+        "trigger_word_stats": {},
+        "last_played": "2025-10-18T10:27:31.979530",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "no_mikey!": {
+      "title": "No Mikey!",
+      "triggers": [
+        "mike"
+      ],
+      "soundfile": "soundboard/no-mikey.mp3",
+      "description": "That was so not right",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T08:22:33.472634",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-17T08:23:02.124095",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 7,
+        "month": 7,
+        "total": 7,
+        "guild_play_count": {
+          "1386497411278573652": 6,
+          "1410579846379081801": 1
+        },
+        "trigger_word_stats": {
+          "mike": 3
+        },
+        "last_played": "2025-10-21T11:40:54.480138",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.3
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "200%_nigga": {
+      "title": "200% Nigga",
+      "triggers": [
+        "nigga"
+      ],
+      "soundfile": "soundboard/200_nigga.mp3",
+      "description": "I'm 200% Nigga!!",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T10:12:13.034478",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-17T10:12:35.916980",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 10,
+        "month": 10,
+        "total": 10,
+        "guild_play_count": {
+          "1386497411278573652": 9,
+          "1410579846379081801": 1
+        },
+        "trigger_word_stats": {
+          "nigga": 2
+        },
+        "last_played": "2025-10-21T10:55:28.763445",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 0.6
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "butt_fucking_quitter": {
+      "title": "Butt fucking quitter",
+      "triggers": [
+        "quit"
+      ],
+      "soundfile": "soundboard/buttfucking-quitter.mp3",
+      "description": "But Quit",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T10:51:44.229554",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 9,
+        "month": 9,
+        "total": 9,
+        "guild_play_count": {
+          "1386497411278573652": 9
+        },
+        "trigger_word_stats": {},
+        "last_played": "2025-10-18T12:30:11.510945",
+        "played_by": [
+          "460072954651475970"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "oh,_herro": {
+      "title": "oh, herro",
+      "triggers": [
+        "hello"
+      ],
+      "soundfile": "soundboard/oh-herro.mp3",
+      "description": "Kim Jong kong",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T10:57:46.451797",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-17T10:59:09.402642",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 35,
+        "month": 35,
+        "total": 35,
+        "guild_play_count": {
+          "1386497411278573652": 25,
+          "1410579846379081801": 10
+        },
+        "trigger_word_stats": {
+          "hello": 7
+        },
+        "last_played": "2025-10-21T11:33:03.704812",
+        "played_by": [
+          "696940351977422878"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.75
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "leroy_jenkins": {
+      "title": "Leroy Jenkins",
+      "triggers": [
+        "push",
+        "leroy",
+        "jenkins"
+      ],
+      "soundfile": "soundboard/224470-33a9f640-d998-45a3-b0c1-31c1687c2ae4.mp3",
+      "description": "Leroy Jenkins",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T11:31:54.066329",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": "don_corleon1979",
+      "last_edited_date": "2025-10-17T13:02:20.557449",
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 28,
+        "month": 28,
+        "total": 28,
+        "guild_play_count": {
+          "1386497411278573652": 28
+        },
+        "trigger_word_stats": {
+          "push": 3,
+          "leroy": 4,
+          "jenkins": 2
+        },
+        "last_played": "2025-10-21T11:41:03.581410",
+        "played_by": [
+          "541466211180085248"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 0.3
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    },
+    "bloody_fuck_you_bloody": {
+      "title": "Bloody Fuck you Bloody",
+      "triggers": [
+        "bloody"
+      ],
+      "soundfile": "soundboard/bloody_fuck_you.ogg",
+      "description": "Bloody Fuck you, Bloody!",
+      "added_by": "don_corleon1979",
+      "added_by_id": "696940351977422878",
+      "added_date": "2025-10-17T11:43:09.954453",
+      "guild_id": "1410579846379081801",
+      "last_edited_by": null,
+      "last_edited_date": null,
+      "is_private": false,
+      "is_disabled": false,
+      "approved": true,
+      "play_stats": {
+        "week": 11,
+        "month": 11,
+        "total": 11,
+        "guild_play_count": {
+          "1386497411278573652": 11
+        },
+        "trigger_word_stats": {
+          "bloody": 1
+        },
+        "last_played": "2025-10-21T10:21:14.150050",
+        "played_by": [
+          "460072954651475970"
+        ]
+      },
+      "audio_metadata": {
+        "duration": null,
+        "volume_adjust": 1.0
+      },
+      "settings": {
+        "cooldown": 0,
+        "autoplay": false
+      }
+    }
+  }
+}

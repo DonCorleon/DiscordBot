@@ -158,60 +158,64 @@ DiscordBot/
 ## Migration Steps (Incremental Approach)
 
 ### Phase 1: Preparation
-- [ ] Create .env.example from .env (remove secrets)
-- [ ] Update .gitignore
-- [ ] Commit current working state
-- [ ] Create feature branch: `git checkout -b restructure`
+- [x] Create .env.example from .env (remove secrets)
+- [x] Update .gitignore
+- [x] Commit current working state
+- [x] Create feature branch: `git checkout -b restructure`
 
 ### Phase 2: Create New Structure (Empty)
-- [ ] Create bot/ package with __init__.py
-- [ ] Create bot/cogs/ with subdomains
-- [ ] Create bot/core/ with submodules
-- [ ] Create bot/ui/
-- [ ] Create data/ with subdirectories
-- [ ] Create tests/, scripts/, docs/
+- [x] Create bot/ package with __init__.py
+- [x] Create bot/cogs/ with subdomains
+- [x] Create bot/core/ with submodules
+- [x] Create bot/ui/
+- [x] Create data/ with subdirectories
+- [x] Create tests/, scripts/, docs/
 
 ### Phase 3: Move Files (One Domain at a Time)
 
 #### 3.1 Core Files
-- [ ] Move main.py → bot/main.py (update imports)
-- [ ] Move config.py → bot/config.py
-- [ ] Move base_cog.py → bot/base_cog.py
+- [x] Move main.py → bot/main.py (update imports)
+- [x] Move config.py → bot/config.py
+- [x] Move base_cog.py → bot/base_cog.py
 
 #### 3.2 Activity Domain
-- [ ] Move cogs/activity_tracker.py → bot/cogs/activity/tracker.py
-- [ ] Move utils/activity_stats.py → bot/core/stats/activity.py
-- [ ] Move utils/user_stats.py → bot/core/stats/user_triggers.py
-- [ ] Extract activity commands from soundboard.py → bot/cogs/activity/commands.py
-- [ ] Update all imports in moved files
-- [ ] Test: ~mystats, ~activityleaderboard, ~leaderboard members
+- [x] Move cogs/activity_tracker.py → bot/cogs/activity/tracker.py
+- [x] Move utils/activity_stats.py → bot/core/stats/activity.py
+- [x] Move utils/user_stats.py → bot/core/stats/user_triggers.py
+- [ ] Extract activity commands from soundboard.py → bot/cogs/activity/commands.py (DEFERRED - keeping in soundboard for now)
+- [x] Update all imports in moved files
+- [ ] Test: ~mystats, ~activityleaderboard, ~leaderboard members (will test after audio domain)
 
 #### 3.3 Audio Domain
-- [ ] Move cogs/soundboard.py → bot/cogs/audio/soundboard.py (refactor to remove non-audio commands)
-- [ ] Move cogs/voicespeech.py → bot/cogs/audio/voice_speech.py
-- [ ] Move cogs/tts.py → bot/cogs/audio/tts.py
-- [ ] Move cogs/edge-tts.py → bot/cogs/audio/edge_tts.py
-- [ ] Move utils/discord_audio_source.py → bot/core/audio/sources.py
-- [ ] Move utils/pyaudio_player.py → bot/core/audio/player.py
-- [ ] Update all imports
-- [ ] Test: ~play, ~join, ~tts, voice recognition
+- [x] Move cogs/soundboard.py → bot/cogs/audio/soundboard.py (keeping all commands for now)
+- [x] Move cogs/voicespeech.py → bot/cogs/audio/voice_speech.py
+- [x] Move cogs/tts.py → bot/cogs/audio/tts.py
+- [x] Move cogs/edge-tts.py → bot/cogs/audio/edge_tts.py
+- [x] Move utils/discord_audio_source.py → bot/core/audio/sources.py
+- [x] Move utils/pyaudio_player.py → bot/core/audio/player.py
+- [x] Move utils/auto_join_manager.py → bot/core/audio/auto_join.py
+- [x] Update all imports
+- [ ] Test: ~play, ~join, ~tts, voice recognition (will test after all moves complete)
 
 #### 3.4 Admin Domain
-- [ ] Move cogs/monitoring.py → bot/cogs/admin/monitoring.py
-- [ ] Move utils/admin_manager.py → bot/core/admin/manager.py
-- [ ] Move utils/admin_data_collector.py → bot/core/admin/data_collector.py
-- [ ] Move admin_interface_full.py → bot/ui/dashboard_full.py
-- [ ] Move admin_interface_minimal.py → bot/ui/dashboard_minimal.py
-- [ ] Extract admin commands from soundboard.py → bot/cogs/admin/commands.py
-- [ ] Update all imports
-- [ ] Test: ~admincontrol, ~weeklyrecap, dashboard
+- [x] Move cogs/monitoring.py → bot/cogs/admin/monitoring.py
+- [x] Move utils/admin_manager.py → bot/core/admin/manager.py
+- [x] Move utils/admin_data_collector.py → bot/core/admin/data_collector.py
+- [x] Move admin_interface_full.py → bot/ui/dashboard_full.py
+- [x] Move admin_interface_minimal.py → bot/ui/dashboard_minimal.py
+- [x] Move utils/error_handler.py → bot/core/errors.py
+- [ ] Extract admin commands from soundboard.py → bot/cogs/admin/commands.py (DEFERRED)
+- [x] Update all imports
+- [x] Update config.py paths (soundboard_dir, log_dir, admin_data_dir)
+- [ ] Test: ~admincontrol, ~weeklyrecap, dashboard (will test after all moves complete)
 
 #### 3.5 Utility & Errors
-- [ ] Move cogs/base_commands.py → bot/cogs/utility/base_commands.py
-- [ ] Move cogs/global_error_handler.py → bot/cogs/errors.py
-- [ ] Move utils/error_handler.py → bot/core/errors.py
-- [ ] Update all imports
-- [ ] Test: Error handling, base commands
+- [x] Move cogs/base_commands.py → bot/cogs/utility/base_commands.py
+- [x] Move cogs/global_error_handler.py → bot/cogs/errors.py
+- [x] Move cogs/test.py → bot/cogs/utility/test.py
+- [x] Move utils/error_handler.py → bot/core/errors.py (done in Phase 3.4)
+- [x] Update all imports
+- [ ] Test: Error handling, base commands (will test after data migration)
 
 ### Phase 4: Move Data
 - [ ] Move soundboard/ → data/soundboard/
