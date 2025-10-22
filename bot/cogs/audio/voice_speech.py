@@ -376,6 +376,10 @@ class VoiceSpeechCog(BaseCog):
 
         def text_callback(user: discord.User, text: str):
             try:
+                # Skip empty text from Vosk (background noise)
+                if not text or not text.strip():
+                    return
+
                 result = json.loads(text)
                 transcribed_text = result.get("text", "").strip()
                 if not transcribed_text:
