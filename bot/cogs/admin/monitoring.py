@@ -7,11 +7,15 @@ import discord
 from discord.ext import commands, tasks
 from datetime import datetime, timedelta, UTC
 import psutil
+import asyncio
+import sys
+import platform
 from typing import Optional
 
 from bot.base_cog import BaseCog, logger
 from bot.core.errors import handle_errors, ErrorCategory, UserFeedback
 from bot.core.admin.data_collector import get_data_collector
+from bot.core.admin.manager import is_admin
 
 
 class MonitoringCog(BaseCog):
@@ -442,6 +446,157 @@ class MonitoringCog(BaseCog):
         )
 
         await ctx.send(embed=embed)
+
+    @commands.command(name="update", help="Update bot from git and restart (Admin only)")
+    @handle_errors(category=ErrorCategory.INTERNAL)
+    async def update(self, ctx):
+        """
+        Pull latest changes from git and restart the bot.
+
+        Admin-only command. If running under systemd, the bot will
+        automatically restart. Otherwise, you need to manually restart.
+        """
+        # Check if user is admin
+        user_roles = [role.id for role in ctx.author.roles] if ctx.guild else []
+        if not is_admin(ctx.author.id, user_roles):
+            await UserFeedback.error(ctx, "This command is admin-only.")
+            return
+
+        # Send initial status
+        status_msg = await ctx.send(embed=discord.Embed(
+            title="🔄 Updating Bot",
+            description="Pulling latest changes from git...",
+            color=discord.Color.blue()
+        ))
+
+        try:
+            # Check git status first
+            process = await asyncio.create_subprocess_exec(
+                'git', 'status', '--porcelain',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                await status_msg.edit(embed=discord.Embed(
+                    title="❌ Update Failed",
+                    description=f"Failed to check git status:\n```{error_msg}```",
+                    color=discord.Color.red()
+                ))
+                return
+
+            # Check if there are uncommitted changes
+            uncommitted = stdout.decode().strip()
+            if uncommitted:
+                logger.warning(f"Uncommitted changes detected:\n{uncommitted}")
+
+            # Get current branch and commit
+            process = await asyncio.create_subprocess_exec(
+                'git', 'rev-parse', '--abbrev-ref', 'HEAD',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await process.communicate()
+            current_branch = stdout.decode().strip()
+
+            process = await asyncio.create_subprocess_exec(
+                'git', 'rev-parse', '--short', 'HEAD',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await process.communicate()
+            old_commit = stdout.decode().strip()
+
+            # Pull latest changes
+            await status_msg.edit(embed=discord.Embed(
+                title="🔄 Updating Bot",
+                description=f"Current: `{current_branch}@{old_commit}`\n\nPulling updates...",
+                color=discord.Color.blue()
+            ))
+
+            process = await asyncio.create_subprocess_exec(
+                'git', 'pull',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode != 0:
+                error_msg = stderr.decode().strip() if stderr else "Unknown error"
+                await status_msg.edit(embed=discord.Embed(
+                    title="❌ Update Failed",
+                    description=f"Failed to pull from git:\n```{error_msg}```",
+                    color=discord.Color.red()
+                ))
+                return
+
+            pull_output = stdout.decode().strip()
+
+            # Get new commit
+            process = await asyncio.create_subprocess_exec(
+                'git', 'rev-parse', '--short', 'HEAD',
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, _ = await process.communicate()
+            new_commit = stdout.decode().strip()
+
+            # Check if there were updates
+            if "Already up to date" in pull_output or old_commit == new_commit:
+                await status_msg.edit(embed=discord.Embed(
+                    title="✅ Already Up to Date",
+                    description=f"Bot is already on the latest version.\n\n**Branch:** `{current_branch}`\n**Commit:** `{new_commit}`",
+                    color=discord.Color.green()
+                ))
+                return
+
+            # Updates were pulled
+            is_linux = platform.system() == 'Linux'
+            is_systemd = is_linux  # Assume systemd if Linux
+
+            restart_info = ""
+            if is_systemd:
+                restart_info = "\n\n🔄 Restarting bot... (systemd will auto-restart)"
+            else:
+                restart_info = "\n\n⚠️ **Manual restart required** - Bot will shut down now."
+
+            await status_msg.edit(embed=discord.Embed(
+                title="✅ Update Complete",
+                description=(
+                    f"**Old commit:** `{old_commit}`\n"
+                    f"**New commit:** `{new_commit}`\n"
+                    f"**Branch:** `{current_branch}`\n"
+                    f"\n**Changes:**\n```{pull_output[:400]}```"
+                    f"{restart_info}"
+                ),
+                color=discord.Color.green()
+            ))
+
+            logger.info(f"Bot updated from {old_commit} to {new_commit} by {ctx.author} (ID: {ctx.author.id})")
+
+            # Give Discord time to send the message
+            await asyncio.sleep(2)
+
+            # Shutdown (systemd will restart automatically)
+            logger.info("Shutting down for update...")
+            await self.bot.close()
+            sys.exit(0)
+
+        except FileNotFoundError:
+            await status_msg.edit(embed=discord.Embed(
+                title="❌ Git Not Found",
+                description="Git is not installed or not in PATH.\n\nPlease install git to use this command.",
+                color=discord.Color.red()
+            ))
+        except Exception as e:
+            logger.error(f"Error during update: {e}", exc_info=True)
+            await status_msg.edit(embed=discord.Embed(
+                title="❌ Update Error",
+                description=f"An error occurred during update:\n```{str(e)}```",
+                color=discord.Color.red()
+            ))
 
 
 async def setup(bot):

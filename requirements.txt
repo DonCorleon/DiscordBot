@@ -1,0 +1,30 @@
+# Discord Bot Requirements
+
+# Discord library with voice support
+discord.py[voice]>=2.3.0
+
+# Voice recognition and audio processing
+discord-ext-voice-recv>=0.4.0
+vosk>=0.3.45
+soundfile>=0.12.1
+PyAudio>=0.2.13
+
+# Audio playback
+ffmpeg-python>=0.2.0
+
+# System monitoring
+psutil>=5.9.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Data handling
+aiofiles>=23.0.0
+
+# Async HTTP requests (if needed)
+aiohttp>=3.8.0
+
+# Web Dashboard
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+websockets>=12.0

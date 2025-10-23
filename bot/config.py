@@ -70,6 +70,12 @@ class BotConfig:
     auto_join_enabled: bool = True  # Enable auto-join for voice channels
     auto_join_timeout: int = 300  # Seconds to wait before leaving empty channel (default: 5 minutes)
 
+    # Web Dashboard Configuration
+    enable_web_dashboard: bool = False  # Enable web-based admin dashboard (disabled by default)
+    web_host: str = "0.0.0.0"  # Listen on all interfaces (use 127.0.0.1 for local only)
+    web_port: int = 8000  # Port for web dashboard
+    web_reload: bool = False  # Auto-reload on code changes (development only)
+
     @classmethod
     def from_env(cls):
         """Create config from environment variables."""
@@ -114,6 +120,11 @@ class BotConfig:
             # Auto-join settings
             auto_join_enabled=os.getenv("AUTO_JOIN_ENABLED", "true").lower() == "true",
             auto_join_timeout=int(os.getenv("AUTO_JOIN_TIMEOUT", "300")),
+            # Web dashboard settings
+            enable_web_dashboard=os.getenv("ENABLE_WEB_DASHBOARD", "false").lower() == "true",
+            web_host=os.getenv("WEB_HOST", "0.0.0.0"),
+            web_port=int(os.getenv("WEB_PORT", "8000")),
+            web_reload=os.getenv("WEB_RELOAD", "false").lower() == "true",
         )
 
     def display(self):

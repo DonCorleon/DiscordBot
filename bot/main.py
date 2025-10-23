@@ -109,7 +109,56 @@ async def on_ready():
     else:
         logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
 
+    # Connect web dashboard to data collector if enabled
+    if config.enable_web_dashboard:
+        try:
+            from web.websocket_manager import manager
+            data_collector.websocket_manager = manager
+            logger.info("🌐 Web dashboard connected to data collector")
+        except Exception as e:
+            logger.error(f"Failed to connect web dashboard: {e}")
+
 # -----------------------
 # Run the bot
 # -----------------------
-bot.run(config.token)
+
+async def start_web_server():
+    """Start the web dashboard server."""
+    if config.enable_web_dashboard:
+        try:
+            from web.app import run_server
+            logger.info(f"🌐 Starting web dashboard on {config.web_host}:{config.web_port}")
+            await run_server(
+                host=config.web_host,
+                port=config.web_port,
+                reload=config.web_reload
+            )
+        except Exception as e:
+            logger.error(f"Failed to start web server: {e}", exc_info=True)
+
+
+async def main():
+    """Main async entry point."""
+    try:
+        # Start web server in background if enabled
+        if config.enable_web_dashboard:
+            import asyncio
+            asyncio.create_task(start_web_server())
+            logger.info("🌐 Web server starting in background...")
+
+        # Start bot
+        async with bot:
+            await bot.start(config.token)
+
+    except KeyboardInterrupt:
+        logger.info("Received shutdown signal")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+    finally:
+        if not bot.is_closed():
+            await bot.close()
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())

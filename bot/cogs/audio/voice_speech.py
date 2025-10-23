@@ -123,8 +123,9 @@ class VoiceSpeechCog(BaseCog):
                 # Start timeout before disconnecting
                 async def disconnect_after_timeout():
                     try:
+                        guild = member.guild
                         await asyncio.sleep(config.auto_join_timeout)
-                        logger.info(f"[{member.guild.name}] Timeout reached, disconnecting from {bot_channel.name}")
+                        logger.info(f"[{guild.name}] Timeout reached, disconnecting from {bot_channel.name}")
 
                         # Cancel queue processor
                         if guild_id in self.queue_tasks:
@@ -136,9 +137,10 @@ class VoiceSpeechCog(BaseCog):
                         # Stop listening
                         if guild_id in self.active_sinks:
                             try:
-                                member.guild.voice_client.stop_listening()
+                                if guild.voice_client:
+                                    guild.voice_client.stop_listening()
                             except Exception as e:
-                                logger.error(f"[{member.guild.name}] Error stopping listener: {e}")
+                                logger.error(f"[{guild.name}] Error stopping listener: {e}")
                             del self.active_sinks[guild_id]
 
                         # Clean up current source
@@ -154,17 +156,20 @@ class VoiceSpeechCog(BaseCog):
                             del self.speaking_users[guild_id]
 
                         try:
-                            await member.guild.voice_client.disconnect()
-                            logger.info(f"[{member.guild.name}] Disconnected after timeout")
+                            if guild.voice_client:
+                                await guild.voice_client.disconnect()
+                                logger.info(f"[{guild.name}] Disconnected after timeout")
+                            else:
+                                logger.debug(f"[{guild.name}] Voice client already disconnected")
                         except Exception as e:
-                            logger.error(f"[{member.guild.name}] Error disconnecting: {e}")
+                            logger.error(f"[{guild.name}] Error disconnecting: {e}")
 
                         # Clean up task reference
                         if guild_id in self.disconnect_tasks:
                             del self.disconnect_tasks[guild_id]
 
                     except asyncio.CancelledError:
-                        logger.debug(f"[{member.guild.name}] Disconnect timeout cancelled")
+                        logger.debug(f"[{guild.name}] Disconnect timeout cancelled")
 
                 self.disconnect_tasks[guild_id] = self.bot.loop.create_task(disconnect_after_timeout())
                 logger.info(f"[{member.guild.name}] All users left, starting {config.auto_join_timeout}s disconnect timer")

@@ -94,6 +94,9 @@ class AdminDataCollector:
         self.collection_task: Optional[asyncio.Task] = None
         self.export_task: Optional[asyncio.Task] = None
 
+        # WebSocket manager for web dashboard (set by web server)
+        self.websocket_manager = None
+
         logger.info("Admin data collector v3 initialized (user_id based)")
 
     async def start(self):
@@ -283,6 +286,25 @@ class AdminDataCollector:
         except Exception as e:
             logger.error(f"Error updating user info for {user}: {e}", exc_info=True)
 
+    def broadcast_event(self, event_type: str, data: Dict[str, Any]):
+        """
+        Send event immediately to web dashboard clients via WebSocket.
+        Non-blocking - creates task if manager is available.
+        """
+        if self.websocket_manager and hasattr(self.websocket_manager, 'get_connection_count'):
+            if self.websocket_manager.get_connection_count() > 0:
+                # Use asyncio.create_task to avoid blocking
+                try:
+                    asyncio.create_task(
+                        self.websocket_manager.broadcast({
+                            "type": event_type,
+                            "data": data,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                    )
+                except Exception as e:
+                    logger.debug(f"Failed to broadcast event: {e}")
+
     def record_command(self, command_name: str, execution_time: float, success: bool):
         """Record a command execution."""
         self.commands_this_minute += 1
@@ -310,6 +332,13 @@ class AdminDataCollector:
         self.command_history.append({
             "timestamp": datetime.now().isoformat(),
             "command": command_name,
+            "execution_time": execution_time,
+            "success": success
+        })
+
+        # Broadcast command event to web dashboard
+        self.broadcast_event("command", {
+            "name": command_name,
             "execution_time": execution_time,
             "success": success
         })
