@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Logs Viewer - Discord Bot Admin{% endblock %}
+
+{% block content %}
+<div class="logs-container">
+    <!-- Controls Panel -->
+    <div class="logs-controls card">
+        <div class="control-row">
+            <div class="control-group">
+                <label for="log-file-select">Log File:</label>
+                <select id="log-file-select" class="control-select">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="log-level-select">Level:</label>
+                <select id="log-level-select" class="control-select">
+                    <option value="ALL">All</option>
+                    <option value="DEBUG">Debug</option>
+                    <option value="INFO">Info</option>
+                    <option value="WARNING">Warning</option>
+                    <option value="ERROR">Error</option>
+                </select>
+            </div>
+
+            <div class="control-group search-group">
+                <label for="log-search">Search:</label>
+                <input type="text" id="log-search" class="control-input" placeholder="Filter by text...">
+            </div>
+
+            <div class="control-group">
+                <button id="refresh-btn" class="btn btn-primary">🔄 Refresh</button>
+                <button id="download-btn" class="btn btn-secondary">⬇️ Download</button>
+                <button id="live-btn" class="btn btn-toggle">▶️ Live</button>
+            </div>
+        </div>
+
+        <div class="control-row stats-row">
+            <div class="log-stat">
+                <span class="stat-label">Total Lines:</span>
+                <span id="total-lines" class="stat-value">0</span>
+            </div>
+            <div class="log-stat">
+                <span class="stat-label">File Size:</span>
+                <span id="file-size" class="stat-value">0 KB</span>
+            </div>
+            <div class="log-stat">
+                <span class="stat-label">Last Modified:</span>
+                <span id="last-modified" class="stat-value">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Display -->
+    <div class="logs-viewer card">
+        <div id="logs-content" class="logs-content">
+            <div class="logs-empty">Select a log file to view</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/logs.js"></script>
+{% endblock %}

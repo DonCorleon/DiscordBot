@@ -341,3 +341,263 @@ canvas {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Logs Viewer Styles */
+.logs-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: calc(100vh - 120px);
+}
+
+.logs-controls {
+    flex-shrink: 0;
+}
+
+.control-row {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.stats-row {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #3a3a3a;
+}
+
+.control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.control-group label {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.search-group {
+    flex: 1;
+    min-width: 250px;
+}
+
+.control-select,
+.control-input {
+    background: #1a1a1a;
+    border: 1px solid #3a3a3a;
+    color: #e0e0e0;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: border-color 0.2s;
+}
+
+.control-select:focus,
+.control-input:focus {
+    outline: none;
+    border-color: #5865F2;
+}
+
+.control-select {
+    min-width: 200px;
+    cursor: pointer;
+}
+
+.control-input {
+    width: 100%;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #5865F2;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #4752C4;
+}
+
+.btn-secondary {
+    background: #3a3a3a;
+    color: #e0e0e0;
+}
+
+.btn-secondary:hover {
+    background: #4a4a4a;
+}
+
+.btn-toggle {
+    background: #43b581;
+    color: white;
+}
+
+.btn-toggle.active {
+    background: #f04747;
+}
+
+.btn-toggle:hover {
+    opacity: 0.9;
+}
+
+.log-stat {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.log-stat .stat-label {
+    color: #b0b0b0;
+    font-size: 0.9rem;
+}
+
+.log-stat .stat-value {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+.logs-viewer {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.logs-content {
+    flex: 1;
+    overflow-y: auto;
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    padding: 1rem;
+    background: #1a1a1a;
+    border-radius: 8px;
+}
+
+.logs-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.logs-content::-webkit-scrollbar-track {
+    background: #0f0f0f;
+    border-radius: 4px;
+}
+
+.logs-content::-webkit-scrollbar-thumb {
+    background: #5865F2;
+    border-radius: 4px;
+}
+
+.logs-content::-webkit-scrollbar-thumb:hover {
+    background: #4752C4;
+}
+
+.logs-empty {
+    color: #666;
+    text-align: center;
+    padding: 4rem;
+    font-style: italic;
+}
+
+.log-entry {
+    padding: 0.25rem 0.5rem;
+    border-left: 3px solid transparent;
+    margin-bottom: 2px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.log-entry:hover {
+    background: #2a2a2a;
+}
+
+.log-timestamp {
+    color: #888;
+    margin-right: 0.5rem;
+}
+
+.log-level {
+    display: inline-block;
+    width: 70px;
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+.log-logger {
+    color: #b0b0b0;
+    margin-right: 0.5rem;
+}
+
+.log-message {
+    color: #e0e0e0;
+}
+
+/* Log Level Colors */
+.log-entry.DEBUG {
+    border-left-color: #7289DA;
+}
+
+.log-entry.DEBUG .log-level {
+    color: #7289DA;
+}
+
+.log-entry.INFO {
+    border-left-color: #43b581;
+}
+
+.log-entry.INFO .log-level {
+    color: #43b581;
+}
+
+.log-entry.WARNING {
+    border-left-color: #faa61a;
+}
+
+.log-entry.WARNING .log-level {
+    color: #faa61a;
+}
+
+.log-entry.ERROR {
+    border-left-color: #f04747;
+    background: rgba(240, 71, 71, 0.1);
+}
+
+.log-entry.ERROR .log-level {
+    color: #f04747;
+}
+
+.log-entry.UNKNOWN {
+    border-left-color: #666;
+}
+
+.log-entry.UNKNOWN .log-level {
+    color: #666;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .control-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .control-group {
+        width: 100%;
+    }
+
+    .search-group {
+        min-width: 100%;
+    }
+}

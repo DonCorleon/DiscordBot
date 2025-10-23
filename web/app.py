@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 import uvicorn
 
 from web.websocket_manager import manager
-from web.routes import api, websocket
+from web.routes import api, websocket, logs
 
 # Configure logger
 logger = logging.getLogger("discordbot.web.app")
@@ -38,6 +38,7 @@ templates = Jinja2Templates(directory="web/templates")
 # Include routers
 app.include_router(api.router)
 app.include_router(websocket.router)
+app.include_router(logs.router)
 
 # Background task reference
 data_pusher_task: Optional[asyncio.Task] = None
@@ -49,6 +50,14 @@ async def root(request: Request):
     Main dashboard page with real-time updates.
     """
     return templates.TemplateResponse("dashboard.html", {"request": request})
+
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request):
+    """
+    Logs viewer page with filtering and search.
+    """
+    return templates.TemplateResponse("logs.html", {"request": request})
 
 
 async def data_pusher():
