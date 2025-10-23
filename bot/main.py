@@ -58,8 +58,37 @@ class IgnoreRTCPFilter(logging.Filter):
             return False
         return True
 
+
+class ConnectionErrorFilter(logging.Filter):
+    """Filter to suppress verbose connection error tracebacks and show cleaner messages."""
+    def filter(self, record):
+        msg = getattr(record, "msg", "")
+
+        # Suppress the verbose "Attempting a reconnect" traceback
+        if "Attempting a reconnect" in str(msg) and record.exc_info:
+            # Log a cleaner message without the full traceback
+            if record.exc_info and record.exc_info[1]:
+                exc = record.exc_info[1]
+                exc_type = type(exc).__name__
+
+                # Create a cleaner log message
+                if "DNS" in exc_type or "getaddrinfo failed" in str(exc):
+                    logger.warning(f"Connection lost (DNS resolution failure) - Retrying...")
+                elif "Connection" in exc_type:
+                    logger.warning(f"Connection lost ({exc_type}) - Retrying...")
+                else:
+                    logger.warning(f"Connection lost - Retrying...")
+
+            # Suppress the original verbose message
+            return False
+
+        return True
+
 # Apply the filter to the voice_recv logger
 logging.getLogger("discord.ext.voice_recv.reader").addFilter(IgnoreRTCPFilter())
+
+# Apply connection error filter to discord.client logger
+logging.getLogger("discord.client").addFilter(ConnectionErrorFilter())
 
 
 logger.info("Bot starting...")
@@ -117,6 +146,24 @@ async def on_ready():
             logger.info("🌐 Web dashboard connected to data collector")
         except Exception as e:
             logger.error(f"Failed to connect web dashboard: {e}")
+
+
+@bot.event
+async def on_disconnect():
+    """Handle bot disconnection from Discord."""
+    logger.warning("⚠️ Disconnected from Discord")
+
+
+@bot.event
+async def on_resumed():
+    """Handle bot resuming connection to Discord."""
+    logger.info("✅ Reconnected to Discord (session resumed)")
+
+
+@bot.event
+async def on_connect():
+    """Handle initial connection to Discord."""
+    logger.info("🔗 Connected to Discord gateway")
 
 # -----------------------
 # Run the bot
