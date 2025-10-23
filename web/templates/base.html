@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Discord Bot Admin{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <span class="logo">🤖</span>
+            Discord Bot Admin
+        </div>
+        <div class="nav-links">
+            <a href="/">Dashboard</a>
+            <a href="/docs" target="_blank">API Docs</a>
+        </div>
+        <div class="connection-status">
+            <span id="ws-status" class="status-disconnected">⚫ Disconnected</span>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="/static/js/websocket.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

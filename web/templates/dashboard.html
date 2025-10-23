@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="dashboard-grid">
+    <!-- Bot Status Card -->
+    <div class="card">
+        <h3>🤖 Bot Status</h3>
+        <div id="bot-status">
+            <div class="stat-row">
+                <span class="stat-label">Uptime:</span>
+                <span id="uptime" class="stat-value">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Guilds:</span>
+                <span id="guild-count" class="stat-value">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Users:</span>
+                <span id="user-count" class="stat-value">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Latency:</span>
+                <span id="latency" class="stat-value">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- System Resources Card -->
+    <div class="card">
+        <h3>💻 System Resources</h3>
+        <div id="system-resources">
+            <div class="stat-row">
+                <span class="stat-label">CPU:</span>
+                <span id="cpu-usage" class="stat-value">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Memory:</span>
+                <span id="memory-usage" class="stat-value">--</span>
+            </div>
+            <div class="stat-row">
+                <span class="stat-label">Connections:</span>
+                <span id="voice-connections" class="stat-value">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Commands Chart -->
+    <div class="card">
+        <h3>📊 Commands (Last Hour)</h3>
+        <canvas id="commands-chart"></canvas>
+    </div>
+
+    <!-- Activity Feed -->
+    <div class="card full-width">
+        <h3>📡 Live Activity Feed</h3>
+        <div id="activity-feed" class="activity-feed">
+            <div class="feed-empty">Waiting for activity...</div>
+        </div>
+    </div>
+
+    <!-- Voice Channels -->
+    <div class="card">
+        <h3>🔊 Voice Channels</h3>
+        <div id="voice-channels" class="voice-list">
+            <div class="voice-empty">No active connections</div>
+        </div>
+    </div>
+
+    <!-- Recent Commands -->
+    <div class="card">
+        <h3>⚡ Recent Commands</h3>
+        <div id="recent-commands" class="command-list">
+            <div class="commands-empty">No commands yet</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/charts.js"></script>
+{% endblock %}

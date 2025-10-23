@@ -10,8 +10,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 import uvicorn
 
 from web.websocket_manager import manager
@@ -27,6 +29,12 @@ app = FastAPI(
     version="0.1.0"
 )
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="web/static"), name="static")
+
+# Templates
+templates = Jinja2Templates(directory="web/templates")
+
 # Include routers
 app.include_router(api.router)
 app.include_router(websocket.router)
@@ -36,75 +44,11 @@ data_pusher_task: Optional[asyncio.Task] = None
 
 
 @app.get("/", response_class=HTMLResponse)
-async def root():
+async def root(request: Request):
     """
-    Simple status page showing the web server is running.
-    Frontend dashboard will be added in Phase 4.
+    Main dashboard page with real-time updates.
     """
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Discord Bot Dashboard</title>
-        <style>
-            body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: #1a1a1a;
-                color: #e0e0e0;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100vh;
-                margin: 0;
-            }
-            .container {
-                text-align: center;
-                background: #2d2d2d;
-                padding: 3rem;
-                border-radius: 12px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            }
-            h1 {
-                color: #5865F2;
-                margin: 0 0 1rem 0;
-            }
-            p {
-                color: #b0b0b0;
-                margin: 0.5rem 0;
-            }
-            .status {
-                display: inline-block;
-                padding: 0.5rem 1rem;
-                background: #43b581;
-                color: white;
-                border-radius: 6px;
-                margin-top: 1rem;
-                font-weight: bold;
-            }
-            a {
-                color: #5865F2;
-                text-decoration: none;
-            }
-            a:hover {
-                text-decoration: underline;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🤖 Discord Bot Dashboard</h1>
-            <div class="status">✅ Web Server Running</div>
-            <p style="margin-top: 2rem;">Backend is operational (Phase 1-3 complete)</p>
-            <p>Frontend dashboard coming in Phase 4</p>
-            <p style="margin-top: 2rem;">
-                <a href="/api/v1/health">Health Check</a> |
-                <a href="/api/v1/stats">Statistics</a> |
-                <a href="/docs">API Docs</a>
-            </p>
-        </div>
-    </body>
-    </html>
-    """
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
 async def data_pusher():
