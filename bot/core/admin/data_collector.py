@@ -7,7 +7,7 @@ VERSION 3: Uses user_id as primary key to prevent duplicates from name changes.
 
 import json
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from collections import deque, defaultdict
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -385,6 +385,31 @@ class AdminDataCollector:
                     "last_updated": datetime.now().isoformat()
                 }, f, indent=2)
 
+            # Calculate uptime
+            uptime_seconds = None
+            uptime_str = "Unknown"
+            if hasattr(self.bot, 'start_time'):
+                uptime_delta = datetime.now(UTC) - self.bot.start_time
+                uptime_seconds = int(uptime_delta.total_seconds())
+
+                # Format uptime as human-readable string
+                days = uptime_seconds // 86400
+                hours = (uptime_seconds % 86400) // 3600
+                minutes = (uptime_seconds % 3600) // 60
+                seconds = uptime_seconds % 60
+
+                if days > 0:
+                    uptime_str = f"{days}d {hours}h {minutes}m"
+                elif hours > 0:
+                    uptime_str = f"{hours}h {minutes}m"
+                elif minutes > 0:
+                    uptime_str = f"{minutes}m {seconds}s"
+                else:
+                    uptime_str = f"{seconds}s"
+
+            # Get latency (in milliseconds)
+            latency_ms = round(self.bot.latency * 1000, 1) if self.bot.latency is not None else None
+
             with open(self.export_dir / "summary.json", "w") as f:
                 json.dump({
                     "timestamp": datetime.now().isoformat(),
@@ -392,7 +417,10 @@ class AdminDataCollector:
                         "guilds": len(self.bot.guilds),
                         "users": sum(g.member_count for g in self.bot.guilds),
                         "commands_loaded": len(self.bot.commands),
-                        "cogs_loaded": len(self.bot.cogs)
+                        "cogs_loaded": len(self.bot.cogs),
+                        "uptime": uptime_str,
+                        "uptime_seconds": uptime_seconds,
+                        "latency_ms": latency_ms
                     },
                     "health": {
                         "cpu_percent": self.health_history[-1]["cpu_percent"] if self.health_history else 0,

@@ -67,17 +67,24 @@ function updateBotStatus(data) {
         userEl.textContent = botInfo.users.toLocaleString();
     }
 
-    // Update uptime (calculate from bot start time if available)
+    // Update uptime
     const uptimeEl = document.getElementById('uptime');
     if (uptimeEl) {
-        // For now, show as N/A - we'd need to add this to the data collector
-        uptimeEl.textContent = 'N/A';
+        if (botInfo.uptime) {
+            uptimeEl.textContent = botInfo.uptime;
+        } else {
+            uptimeEl.textContent = 'N/A';
+        }
     }
 
-    // Update latency (would need to add this to data collector)
+    // Update latency
     const latencyEl = document.getElementById('latency');
     if (latencyEl) {
-        latencyEl.textContent = 'N/A';
+        if (botInfo.latency_ms !== null && botInfo.latency_ms !== undefined) {
+            latencyEl.textContent = `${botInfo.latency_ms} ms`;
+        } else {
+            latencyEl.textContent = 'N/A';
+        }
     }
 }
 
