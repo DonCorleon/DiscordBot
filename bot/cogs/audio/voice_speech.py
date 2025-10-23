@@ -401,11 +401,14 @@ class VoiceSpeechCog(BaseCog):
                     return
 
                 guild_name = ctx.guild.name
+                channel_name = ctx.guild.voice_client.channel.name if ctx.guild.voice_client else "Unknown"
 
                 transcription_data = {
                     "timestamp": datetime.now().isoformat(),
                     "guild_id": guild_id,
                     "guild": guild_name,
+                    "channel_id": voice_channel_id,
+                    "channel": channel_name,
                     "user_id": str(user.id),
                     "user": user.display_name,
                     "text": transcribed_text,
@@ -427,6 +430,9 @@ class VoiceSpeechCog(BaseCog):
                 if not soundboard_cog:
                     # Log transcription even if no soundboard triggers
                     logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                    # Record transcription to data collector for web dashboard
+                    if data_collector:
+                        data_collector.record_transcription(transcription_data)
                     return
 
                 # Check for soundboard triggers
@@ -446,11 +452,17 @@ class VoiceSpeechCog(BaseCog):
 
                         # Log transcription with guild_id and triggers after adding them
                         logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                        # Record transcription to data collector for web dashboard
+                        if data_collector:
+                            data_collector.record_transcription(transcription_data)
 
                     asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
                 else:
                     # Log transcription with no triggers
                     logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                    # Record transcription to data collector for web dashboard
+                    if data_collector:
+                        data_collector.record_transcription(transcription_data)
 
             except Exception as e:
                 logger.error(f"Error in text_callback: {e}", exc_info=True)

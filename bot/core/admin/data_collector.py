@@ -69,6 +69,7 @@ class AdminDataCollector:
         self.health_history: deque = deque(maxlen=max_history)
         self.command_history: deque = deque(maxlen=max_history)
         self.error_history: deque = deque(maxlen=max_history)
+        self.transcription_history: deque = deque(maxlen=500)  # Last 500 transcriptions
 
         # Current state
         self.current_connections: Dict[int, ConnectionInfo] = {}
@@ -350,6 +351,19 @@ class AdminDataCollector:
             **error_data
         })
 
+    def record_transcription(self, transcription_data: dict):
+        """
+        Record a voice transcription.
+
+        Args:
+            transcription_data: Dict with timestamp, guild_id, guild, channel_id, channel,
+                               user_id, user, text, triggers
+        """
+        self.transcription_history.append(transcription_data)
+
+        # Broadcast transcription event to web dashboard in real-time
+        self.broadcast_event("transcription", transcription_data)
+
     async def _export_data(self):
         """Export all collected data to JSON files."""
         if not self.enable_export or not self.export_dir:
@@ -382,6 +396,14 @@ class AdminDataCollector:
             with open(self.export_dir / "user_info.json", "w") as f:
                 json.dump({
                     "users": self.user_info,  # V3: Simple - keyed by user_id
+                    "last_updated": datetime.now().isoformat()
+                }, f, indent=2)
+
+            # Export transcriptions (last 500)
+            with open(self.export_dir / "transcriptions.json", "w") as f:
+                json.dump({
+                    "transcriptions": list(self.transcription_history),
+                    "count": len(self.transcription_history),
                     "last_updated": datetime.now().isoformat()
                 }, f, indent=2)
 

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Transcripts - Discord Bot Admin{% endblock %}
+
+{% block content %}
+<div class="transcripts-container">
+    <!-- Filters Panel -->
+    <div class="transcripts-controls card">
+        <div class="control-row">
+            <div class="control-group">
+                <label for="guild-select">Guild:</label>
+                <select id="guild-select" class="control-select">
+                    <option value="">All Guilds</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="channel-select">Channel:</label>
+                <select id="channel-select" class="control-select">
+                    <option value="">All Channels</option>
+                </select>
+            </div>
+
+            <div class="control-group search-group">
+                <label for="transcript-search">Search:</label>
+                <input type="text" id="transcript-search" class="control-input" placeholder="Search transcriptions...">
+            </div>
+
+            <div class="control-group">
+                <button id="clear-filters-btn" class="btn btn-secondary">Clear Filters</button>
+                <button id="live-btn" class="btn btn-toggle">▶️ Live</button>
+            </div>
+        </div>
+
+        <div class="control-row stats-row">
+            <div class="log-stat">
+                <span class="stat-label">Total Transcriptions:</span>
+                <span id="total-transcripts" class="stat-value">0</span>
+            </div>
+            <div class="log-stat">
+                <span class="stat-label">Filtered:</span>
+                <span id="filtered-transcripts" class="stat-value">0</span>
+            </div>
+            <div class="log-stat">
+                <span class="stat-label">Last Updated:</span>
+                <span id="last-updated" class="stat-value">--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transcripts Display -->
+    <div class="transcripts-viewer card">
+        <div id="transcripts-content" class="transcripts-content">
+            <div class="transcripts-empty">Waiting for transcriptions...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/transcripts.js"></script>
+{% endblock %}
