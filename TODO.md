@@ -28,8 +28,8 @@
 
 # ADMIN
 
-- Change from app to webserver.
-  - to have voice transcripts
+- Additions to webserver.
+  - to have voice transcripts per guild and then per voice channel
   - sound editing, adding and deleting
   - bot monitor statuses/health
   - live config changes (with error checking and a "ARE you fucking sure?" check)
