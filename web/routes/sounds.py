@@ -124,25 +124,40 @@ async def list_sounds(
 @router.get("/guilds")
 async def list_guilds():
     """
-    Get list of guilds that have sounds.
+    Get list of all guilds the bot is in, with sound counts.
     """
     try:
+        from web.app import bot_instance
+
+        # Count sounds per guild
         config_data = _load_soundboard_config()
         sounds_dict = config_data.get("sounds", {})
 
-        # Get unique guilds
-        guilds_dict = {}
+        sound_counts = {}
         for sound_data in sounds_dict.values():
             guild_id = sound_data.get("guild_id", "default_guild")
-            if guild_id not in guilds_dict:
-                guilds_dict[guild_id] = {
-                    "guild_id": guild_id,
-                    "guild_name": _get_guild_name(guild_id),
-                    "sound_count": 0
-                }
-            guilds_dict[guild_id]["sound_count"] += 1
+            sound_counts[guild_id] = sound_counts.get(guild_id, 0) + 1
 
-        return {"guilds": list(guilds_dict.values())}
+        guilds_list = []
+
+        # Always include "Global" (default_guild)
+        guilds_list.append({
+            "guild_id": "default_guild",
+            "guild_name": "Global",
+            "sound_count": sound_counts.get("default_guild", 0)
+        })
+
+        # Add all guilds the bot is in
+        if bot_instance:
+            for guild in bot_instance.guilds:
+                guild_id_str = str(guild.id)
+                guilds_list.append({
+                    "guild_id": guild_id_str,
+                    "guild_name": guild.name,
+                    "sound_count": sound_counts.get(guild_id_str, 0)
+                })
+
+        return {"guilds": guilds_list}
 
     except Exception as e:
         logger.error(f"Error listing guilds: {e}", exc_info=True)
@@ -469,10 +484,25 @@ def _format_size(size_bytes: int) -> str:
 
 
 def _get_guild_name(guild_id: str) -> str:
-    """Get guild name from ID (placeholder - could fetch from bot)."""
-    guild_names = {
-        "default_guild": "Global",
-        "1410579846379081801": "Soundboards",
-        "1386497411278573652": "The Ranch"
-    }
-    return guild_names.get(guild_id, guild_id)
+    """Get guild name from ID - fetches from bot if available."""
+    # Special case for global sounds
+    if guild_id == "default_guild":
+        return "Global"
+
+    # Try to fetch from bot instance
+    try:
+        from web.app import bot_instance
+
+        if bot_instance:
+            try:
+                guild_id_int = int(guild_id)
+                guild = bot_instance.get_guild(guild_id_int)
+                if guild:
+                    return guild.name
+            except (ValueError, AttributeError):
+                pass
+    except ImportError:
+        pass
+
+    # Fallback: return the guild ID if we can't fetch the name
+    return guild_id

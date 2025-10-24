@@ -45,6 +45,15 @@ app.include_router(sounds.router)
 # Background task reference
 data_pusher_task: Optional[asyncio.Task] = None
 
+# Global bot reference (set by bot on startup)
+bot_instance = None
+
+def set_bot_instance(bot):
+    """Set the bot instance for web routes to access."""
+    global bot_instance
+    bot_instance = bot
+    logger.info("Bot instance registered with web app")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
