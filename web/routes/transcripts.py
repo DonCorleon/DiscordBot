@@ -14,8 +14,8 @@ router = APIRouter(prefix="/api/v1/transcripts", tags=["Transcripts"])
 
 @router.get("/list")
 async def list_transcripts(
-    guild_id: Optional[int] = Query(None, description="Filter by guild ID"),
-    channel_id: Optional[int] = Query(None, description="Filter by channel ID"),
+    guild_id: Optional[str] = Query(None, description="Filter by guild ID"),
+    channel_id: Optional[str] = Query(None, description="Filter by channel ID"),
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
     search: Optional[str] = Query(None, description="Search in transcript text"),
     limit: int = Query(100, description="Maximum number of transcripts to return")
@@ -46,10 +46,14 @@ async def list_transcripts(
         filtered = transcriptions
 
         if guild_id is not None:
-            filtered = [t for t in filtered if t.get("guild_id") == guild_id]
+            # Convert string to int for comparison with stored int IDs
+            guild_id_int = int(guild_id)
+            filtered = [t for t in filtered if t.get("guild_id") == guild_id_int]
 
         if channel_id is not None:
-            filtered = [t for t in filtered if t.get("channel_id") == channel_id]
+            # Convert string to int for comparison with stored int IDs
+            channel_id_int = int(channel_id)
+            filtered = [t for t in filtered if t.get("channel_id") == channel_id_int]
 
         if user_id is not None:
             filtered = [t for t in filtered if t.get("user_id") == user_id]
@@ -113,7 +117,7 @@ async def list_guilds():
 
 @router.get("/channels")
 async def list_channels(
-    guild_id: int = Query(..., description="Guild ID to get channels for")
+    guild_id: str = Query(..., description="Guild ID to get channels for")
 ):
     """
     Get list of channels that have transcriptions for a specific guild.
@@ -130,10 +134,13 @@ async def list_channels(
             data = json.load(f)
             transcriptions = data.get("transcriptions", [])
 
+        # Convert string guild_id to int for comparison
+        guild_id_int = int(guild_id)
+
         # Get unique channels for this guild
         channels_dict = {}
         for t in transcriptions:
-            if t.get("guild_id") == guild_id:
+            if t.get("guild_id") == guild_id_int:
                 channel_id = t.get("channel_id")
                 if channel_id and channel_id not in channels_dict:
                     channels_dict[channel_id] = {

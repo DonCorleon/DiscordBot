@@ -127,13 +127,13 @@ async function loadTranscripts() {
         });
 
         if (currentGuild) {
-            // Ensure guild_id is sent as integer
-            params.append('guild_id', parseInt(currentGuild));
+            // Keep as string - Discord IDs are too large for JS numbers
+            params.append('guild_id', currentGuild);
         }
 
         if (currentChannel) {
-            // Ensure channel_id is sent as integer
-            params.append('channel_id', parseInt(currentChannel));
+            // Keep as string - Discord IDs are too large for JS numbers
+            params.append('channel_id', currentChannel);
         }
 
         if (currentSearch) {
@@ -184,9 +184,9 @@ function displayTranscripts(transcriptList) {
 
 function addTranscriptionToView(transcription) {
     // Only add if it matches current filters
-    // Use == instead of != to handle type coercion (string vs number)
-    if (currentGuild && transcription.guild_id != parseInt(currentGuild)) return;
-    if (currentChannel && transcription.channel_id != parseInt(currentChannel)) return;
+    // Compare as strings since Discord IDs are too large for JS numbers
+    if (currentGuild && transcription.guild_id.toString() !== currentGuild.toString()) return;
+    if (currentChannel && transcription.channel_id.toString() !== currentChannel.toString()) return;
     if (currentSearch) {
         const searchLower = currentSearch.toLowerCase();
         if (!transcription.text.toLowerCase().includes(searchLower) &&
