@@ -111,6 +111,95 @@ data_collector = initialize_data_collector(
     enable_export=config.enable_admin_dashboard
 )
 
+
+async def rejoin_saved_voice_channels():
+    """
+    Rejoin voice channels from saved state if users are present.
+    Called on bot startup to restore voice connections.
+    """
+    try:
+        from bot.core.audio.voice_state import load_voice_state
+
+        voice_state = load_voice_state()
+        if not voice_state:
+            logger.info("No saved voice channels to rejoin")
+            return
+
+        rejoined_count = 0
+        skipped_count = 0
+
+        for guild_id_str, state_data in voice_state.items():
+            try:
+                guild_id = int(guild_id_str)
+                channel_id = int(state_data.get("channel_id"))
+
+                # Get guild and channel
+                guild = bot.get_guild(guild_id)
+                if not guild:
+                    logger.warning(f"Guild {guild_id} not found, skipping rejoin")
+                    skipped_count += 1
+                    continue
+
+                channel = guild.get_channel(channel_id)
+                if not channel or not isinstance(channel, discord.VoiceChannel):
+                    logger.warning(f"Voice channel {channel_id} not found in {guild.name}, skipping rejoin")
+                    skipped_count += 1
+                    continue
+
+                # Check if there are non-bot users in the channel
+                users_in_channel = [m for m in channel.members if not m.bot]
+                if not users_in_channel:
+                    logger.info(f"No users in {channel.name} ({guild.name}), skipping rejoin")
+                    skipped_count += 1
+                    continue
+
+                # Check if already connected
+                if guild.voice_client and guild.voice_client.is_connected():
+                    logger.info(f"Already connected to voice in {guild.name}, skipping rejoin")
+                    skipped_count += 1
+                    continue
+
+                # Rejoin the channel
+                logger.info(f"Rejoining {channel.name} in {guild.name} ({len(users_in_channel)} users present)")
+                vc = await channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
+
+                # Start listening for speech (get the VoiceSpeechCog)
+                voice_cog = bot.get_cog("VoiceSpeechCog")
+                if voice_cog:
+                    # Start keepalive task if needed
+                    if not voice_cog._keepalive_task:
+                        voice_cog._keepalive_task = bot.loop.create_task(voice_cog._keepalive_loop())
+
+                    # Create a minimal context object for speech listener
+                    class AutoRejoinContext:
+                        def __init__(self, guild, voice_client):
+                            self.guild = guild
+                            self.voice_client = voice_client
+
+                    ctx = AutoRejoinContext(guild, vc)
+                    sink = voice_cog._create_speech_listener(ctx)
+                    vc.listen(sink)
+                    voice_cog.active_sinks[guild_id] = sink
+                    logger.info(f"✅ Rejoined and started listening in {channel.name} ({guild.name})")
+                else:
+                    logger.warning(f"Rejoined {channel.name} but VoiceSpeech cog not available")
+
+                rejoined_count += 1
+
+            except Exception as e:
+                logger.error(f"Failed to rejoin voice channel in guild {guild_id_str}: {e}")
+                skipped_count += 1
+                continue
+
+        if rejoined_count > 0:
+            logger.info(f"🔊 Rejoined {rejoined_count} voice channel(s) from saved state")
+        if skipped_count > 0:
+            logger.info(f"⏭️  Skipped {skipped_count} channel(s) (no users or not found)")
+
+    except Exception as e:
+        logger.error(f"Error loading saved voice channels: {e}", exc_info=True)
+
+
 @bot.event
 async def on_ready():
     logger.info(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
@@ -142,10 +231,15 @@ async def on_ready():
     if config.enable_web_dashboard:
         try:
             from web.websocket_manager import manager
+            from web.app import set_bot_instance
             data_collector.websocket_manager = manager
+            set_bot_instance(bot)
             logger.info("🌐 Web dashboard connected to data collector")
         except Exception as e:
             logger.error(f"Failed to connect web dashboard: {e}")
+
+    # Rejoin voice channels from saved state if users are present
+    await rejoin_saved_voice_channels()
 
 
 @bot.event

@@ -77,6 +77,10 @@ class VoiceSpeechCog(BaseCog):
                             vc = await after.channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
                             logger.info(f"[{member.guild.name}] Auto-joined {after.channel.name} (triggered by {member.name})")
 
+                            # Save voice state for persistence
+                            from bot.core.audio.voice_state import save_voice_state
+                            save_voice_state(guild_id, after.channel.id)
+
                             # Start keepalive if needed
                             if not self._keepalive_task:
                                 self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
@@ -158,6 +162,9 @@ class VoiceSpeechCog(BaseCog):
                         try:
                             if guild.voice_client:
                                 await guild.voice_client.disconnect()
+                                # Remove voice state (disconnected due to timeout)
+                                from bot.core.audio.voice_state import remove_voice_state
+                                remove_voice_state(guild_id)
                                 logger.info(f"[{guild.name}] Disconnected after timeout")
                             else:
                                 logger.debug(f"[{guild.name}] Voice client already disconnected")
@@ -683,6 +690,10 @@ class VoiceSpeechCog(BaseCog):
             if not self._keepalive_task:
                 self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
 
+            # Save voice state for persistence across restarts
+            from bot.core.audio.voice_state import save_voice_state
+            save_voice_state(ctx.guild.id, target_channel.id)
+
             # Enable auto-join for this channel
             if config.auto_join_enabled:
                 add_auto_join_channel(ctx.guild.id, target_channel.id)
@@ -721,6 +732,11 @@ class VoiceSpeechCog(BaseCog):
             del self.current_sources[guild_id]
 
         await vc.disconnect()
+
+        # Remove voice state for persistence
+        from bot.core.audio.voice_state import remove_voice_state
+        remove_voice_state(ctx.guild.id)
+
         await UserFeedback.success(ctx, "Left the voice channel.")
 
         if self._keepalive_task:
