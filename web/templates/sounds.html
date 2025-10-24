@@ -218,6 +218,11 @@
     min-width: 200px;
 }
 
+.filter-select option {
+    background: #FFFFFF;
+    color: #000000;
+}
+
 #sound-search {
     flex: 1;
     padding: 0.75rem;
@@ -388,7 +393,7 @@
     top: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.85);
     align-items: center;
     justify-content: center;
 }
@@ -398,12 +403,13 @@
 }
 
 .modal-content {
-    background: var(--bg-secondary);
+    background: #2C2F33;
     border-radius: 12px;
     max-width: 600px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 }
 
 .modal-large {
@@ -419,12 +425,15 @@
     justify-content: space-between;
     align-items: center;
     padding: 1.5rem;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 2px solid #40444B;
+    background: #23272A;
+    border-radius: 12px 12px 0 0;
 }
 
 .modal-header h2 {
     margin: 0;
-    color: var(--text-primary);
+    color: #FFFFFF;
+    font-weight: 600;
 }
 
 .modal-close {
@@ -445,7 +454,9 @@
     gap: 1rem;
     justify-content: flex-end;
     padding: 1.5rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 2px solid #40444B;
+    background: #23272A;
+    border-radius: 0 0 12px 12px;
 }
 
 .form-group {
@@ -461,8 +472,9 @@
 .form-group label {
     display: block;
     margin-bottom: 0.5rem;
-    color: var(--text-primary);
-    font-weight: 500;
+    color: #FFFFFF;
+    font-weight: 600;
+    font-size: 0.95rem;
 }
 
 .form-group input[type="text"],
@@ -471,20 +483,35 @@
 .form-group select {
     width: 100%;
     padding: 0.75rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    background: #23272A;
+    border: 2px solid #40444B;
     border-radius: 6px;
-    color: var(--text-primary);
+    color: #DCDDDE;
     font-size: 0.95rem;
+    transition: border-color 0.2s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #5865F2;
+    background: #2C2F33;
+}
+
+.form-group select option {
+    background: #FFFFFF;
+    color: #000000;
 }
 
 .form-group input[type="file"] {
     width: 100%;
     padding: 0.5rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
+    background: #23272A;
+    border: 2px solid #40444B;
     border-radius: 6px;
-    color: var(--text-primary);
+    color: #DCDDDE;
 }
 
 .form-group small {
@@ -508,13 +535,19 @@
 .sound-info {
     margin-top: 1.5rem;
     padding: 1rem;
-    background: var(--bg-tertiary);
+    background: #23272A;
+    border: 2px solid #40444B;
     border-radius: 6px;
     font-size: 0.9rem;
 }
 
 .sound-info div {
     margin-bottom: 0.5rem;
+    color: #DCDDDE;
+}
+
+.sound-info strong {
+    color: #B9BBBE;
 }
 
 .warning-text {

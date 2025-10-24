@@ -9,6 +9,22 @@ let currentGuild = '';
 let currentAudio = null;
 let deleteTarget = null;
 
+// Generate consistent random color for each sound based on ID
+function getCardColor(soundId) {
+    // Use sound ID to seed color generation for consistency
+    let hash = 0;
+    for (let i = 0; i < soundId.length; i++) {
+        hash = soundId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // Generate pastel/vibrant colors
+    const hue = Math.abs(hash % 360);
+    const saturation = 45 + (Math.abs(hash) % 20); // 45-65%
+    const lightness = 35 + (Math.abs(hash >> 8) % 15); // 35-50%
+
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadGuilds();
@@ -57,6 +73,10 @@ async function loadGuilds() {
 
         // Populate guild filter
         const filterSelect = document.getElementById('guild-filter');
+
+        // Save current selection
+        const currentSelection = filterSelect.value;
+
         filterSelect.innerHTML = '<option value="">All Guilds</option>';
 
         guilds.forEach(guild => {
@@ -65,6 +85,11 @@ async function loadGuilds() {
             option.textContent = `${guild.guild_name} (${guild.sound_count})`;
             filterSelect.appendChild(option);
         });
+
+        // Restore previous selection
+        if (currentSelection) {
+            filterSelect.value = currentSelection;
+        }
 
         // Populate guild selects in modals
         populateGuildSelects();
@@ -134,9 +159,10 @@ function displaySounds(soundList) {
         ).join('');
 
         const disabledClass = sound.is_disabled ? 'disabled' : '';
+        const cardColor = getCardColor(sound.id);
 
         return `
-            <div class="sound-card ${disabledClass}" onclick="openEditModal('${escapeHtml(sound.id)}')">
+            <div class="sound-card ${disabledClass}" onclick="openEditModal('${escapeHtml(sound.id)}')" style="background: ${cardColor};">
                 <div class="sound-header">
                     <div>
                         <div class="sound-title">${escapeHtml(sound.title)}</div>
@@ -238,6 +264,7 @@ async function saveSound() {
         showNotification('Sound updated successfully', 'success');
         closeEditModal();
         loadSounds();
+        loadGuilds(); // Reload guild list to update counts
 
     } catch (error) {
         console.error('Error saving sound:', error);
@@ -277,6 +304,7 @@ async function confirmDelete() {
         showNotification('Sound deleted successfully', 'success');
         closeDeleteModal();
         loadSounds();
+        loadGuilds(); // Reload guild list to update counts
 
     } catch (error) {
         console.error('Error deleting sound:', error);
