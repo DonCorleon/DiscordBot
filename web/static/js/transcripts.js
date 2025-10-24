@@ -187,17 +187,29 @@ function displayTranscripts(transcriptList) {
 }
 
 function addTranscriptionToView(transcription) {
+    console.log('addTranscriptionToView called with:', transcription);
+    console.log('Current filters - Guild:', currentGuild, 'Channel:', currentChannel, 'Search:', currentSearch);
+
     // Only add if it matches current filters
     // IDs are now strings from backend for JavaScript compatibility
-    if (currentGuild && transcription.guild_id !== currentGuild) return;
-    if (currentChannel && transcription.channel_id !== currentChannel) return;
+    if (currentGuild && transcription.guild_id !== currentGuild) {
+        console.log('❌ Filtered out by guild filter:', transcription.guild_id, '!==', currentGuild);
+        return;
+    }
+    if (currentChannel && transcription.channel_id !== currentChannel) {
+        console.log('❌ Filtered out by channel filter:', transcription.channel_id, '!==', currentChannel);
+        return;
+    }
     if (currentSearch) {
         const searchLower = currentSearch.toLowerCase();
         if (!transcription.text.toLowerCase().includes(searchLower) &&
             !transcription.user.toLowerCase().includes(searchLower)) {
+            console.log('❌ Filtered out by search filter');
             return;
         }
     }
+
+    console.log('✅ Transcription passed filters, adding to view');
 
     // Add to beginning of transcripts array
     transcripts.unshift(transcription);
@@ -206,6 +218,8 @@ function addTranscriptionToView(transcription) {
     if (transcripts.length > 100) {
         transcripts = transcripts.slice(0, 100);
     }
+
+    console.log('Transcripts array now has', transcripts.length, 'items');
 
     // Re-display
     displayTranscripts(transcripts);
