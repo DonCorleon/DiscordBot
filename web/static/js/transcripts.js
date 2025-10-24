@@ -127,11 +127,13 @@ async function loadTranscripts() {
         });
 
         if (currentGuild) {
-            params.append('guild_id', currentGuild);
+            // Ensure guild_id is sent as integer
+            params.append('guild_id', parseInt(currentGuild));
         }
 
         if (currentChannel) {
-            params.append('channel_id', currentChannel);
+            // Ensure channel_id is sent as integer
+            params.append('channel_id', parseInt(currentChannel));
         }
 
         if (currentSearch) {
@@ -182,8 +184,9 @@ function displayTranscripts(transcriptList) {
 
 function addTranscriptionToView(transcription) {
     // Only add if it matches current filters
-    if (currentGuild && transcription.guild_id != currentGuild) return;
-    if (currentChannel && transcription.channel_id != currentChannel) return;
+    // Use == instead of != to handle type coercion (string vs number)
+    if (currentGuild && transcription.guild_id != parseInt(currentGuild)) return;
+    if (currentChannel && transcription.channel_id != parseInt(currentChannel)) return;
     if (currentSearch) {
         const searchLower = currentSearch.toLowerCase();
         if (!transcription.text.toLowerCase().includes(searchLower) &&

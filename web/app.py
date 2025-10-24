@@ -50,7 +50,7 @@ async def root(request: Request):
     """
     Main dashboard page with real-time updates.
     """
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse("dashboard.html", {"request": request, "active_page": "dashboard"})
 
 
 @app.get("/logs", response_class=HTMLResponse)
@@ -58,7 +58,7 @@ async def logs_page(request: Request):
     """
     Logs viewer page with filtering and search.
     """
-    return templates.TemplateResponse("logs.html", {"request": request})
+    return templates.TemplateResponse("logs.html", {"request": request, "active_page": "logs"})
 
 
 @app.get("/transcripts", response_class=HTMLResponse)
@@ -66,7 +66,7 @@ async def transcripts_page(request: Request):
     """
     Voice transcriptions viewer page with real-time updates.
     """
-    return templates.TemplateResponse("transcripts.html", {"request": request})
+    return templates.TemplateResponse("transcripts.html", {"request": request, "active_page": "transcripts"})
 
 
 async def data_pusher():

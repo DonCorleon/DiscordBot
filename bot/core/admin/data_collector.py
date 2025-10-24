@@ -294,15 +294,18 @@ class AdminDataCollector:
         """
         if self.websocket_manager and hasattr(self.websocket_manager, 'get_connection_count'):
             if self.websocket_manager.get_connection_count() > 0:
-                # Use asyncio.create_task to avoid blocking
+                # Use bot's event loop to schedule the coroutine
                 try:
-                    asyncio.create_task(
-                        self.websocket_manager.broadcast({
-                            "type": event_type,
-                            "data": data,
-                            "timestamp": datetime.now().isoformat()
-                        })
-                    )
+                    loop = self.bot.loop
+                    if loop and loop.is_running():
+                        asyncio.run_coroutine_threadsafe(
+                            self.websocket_manager.broadcast({
+                                "type": event_type,
+                                "data": data,
+                                "timestamp": datetime.now().isoformat()
+                            }),
+                            loop
+                        )
                 except Exception as e:
                     logger.debug(f"Failed to broadcast event: {e}")
 
