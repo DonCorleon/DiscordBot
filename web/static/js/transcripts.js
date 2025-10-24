@@ -15,7 +15,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loadGuilds();
     loadTranscripts();
     setupEventListeners();
-    setupWebSocket();
+
+    // Setup WebSocket handlers after wsClient is ready
+    // Use a slight delay to ensure websocket.js has loaded and created wsClient
+    setTimeout(() => {
+        if (window.wsClient) {
+            setupWebSocket();
+        } else {
+            console.error('⚠️ wsClient still not available after delay');
+        }
+    }, 500);
 });
 
 function setupEventListeners() {
