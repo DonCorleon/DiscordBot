@@ -98,7 +98,30 @@ class AdminDataCollector:
         # WebSocket manager for web dashboard (set by web server)
         self.websocket_manager = None
 
+        # Load existing transcriptions from file if available
+        self._load_existing_transcriptions()
+
         logger.info("Admin data collector v3 initialized (user_id based)")
+
+    def _load_existing_transcriptions(self):
+        """Load existing transcriptions from file on startup for persistence."""
+        if not self.export_dir:
+            return
+
+        transcriptions_file = self.export_dir / "transcriptions.json"
+        if transcriptions_file.exists():
+            try:
+                with open(transcriptions_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    existing = data.get("transcriptions", [])
+
+                    # Load existing transcriptions into deque (preserves order)
+                    for transcription in existing:
+                        self.transcription_history.append(transcription)
+
+                    logger.info(f"Loaded {len(existing)} existing transcriptions from file")
+            except Exception as e:
+                logger.error(f"Failed to load existing transcriptions: {e}")
 
     async def start(self):
         """Start background data collection tasks."""
@@ -365,7 +388,14 @@ class AdminDataCollector:
         self.transcription_history.append(transcription_data)
 
         # Broadcast transcription event to web dashboard in real-time
-        self.broadcast_event("transcription", transcription_data)
+        # Convert IDs to strings for JavaScript compatibility
+        broadcast_data = transcription_data.copy()
+        if "guild_id" in broadcast_data:
+            broadcast_data["guild_id"] = str(broadcast_data["guild_id"])
+        if "channel_id" in broadcast_data:
+            broadcast_data["channel_id"] = str(broadcast_data["channel_id"])
+
+        self.broadcast_event("transcription", broadcast_data)
 
     async def _export_data(self):
         """Export all collected data to JSON files."""

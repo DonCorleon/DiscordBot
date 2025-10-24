@@ -184,9 +184,9 @@ function displayTranscripts(transcriptList) {
 
 function addTranscriptionToView(transcription) {
     // Only add if it matches current filters
-    // Compare as strings since Discord IDs are too large for JS numbers
-    if (currentGuild && transcription.guild_id.toString() !== currentGuild.toString()) return;
-    if (currentChannel && transcription.channel_id.toString() !== currentChannel.toString()) return;
+    // IDs are now strings from backend for JavaScript compatibility
+    if (currentGuild && transcription.guild_id !== currentGuild) return;
+    if (currentChannel && transcription.channel_id !== currentChannel) return;
     if (currentSearch) {
         const searchLower = currentSearch.toLowerCase();
         if (!transcription.text.toLowerCase().includes(searchLower) &&

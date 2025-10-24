@@ -70,6 +70,13 @@ async def list_transcripts(
         filtered.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         filtered = filtered[:limit]
 
+        # Convert IDs to strings for JavaScript compatibility
+        for t in filtered:
+            if "guild_id" in t:
+                t["guild_id"] = str(t["guild_id"])
+            if "channel_id" in t:
+                t["channel_id"] = str(t["channel_id"])
+
         return {
             "transcriptions": filtered,
             "count": len(filtered),
@@ -104,7 +111,7 @@ async def list_guilds():
             guild_id = t.get("guild_id")
             if guild_id and guild_id not in guilds_dict:
                 guilds_dict[guild_id] = {
-                    "guild_id": guild_id,
+                    "guild_id": str(guild_id),  # Convert to string for JavaScript
                     "guild_name": t.get("guild", "Unknown")
                 }
 
@@ -144,7 +151,7 @@ async def list_channels(
                 channel_id = t.get("channel_id")
                 if channel_id and channel_id not in channels_dict:
                     channels_dict[channel_id] = {
-                        "channel_id": channel_id,
+                        "channel_id": str(channel_id),  # Convert to string for JavaScript
                         "channel_name": t.get("channel", "Unknown")
                     }
 
