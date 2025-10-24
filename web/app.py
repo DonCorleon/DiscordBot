@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 import uvicorn
 
 from web.websocket_manager import manager
-from web.routes import api, websocket, logs, transcripts
+from web.routes import api, websocket, logs, transcripts, sounds
 
 # Configure logger
 logger = logging.getLogger("discordbot.web.app")
@@ -40,6 +40,7 @@ app.include_router(api.router)
 app.include_router(websocket.router)
 app.include_router(logs.router)
 app.include_router(transcripts.router)
+app.include_router(sounds.router)
 
 # Background task reference
 data_pusher_task: Optional[asyncio.Task] = None
@@ -67,6 +68,14 @@ async def transcripts_page(request: Request):
     Voice transcriptions viewer page with real-time updates.
     """
     return templates.TemplateResponse("transcripts.html", {"request": request, "active_page": "transcripts"})
+
+
+@app.get("/sounds", response_class=HTMLResponse)
+async def sounds_page(request: Request):
+    """
+    Sound management page for uploading, editing, and deleting soundboard files.
+    """
+    return templates.TemplateResponse("sounds.html", {"request": request, "active_page": "sounds"})
 
 
 async def data_pusher():

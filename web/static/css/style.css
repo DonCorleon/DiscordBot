@@ -727,3 +727,35 @@ canvas {
     font-family: monospace;
     font-size: 0.8rem;
 }
+
+/* Notifications */
+.notification {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    color: white;
+    font-weight: 500;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    transform: translateX(400px);
+    transition: transform 0.3s ease;
+    z-index: 2000;
+    max-width: 400px;
+}
+
+.notification.show {
+    transform: translateX(0);
+}
+
+.notification-success {
+    background: #43B581;
+}
+
+.notification-error {
+    background: #F04747;
+}
+
+.notification-info {
+    background: #5865F2;
+}

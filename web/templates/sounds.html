@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Sound Management{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>🔊 Sound Management</h1>
+    <p>Upload, manage, and preview soundboard files</p>
+</div>
+
+<div class="sounds-controls">
+    <div class="search-bar">
+        <input
+            type="text"
+            id="sound-search"
+            placeholder="Search sounds..."
+            autocomplete="off"
+        >
+    </div>
+
+    <div class="upload-section">
+        <label for="file-upload" class="upload-btn">
+            📤 Upload Sound
+        </label>
+        <input
+            type="file"
+            id="file-upload"
+            accept=".mp3,.wav,.ogg,.m4a,.flac"
+            style="display: none;"
+        >
+        <div class="drag-drop-zone" id="drag-drop-zone">
+            Drag and drop sound files here
+        </div>
+    </div>
+</div>
+
+<div class="sounds-stats">
+    <div class="stat-item">
+        <span class="stat-label">Total Sounds:</span>
+        <span id="total-sounds">0</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-label">Total Size:</span>
+        <span id="total-size">0 B</span>
+    </div>
+</div>
+
+<div class="sounds-table-container">
+    <table class="sounds-table">
+        <thead>
+            <tr>
+                <th>Filename</th>
+                <th>Size</th>
+                <th>Play Count</th>
+                <th>Volume</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="sounds-tbody">
+            <tr>
+                <td colspan="5" class="sounds-loading">Loading sounds...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal">
+    <div class="modal-content">
+        <h2>Confirm Delete</h2>
+        <p>Are you sure you want to delete <strong id="delete-filename"></strong>?</p>
+        <p class="modal-warning">This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button id="confirm-delete-btn" class="btn-danger">Delete</button>
+            <button id="cancel-delete-btn" class="btn-secondary">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Progress Modal -->
+<div id="upload-modal" class="modal">
+    <div class="modal-content">
+        <h2>Uploading...</h2>
+        <div class="upload-progress">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <p id="upload-status">Preparing upload...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+.sounds-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.search-bar {
+    flex: 1;
+    min-width: 250px;
+}
+
+.search-bar input {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.upload-section {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.upload-btn {
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
+    color: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.upload-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
+}
+
+.drag-drop-zone {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+}
+
+.drag-drop-zone.drag-over {
+    border-color: #5865F2;
+    background: rgba(88, 101, 242, 0.1);
+    color: #5865F2;
+}
+
+.sounds-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.stat-item {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.sounds-table-container {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.sounds-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.sounds-table thead {
+    background: var(--bg-tertiary);
+}
+
+.sounds-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sounds-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.sounds-table tbody tr:hover {
+    background: rgba(88, 101, 242, 0.05);
+}
+
+.sounds-loading {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem !important;
+}
+
+.sound-filename {
+    font-family: 'Monaco', 'Courier New', monospace;
+    color: var(--text-primary);
+}
+
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.volume-input {
+    width: 60px;
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    text-align: center;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-play, .btn-edit, .btn-delete {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+}
+
+.btn-play {
+    background: #43B581;
+    color: white;
+}
+
+.btn-play:hover {
+    background: #3CA374;
+}
+
+.btn-edit {
+    background: #FFA500;
+    color: white;
+}
+
+.btn-edit:hover {
+    background: #E69500;
+}
+
+.btn-delete {
+    background: #F04747;
+    color: white;
+}
+
+.btn-delete:hover {
+    background: #D84040;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-secondary);
+    padding: 2rem;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: var(--text-primary);
+}
+
+.modal-warning {
+    color: #F04747;
+    font-weight: 500;
+    margin: 1rem 0;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+.btn-danger, .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-danger {
+    background: #F04747;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #D84040;
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    background: var(--border-color);
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 1rem 0;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #43B581 0%, #3CA374 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#upload-status {
+    color: var(--text-secondary);
+    text-align: center;
+}
+</style>
+
+<script src="/static/js/sounds.js"></script>
+{% endblock %}
