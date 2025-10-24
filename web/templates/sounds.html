@@ -5,11 +5,15 @@
 {% block content %}
 <div class="page-header">
     <h1>🔊 Sound Management</h1>
-    <p>Upload, manage, and preview soundboard files</p>
+    <p>Manage soundboard files and metadata</p>
 </div>
 
 <div class="sounds-controls">
-    <div class="search-bar">
+    <div class="control-group">
+        <select id="guild-filter" class="filter-select">
+            <option value="">All Guilds</option>
+        </select>
+
         <input
             type="text"
             id="sound-search"
@@ -18,74 +22,173 @@
         >
     </div>
 
-    <div class="upload-section">
-        <label for="file-upload" class="upload-btn">
-            📤 Upload Sound
-        </label>
-        <input
-            type="file"
-            id="file-upload"
-            accept=".mp3,.wav,.ogg,.m4a,.flac"
-            style="display: none;"
-        >
-        <div class="drag-drop-zone" id="drag-drop-zone">
-            Drag and drop sound files here
-        </div>
-    </div>
+    <button id="upload-btn" class="btn-primary">
+        📤 Upload New Sound
+    </button>
 </div>
 
 <div class="sounds-stats">
     <div class="stat-item">
-        <span class="stat-label">Total Sounds:</span>
+        <span class="stat-label">Total:</span>
         <span id="total-sounds">0</span>
     </div>
     <div class="stat-item">
-        <span class="stat-label">Total Size:</span>
+        <span class="stat-label">Size:</span>
         <span id="total-size">0 B</span>
     </div>
 </div>
 
-<div class="sounds-table-container">
-    <table class="sounds-table">
-        <thead>
-            <tr>
-                <th>Filename</th>
-                <th>Size</th>
-                <th>Play Count</th>
-                <th>Volume</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="sounds-tbody">
-            <tr>
-                <td colspan="5" class="sounds-loading">Loading sounds...</td>
-            </tr>
-        </tbody>
-    </table>
+<div id="sounds-grid" class="sounds-grid">
+    <div class="sounds-loading">Loading sounds...</div>
 </div>
 
-<!-- Delete Confirmation Modal -->
-<div id="delete-modal" class="modal">
-    <div class="modal-content">
-        <h2>Confirm Delete</h2>
-        <p>Are you sure you want to delete <strong id="delete-filename"></strong>?</p>
-        <p class="modal-warning">This action cannot be undone.</p>
-        <div class="modal-actions">
-            <button id="confirm-delete-btn" class="btn-danger">Delete</button>
-            <button id="cancel-delete-btn" class="btn-secondary">Cancel</button>
+<!-- Edit Sound Modal -->
+<div id="edit-modal" class="modal">
+    <div class="modal-content modal-large">
+        <div class="modal-header">
+            <h2>Edit Sound</h2>
+            <button class="modal-close" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-form">
+                <input type="hidden" id="edit-sound-id">
+
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" id="edit-title" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="edit-description" rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Trigger Words (comma-separated)</label>
+                    <input type="text" id="edit-triggers" placeholder="word1, word2, word3">
+                    <small>Words that will trigger this sound in voice chat</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Volume (0.0 - 2.0)</label>
+                        <input type="number" id="edit-volume" min="0" max="2" step="0.1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Cooldown (seconds)</label>
+                        <input type="number" id="edit-cooldown" min="0" step="1">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Guild</label>
+                    <select id="edit-guild">
+                        <option value="default_guild">Global</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="edit-disabled">
+                        Disabled (sound won't play)
+                    </label>
+                </div>
+
+                <div class="sound-info">
+                    <div><strong>Filename:</strong> <span id="edit-filename"></span></div>
+                    <div><strong>Size:</strong> <span id="edit-size"></span></div>
+                    <div><strong>Play Count:</strong> <span id="edit-playcount"></span></div>
+                    <div><strong>Added By:</strong> <span id="edit-addedby"></span></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-danger" onclick="deleteSoundFromModal()">
+                🗑️ Delete Sound
+            </button>
+            <button type="button" class="btn-secondary" onclick="closeEditModal()">
+                Cancel
+            </button>
+            <button type="button" class="btn-primary" onclick="saveSound()">
+                💾 Save Changes
+            </button>
         </div>
     </div>
 </div>
 
-<!-- Upload Progress Modal -->
+<!-- Upload Modal -->
 <div id="upload-modal" class="modal">
     <div class="modal-content">
-        <h2>Uploading...</h2>
-        <div class="upload-progress">
-            <div class="progress-bar">
-                <div id="progress-fill" class="progress-fill"></div>
+        <div class="modal-header">
+            <h2>Upload New Sound</h2>
+            <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="upload-form">
+                <div class="form-group">
+                    <label>Audio File *</label>
+                    <input type="file" id="upload-file" accept=".mp3,.wav,.ogg,.m4a,.flac" required>
+                    <small>Supported: MP3, WAV, OGG, M4A, FLAC</small>
+                </div>
+
+                <div class="form-group">
+                    <label>Title *</label>
+                    <input type="text" id="upload-title" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="upload-description" rows="2"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Trigger Words (comma-separated)</label>
+                    <input type="text" id="upload-triggers" placeholder="word1, word2">
+                </div>
+
+                <div class="form-group">
+                    <label>Guild</label>
+                    <select id="upload-guild">
+                        <option value="default_guild">Global</option>
+                    </select>
+                </div>
+            </form>
+            <div id="upload-progress" class="upload-progress" style="display: none;">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <p id="upload-status">Uploading...</p>
             </div>
-            <p id="upload-status">Preparing upload...</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeUploadModal()">
+                Cancel
+            </button>
+            <button type="button" class="btn-primary" onclick="submitUpload()">
+                📤 Upload
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h2>Confirm Delete</h2>
+        </div>
+        <div class="modal-body">
+            <p>Are you sure you want to delete <strong id="delete-sound-title"></strong>?</p>
+            <p class="warning-text">This will permanently delete the sound file and cannot be undone.</p>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeDeleteModal()">
+                Cancel
+            </button>
+            <button type="button" class="btn-danger" onclick="confirmDelete()">
+                🗑️ Delete
+            </button>
         </div>
     </div>
 </div>
@@ -95,16 +198,28 @@
     display: flex;
     gap: 1rem;
     margin-bottom: 1.5rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.search-bar {
+.control-group {
+    display: flex;
+    gap: 1rem;
     flex: 1;
-    min-width: 250px;
 }
 
-.search-bar input {
-    width: 100%;
+.filter-select {
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    min-width: 200px;
+}
+
+#sound-search {
+    flex: 1;
     padding: 0.75rem;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -113,42 +228,20 @@
     font-size: 0.95rem;
 }
 
-.upload-section {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
-
-.upload-btn {
+.btn-primary {
     padding: 0.75rem 1.5rem;
     background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
     color: white;
+    border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.3s ease;
     white-space: nowrap;
 }
 
-.upload-btn:hover {
+.btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(88, 101, 242, 0.4);
-}
-
-.drag-drop-zone {
-    padding: 0.75rem 1.5rem;
-    background: var(--bg-secondary);
-    border: 2px dashed var(--border-color);
-    border-radius: 8px;
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    transition: all 0.3s ease;
-}
-
-.drag-drop-zone.drag-over {
-    border-color: #5865F2;
-    background: rgba(88, 101, 242, 0.1);
-    color: #5865F2;
 }
 
 .sounds-stats {
@@ -170,104 +263,121 @@
     font-weight: 500;
 }
 
-.sounds-table-container {
-    background: var(--bg-secondary);
-    border-radius: 12px;
-    overflow: hidden;
-}
-
-.sounds-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.sounds-table thead {
-    background: var(--bg-tertiary);
-}
-
-.sounds-table th {
-    padding: 1rem;
-    text-align: left;
-    font-weight: 600;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--border-color);
-}
-
-.sounds-table td {
-    padding: 1rem;
-    border-bottom: 1px solid var(--border-color);
-}
-
-.sounds-table tbody tr:hover {
-    background: rgba(88, 101, 242, 0.05);
+.sounds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
 }
 
 .sounds-loading {
+    grid-column: 1 / -1;
     text-align: center;
+    padding: 3rem;
     color: var(--text-secondary);
-    padding: 2rem !important;
 }
 
-.sound-filename {
-    font-family: 'Monaco', 'Courier New', monospace;
+.sound-card {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.sound-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    border-color: #5865F2;
+}
+
+.sound-card.disabled {
+    opacity: 0.5;
+}
+
+.sound-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 0.75rem;
+}
+
+.sound-title {
+    font-size: 1.1rem;
+    font-weight: 600;
     color: var(--text-primary);
+    margin-bottom: 0.25rem;
 }
 
-.volume-control {
+.sound-guild {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: rgba(88, 101, 242, 0.2);
+    color: #5865F2;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.sound-description {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+}
+
+.sound-triggers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.trigger-tag {
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.sound-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.85rem;
+}
+
+.meta-item {
+    color: var(--text-secondary);
+}
+
+.meta-value {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.sound-play-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 40px;
+    height: 40px;
+    background: rgba(67, 181, 129, 0.2);
+    border: 2px solid #43B581;
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-}
-
-.volume-input {
-    width: 60px;
-    padding: 0.25rem 0.5rem;
-    background: var(--bg-primary);
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    color: var(--text-primary);
-    text-align: center;
-}
-
-.action-buttons {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.btn-play, .btn-edit, .btn-delete {
-    padding: 0.5rem 0.75rem;
-    border: none;
-    border-radius: 6px;
+    justify-content: center;
     cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
 }
 
-.btn-play {
+.sound-play-btn:hover {
     background: #43B581;
-    color: white;
-}
-
-.btn-play:hover {
-    background: #3CA374;
-}
-
-.btn-edit {
-    background: #FFA500;
-    color: white;
-}
-
-.btn-edit:hover {
-    background: #E69500;
-}
-
-.btn-delete {
-    background: #F04747;
-    color: white;
-}
-
-.btn-delete:hover {
-    background: #D84040;
+    transform: scale(1.1);
 }
 
 .modal {
@@ -289,55 +399,160 @@
 
 .modal-content {
     background: var(--bg-secondary);
-    padding: 2rem;
     border-radius: 12px;
-    max-width: 500px;
+    max-width: 600px;
     width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
-.modal-content h2 {
-    margin-top: 0;
+.modal-large {
+    max-width: 800px;
+}
+
+.modal-small {
+    max-width: 400px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+    margin: 0;
     color: var(--text-primary);
 }
 
-.modal-warning {
-    color: #F04747;
-    font-weight: 500;
-    margin: 1rem 0;
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    line-height: 1;
 }
 
-.modal-actions {
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
     display: flex;
     gap: 1rem;
     justify-content: flex-end;
-    margin-top: 1.5rem;
+    padding: 1.5rem;
+    border-top: 1px solid var(--border-color);
 }
 
-.btn-danger, .btn-secondary {
+.form-group {
+    margin-bottom: 1.25rem;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.form-group input[type="file"] {
+    width: 100%;
+    padding: 0.5rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.25rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+}
+
+.sound-info {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.sound-info div {
+    margin-bottom: 0.5rem;
+}
+
+.warning-text {
+    color: #F04747;
+    font-weight: 500;
+    margin-top: 1rem;
+}
+
+.btn-secondary {
     padding: 0.75rem 1.5rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
     border: none;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--border-color);
 }
 
 .btn-danger {
+    padding: 0.75rem 1.5rem;
     background: #F04747;
     color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
 }
 
 .btn-danger:hover {
     background: #D84040;
 }
 
-.btn-secondary {
-    background: var(--bg-tertiary);
-    color: var(--text-primary);
-}
-
-.btn-secondary:hover {
-    background: var(--border-color);
+.upload-progress {
+    margin-top: 1rem;
 }
 
 .progress-bar {
