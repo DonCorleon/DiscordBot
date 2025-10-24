@@ -119,6 +119,7 @@ class WebSocketClient {
 
 // Global WebSocket instance
 const wsClient = new WebSocketClient();
+window.wsClient = wsClient;  // Make it available globally
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
