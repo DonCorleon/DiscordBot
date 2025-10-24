@@ -316,7 +316,10 @@ class AdminDataCollector:
         Non-blocking - creates task if manager is available.
         """
         if self.websocket_manager and hasattr(self.websocket_manager, 'get_connection_count'):
-            if self.websocket_manager.get_connection_count() > 0:
+            connection_count = self.websocket_manager.get_connection_count()
+            logger.info(f"Broadcasting {event_type} event to {connection_count} WebSocket clients")
+
+            if connection_count > 0:
                 # Use bot's event loop to schedule the coroutine
                 try:
                     loop = self.bot.loop
@@ -329,8 +332,15 @@ class AdminDataCollector:
                             }),
                             loop
                         )
+                        logger.debug(f"Successfully queued broadcast for {event_type}")
+                    else:
+                        logger.warning(f"Bot loop not running, cannot broadcast {event_type}")
                 except Exception as e:
-                    logger.debug(f"Failed to broadcast event: {e}")
+                    logger.error(f"Failed to broadcast event {event_type}: {e}", exc_info=True)
+            else:
+                logger.debug(f"No WebSocket clients connected, skipping {event_type} broadcast")
+        else:
+            logger.debug(f"WebSocket manager not available for {event_type} broadcast")
 
     def record_command(self, command_name: str, execution_time: float, success: bool):
         """Record a command execution."""

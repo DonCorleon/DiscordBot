@@ -63,12 +63,16 @@ function setupEventListeners() {
 function setupWebSocket() {
     // Listen for real-time transcription events via WebSocket
     if (window.wsClient) {
+        console.log('Setting up transcription WebSocket listener');
         wsClient.on('transcription', (data) => {
-            console.log('Received real-time transcription:', data);
+            console.log('🎤 Received real-time transcription:', data);
+            console.log('Transcription data:', data.data);
             // Add to transcripts list
             addTranscriptionToView(data.data);
             updateStats();
         });
+    } else {
+        console.error('⚠️ wsClient not available!');
     }
 }
 
