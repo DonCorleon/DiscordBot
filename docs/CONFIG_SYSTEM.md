@@ -1,20 +1,21 @@
 # Configuration System - Developer Guide
 
-**Status:** Phase 1 Complete ✅
-**Version:** 1.0
-**Last Updated:** January 2025
+**Status:** Phase 2 Complete ✅ (All Cogs Migrated)
+**Version:** 2.0
+**Last Updated:** October 2025
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Quick Start](#quick-start)
-3. [Core Concepts](#core-concepts)
-4. [API Reference](#api-reference)
-5. [Examples](#examples)
-6. [Best Practices](#best-practices)
-7. [Migration Guide](#migration-guide)
+2. [Configuration Scope](#configuration-scope)
+3. [Quick Start](#quick-start)
+4. [Core Concepts](#core-concepts)
+5. [API Reference](#api-reference)
+6. [Examples](#examples)
+7. [Best Practices](#best-practices)
+8. [Migrated Cogs](#migrated-cogs)
 
 ---
 
@@ -28,6 +29,7 @@ The new configuration system provides a declarative, self-documenting way to def
 - ✅ **Automatic validation** with sensible defaults
 - ✅ **Minimal boilerplate** for cog developers
 - ✅ **Auto-generated web UI** from schemas
+- ✅ **Inline schemas** - Config defined directly in cog files
 
 ### Design Principles
 
@@ -35,6 +37,35 @@ The new configuration system provides a declarative, self-documenting way to def
 2. **Clear hierarchy**: `default → global → guild`
 3. **Fail gracefully** - Invalid configs log errors and use defaults
 4. **Property access** - Clean, Pythonic API with IDE support
+5. **Inline schemas** - No separate config files, schemas live with cogs
+
+---
+
+## Configuration Scope
+
+### What Goes in ConfigManager (Guild-Overridable Settings)
+
+Use the new ConfigManager for **cog-specific settings** that should support per-guild customization:
+- Audio playback settings (volume, ducking, etc.)
+- TTS voice and rate preferences
+- Activity tracking and points
+- Leaderboard display options
+- Auto-join behavior
+
+✅ **Rule of thumb:** If a guild admin should be able to customize it, use ConfigManager.
+
+### What Stays in bot.config (System-Level Settings)
+
+Keep these in `bot.config.BotConfig` (NOT migrated to ConfigManager):
+- **Discord credentials** (token, bot_owner_id)
+- **Command prefix** (affects command parsing)
+- **Web dashboard** (host, port, enable/disable)
+- **Monitoring** (health intervals, data export)
+- **File paths** (log_dir, admin_data_dir)
+- **Feature flags** (enable_admin_dashboard, enable_speech_recognition)
+- **Logging** (log_level)
+
+❌ **Rule of thumb:** If it affects the bot process itself (not guild behavior), keep it in BotConfig.
 
 ---
 
@@ -507,14 +538,80 @@ All 17 tests should pass:
 
 ---
 
-## What's Next?
+## Migrated Cogs
 
-**Phase 1:** ✅ Complete
-**Phase 2:** Migrate first cog (SoundboardCog)
-**Phase 3:** Migrate remaining cogs
-**Phase 4:** Remove old system
+**Phase 2 Complete:** All cogs successfully migrated! 🎉
 
-See [CONFIG_MIGRATION.md](CONFIG_MIGRATION.md) for the full migration plan.
+### Summary
+
+**5 Cogs Migrated** with **32 Total Settings**
+
+| Cog | Settings | Category | Guild Override |
+|-----|----------|----------|----------------|
+| **Soundboard** | 7 | Playback, Admin | ✅ |
+| **TTS** | 3 | TTS | ✅ |
+| **EdgeTTS** | 2 | TTS | ✅ |
+| **Activity** | 18 | Stats | ✅ |
+| **Voice** | 2 | Playback | ✅ |
+
+### Detailed Breakdown
+
+#### Soundboard (7 settings)
+- `default_volume` - Playback volume (0.0-2.0)
+- `ducking_enabled` - Auto-reduce volume when users speak
+- `ducking_level` - Volume reduction level (0.0-1.0)
+- `ducking_transition_ms` - Smooth transition time (10-500ms)
+- `sound_playback_timeout` - Max playback wait time (5-300s)
+- `sound_queue_warning_size` - Queue size threshold (10-500)
+- `soundboard_dir` - Sound files directory (admin-only, requires restart)
+
+#### TTS (3 settings)
+- `tts_default_volume` - TTS playback volume (0.0-2.0)
+- `tts_default_rate` - Speech rate in WPM (50-400)
+- `tts_max_text_length` - Max message length (50-2000, admin-only)
+
+#### EdgeTTS (2 settings)
+- `edge_tts_default_volume` - Edge TTS volume (0.0-2.0)
+- `edge_tts_default_voice` - Default voice (e.g., en-US-AriaNeural)
+
+#### Activity (18 settings)
+
+**Voice Tracking (4):**
+- `voice_tracking_enabled` - Enable voice time tracking
+- `voice_points_per_minute` - Points per minute in voice (0.0-10.0)
+- `voice_time_display_mode` - Display mode (ranges/descriptions/points_only)
+- `voice_tracking_type` - Tracking type (total/unmuted/speaking)
+
+**Weekly Recap (4):**
+- `enable_weekly_recap` - Enable weekly activity recaps
+- `weekly_recap_channel_id` - Channel ID for recaps
+- `weekly_recap_day` - Day of week (0=Monday, 6=Sunday)
+- `weekly_recap_hour` - Hour to post (0-23)
+
+**Activity Points (6):**
+- `activity_base_message_points_min` - Min message points (0.0-10.0)
+- `activity_base_message_points_max` - Max message points (0.0-10.0)
+- `activity_link_bonus_points` - Link bonus (0.0-10.0)
+- `activity_attachment_bonus_points` - Attachment bonus (0.0-10.0)
+- `activity_reaction_points` - Reaction points (0.0-10.0)
+- `activity_reply_points` - Reply points (0.0-10.0)
+
+**Leaderboard (4):**
+- `leaderboard_default_limit` - Default entries shown (1-50)
+- `user_stats_channel_breakdown_limit` - Channels in breakdown (1-20)
+- `user_stats_triggers_limit` - Top triggers shown (1-20)
+- `leaderboard_bar_chart_length` - Bar chart length (5-50)
+
+#### Voice (2 settings)
+- `auto_join_enabled` - Enable auto-join for voice channels
+- `auto_join_timeout` - Leave timeout for empty channels (0-3600s)
+
+### Migration Status
+
+- ✅ **Phase 1:** Core infrastructure complete
+- ✅ **Phase 2:** All cogs migrated (5/5)
+- ⏭️  **Phase 3:** Old system remains for backwards compatibility
+- 🔮 **Future:** Deprecate old `bot.config` for cog settings
 
 ---
 
