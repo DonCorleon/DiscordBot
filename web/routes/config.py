@@ -59,26 +59,58 @@ async def get_all_config():
         raise HTTPException(status_code=503, detail="Guild config manager not initialized")
 
     try:
-        from bot.core.guild_config_manager import GUILD_OVERRIDABLE_SETTINGS
+        from bot.core.guild_config_manager import GuildConfigManager
+        from bot.config import BotConfig
+        import inspect
 
-        # Build settings from GUILD_OVERRIDABLE_SETTINGS
+        # Get type hints from BotConfig to infer types
+        type_hints = BotConfig.__annotations__
+
+        # Build settings from GUILD_OVERRIDABLE_SETTINGS (it's a class attribute)
         categorized = {}
-        for key, metadata in GUILD_OVERRIDABLE_SETTINGS.items():
-            category = metadata.get("category", "General")
+        for key in GuildConfigManager.GUILD_OVERRIDABLE_SETTINGS:
+            # Infer category from key prefix
+            if key.startswith("tts_") or key.startswith("edge_tts_"):
+                category = "TTS"
+            elif key.startswith("voice_"):
+                category = "Stats"
+            elif key.startswith("activity_"):
+                category = "Stats"
+            elif key.startswith("leaderboard_") or key.startswith("user_stats_"):
+                category = "Stats"
+            elif key.startswith("weekly_recap_"):
+                category = "Stats"
+            elif "ducking" in key or "volume" in key or "playback" in key or "queue" in key or key.startswith("sound_"):
+                category = "Playback"
+            elif "join" in key:
+                category = "Playback"
+            else:
+                category = "Admin"
+
             if category not in categorized:
                 categorized[category] = {}
 
+            # Get type from BotConfig
+            config_type = type_hints.get(key, str)
+            type_name = "string"
+            if config_type == bool:
+                type_name = "boolean"
+            elif config_type == int:
+                type_name = "number"
+            elif config_type == float:
+                type_name = "number"
+
+            # Get default value from guild_config_manager's global_config
+            default_value = getattr(guild_config_manager.global_config, key, None)
+
             categorized[category][key] = {
                 "key": key,
-                "value": guild_config_manager.config_defaults.get(key),
-                "type": metadata.get("type", "string"),
-                "description": metadata.get("description", ""),
+                "value": default_value,
+                "type": type_name,
+                "description": f"Guild-overridable setting: {key.replace('_', ' ').title()}",
                 "category": category,
                 "guild_override": True,
-                "admin_only": metadata.get("admin_only", False),
-                "min": metadata.get("min"),
-                "max": metadata.get("max"),
-                "options": metadata.get("options")
+                "admin_only": False
             }
 
         return {
@@ -99,23 +131,34 @@ async def get_config_setting(key: str):
         raise HTTPException(status_code=503, detail="Guild config manager not initialized")
 
     try:
-        from bot.core.guild_config_manager import GUILD_OVERRIDABLE_SETTINGS
+        from bot.core.guild_config_manager import GuildConfigManager
+        from bot.config import BotConfig
 
-        if key not in GUILD_OVERRIDABLE_SETTINGS:
+        if key not in GuildConfigManager.GUILD_OVERRIDABLE_SETTINGS:
             raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
 
-        metadata = GUILD_OVERRIDABLE_SETTINGS[key]
+        # Get type from BotConfig
+        type_hints = BotConfig.__annotations__
+        config_type = type_hints.get(key, str)
+        type_name = "string"
+        if config_type == bool:
+            type_name = "boolean"
+        elif config_type == int:
+            type_name = "number"
+        elif config_type == float:
+            type_name = "number"
+
+        # Get default value
+        default_value = getattr(guild_config_manager.global_config, key, None)
+
         return {
             "key": key,
-            "value": guild_config_manager.config_defaults.get(key),
-            "type": metadata.get("type", "string"),
-            "description": metadata.get("description", ""),
-            "category": metadata.get("category", "General"),
+            "value": default_value,
+            "type": type_name,
+            "description": f"Guild-overridable setting: {key.replace('_', ' ').title()}",
+            "category": "General",
             "guild_override": True,
-            "admin_only": metadata.get("admin_only", False),
-            "min": metadata.get("min"),
-            "max": metadata.get("max"),
-            "options": metadata.get("options")
+            "admin_only": False
         }
 
     except HTTPException:
