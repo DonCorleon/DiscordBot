@@ -206,7 +206,19 @@ async def on_ready():
     # Start data collection
     await data_collector.start()
 
-    # Load cogs from new structure
+    # Initialize guild config manager (always available)
+    from bot.core.guild_config_manager import GuildConfigManager
+    guild_config_mgr = GuildConfigManager(config)
+    bot.guild_config = guild_config_mgr  # Make accessible to cogs
+    logger.info("⚙️ Guild configuration manager initialized")
+
+    # Initialize new config system BEFORE loading cogs (Phase 2)
+    from bot.core.config_system import ConfigManager
+    config_manager = ConfigManager()
+    bot.config_manager = config_manager  # Make accessible to cogs
+    logger.info("⚙️  New configuration system initialized")
+
+    # Load cogs from new structure (cogs can now register schemas)
     cog_domains = ["activity", "audio", "admin", "utility"]
     cogs_base = os.path.join(os.path.dirname(__file__), "cogs")
 
@@ -226,18 +238,6 @@ async def on_ready():
         logger.info("📊 Admin dashboard enabled - Data exporting to data/admin/")
     else:
         logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
-
-    # Initialize guild config manager (always available)
-    from bot.core.guild_config_manager import GuildConfigManager
-    guild_config_mgr = GuildConfigManager(config)
-    bot.guild_config = guild_config_mgr  # Make accessible to cogs
-    logger.info("⚙️ Guild configuration manager initialized")
-
-    # Initialize new config system (Phase 1)
-    from bot.core.config_system import ConfigManager
-    config_manager = ConfigManager()
-    bot.config_manager = config_manager  # Make accessible to cogs
-    logger.info("⚙️  New configuration system initialized")
 
     # Connect web dashboard to data collector if enabled
     if config.enable_web_dashboard:
