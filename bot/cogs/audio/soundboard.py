@@ -814,6 +814,14 @@ class Soundboard(BaseCog):
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
+
+        # Register config schema (Phase 2)
+        from bot.core.config_system import CogConfigSchema
+        from .soundboard_config import SoundboardConfig
+        schema = CogConfigSchema.from_dataclass("Soundboard", SoundboardConfig)
+        bot.config_manager.register_schema("Soundboard", schema)
+        logger.info("Registered Soundboard config schema")
+
         self.soundboard: SoundboardData = SoundboardData()
         if Path(SOUNDBOARD_FILE).exists():
             try:

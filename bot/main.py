@@ -233,6 +233,12 @@ async def on_ready():
     bot.guild_config = guild_config_mgr  # Make accessible to cogs
     logger.info("⚙️ Guild configuration manager initialized")
 
+    # Initialize new config system (Phase 1)
+    from bot.core.config_system import ConfigManager
+    config_manager = ConfigManager()
+    bot.config_manager = config_manager  # Make accessible to cogs
+    logger.info("⚙️  New configuration system initialized")
+
     # Connect web dashboard to data collector if enabled
     if config.enable_web_dashboard:
         try:
