@@ -48,6 +48,72 @@ def _save_soundboard_config(config_data):
         json.dump(config_data, f, indent=2)
 
 
+def _update_bot_soundboard(sound_id: str, sound_data: dict):
+    """Update the bot's in-memory soundboard after a change."""
+    try:
+        from web.app import bot_instance
+
+        if not bot_instance:
+            logger.warning("Bot instance not available, skipping in-memory update")
+            return
+
+        # Find the soundboard cog
+        soundboard_cog = bot_instance.get_cog("Soundboard")
+        if not soundboard_cog:
+            logger.warning("Soundboard cog not found, skipping in-memory update")
+            return
+
+        # Import the SoundEntry class from soundboard module
+        from bot.cogs.audio.soundboard import SoundEntry, PlayStats, AudioMetadata, SoundSettings
+
+        # Convert dict to SoundEntry dataclass
+        if 'play_stats' in sound_data and isinstance(sound_data['play_stats'], dict):
+            sound_data['play_stats'] = PlayStats(**sound_data['play_stats'])
+        if 'audio_metadata' in sound_data and isinstance(sound_data['audio_metadata'], dict):
+            sound_data['audio_metadata'] = AudioMetadata(**sound_data['audio_metadata'])
+        if 'settings' in sound_data and isinstance(sound_data['settings'], dict):
+            sound_data['settings'] = SoundSettings(**sound_data['settings'])
+
+        sound_entry = SoundEntry(**sound_data)
+
+        # Update the in-memory soundboard
+        soundboard_cog.soundboard.sounds[sound_id] = sound_entry
+        logger.info(f"Updated bot's in-memory soundboard for '{sound_id}'")
+
+    except ImportError as e:
+        logger.warning(f"Could not import bot modules: {e}")
+    except Exception as e:
+        logger.error(f"Error updating bot soundboard in memory: {e}", exc_info=True)
+
+
+def _delete_bot_soundboard_entry(sound_id: str):
+    """Delete a sound from the bot's in-memory soundboard."""
+    try:
+        from web.app import bot_instance
+
+        if not bot_instance:
+            logger.warning("Bot instance not available, skipping in-memory deletion")
+            return
+
+        # Find the soundboard cog
+        soundboard_cog = bot_instance.get_cog("Soundboard")
+        if not soundboard_cog:
+            logger.warning("Soundboard cog not found, skipping in-memory deletion")
+            return
+
+        # Delete from in-memory soundboard
+        if sound_id in soundboard_cog.soundboard.sounds:
+            del soundboard_cog.soundboard.sounds[sound_id]
+            logger.info(f"Deleted '{sound_id}' from bot's in-memory soundboard")
+        else:
+            logger.warning(f"Sound '{sound_id}' not found in bot's in-memory soundboard")
+
+    except ImportError as e:
+        logger.warning(f"Could not import bot modules: {e}")
+    except Exception as e:
+        logger.error(f"Error deleting sound from bot soundboard in memory: {e}", exc_info=True)
+
+
 @router.get("/list")
 async def list_sounds(
     search: Optional[str] = Query(None, description="Filter by title or filename"),
@@ -306,6 +372,9 @@ async def upload_sound(
         config_data["sounds"] = sounds_dict
         _save_soundboard_config(config_data)
 
+        # Update bot's in-memory soundboard
+        _update_bot_soundboard(sound_id, sounds_dict[sound_id])
+
         logger.info(f"Uploaded sound: {sound_id} ({file.filename})")
 
         return {
@@ -349,6 +418,9 @@ async def delete_sound(sound_id: str):
         del sounds_dict[sound_id]
         config_data["sounds"] = sounds_dict
         _save_soundboard_config(config_data)
+
+        # Delete from bot's in-memory soundboard
+        _delete_bot_soundboard_entry(sound_id)
 
         return {
             "success": True,
@@ -414,6 +486,9 @@ async def update_sound_metadata(sound_id: str, metadata: SoundMetadata):
         sounds_dict[sound_id] = sound_data
         config_data["sounds"] = sounds_dict
         _save_soundboard_config(config_data)
+
+        # Update bot's in-memory soundboard
+        _update_bot_soundboard(sound_id, sound_data)
 
         logger.info(f"Updated metadata for {sound_id}")
 
