@@ -538,6 +538,9 @@ class ActivityTracker(BaseCog):
     async def voice_time_task(self):
         """Background task that runs every minute to update voice time for all active sessions."""
         try:
+            # Get config for activity tracking
+            cfg = self.bot.config_manager.for_guild("Activity")
+
             # Check if anyone is in voice channels first
             has_active_sessions = False
             for guild in self.bot.guilds:
