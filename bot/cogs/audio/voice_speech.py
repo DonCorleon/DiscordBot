@@ -6,11 +6,36 @@ from discord.ext import commands, voice_recv
 from discord.ext.voice_recv.extras import speechrecognition as dsr
 import asyncio
 import os
+from dataclasses import dataclass
 from datetime import datetime
 from bot.base_cog import BaseCog, logger
+from bot.core.config_base import ConfigBase, config_field
 from bot.core.audio.sources import DuckedAudioSource
 from bot.core.errors import UserFeedback
 from bot.config import config
+
+
+# -------- Configuration Schema --------
+
+@dataclass
+class VoiceConfig(ConfigBase):
+    """Voice channel and auto-join configuration schema."""
+
+    auto_join_enabled: bool = config_field(
+        default=True,
+        description="Enable auto-join when users enter voice channels",
+        category="Playback",
+        guild_override=True
+    )
+
+    auto_join_timeout: int = config_field(
+        default=300,
+        description="Seconds to wait before leaving empty voice channel (0 = stay forever)",
+        category="Playback",
+        guild_override=True,
+        min_value=0,
+        max_value=3600
+    )
 
 
 # Monkey patch for discord-ext-voice-recv bug
@@ -40,8 +65,14 @@ class VoiceSpeechCog(BaseCog):
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
+
+        # Register config schema
+        from bot.core.config_system import CogConfigSchema
+        schema = CogConfigSchema.from_dataclass("Voice", VoiceConfig)
+        bot.config_manager.register_schema("Voice", schema)
+        logger.info("Registered Voice config schema")
+
         self.active_sinks = {}
-        self._keepalive_interval = config.keepalive_interval
         self._keepalive_task = None
         self.sound_queues = {}  # {guild_id: asyncio.Queue}
         self.queue_tasks = {}  # {guild_id: Task}
@@ -248,7 +279,7 @@ class VoiceSpeechCog(BaseCog):
         self.speaking_users.clear()
         logger.info("VoiceSpeechCog cleanup complete.")
 
-    async def _process_sound_queue(self, guild_id: int, default_volume: float = 0.5):
+    async def _process_sound_queue(self, guild_id: int):
         """Process sound queue with ducking support."""
         queue = self.sound_queues[guild_id]
 
@@ -285,11 +316,16 @@ class VoiceSpeechCog(BaseCog):
 
                     self.bot.loop.call_soon_threadsafe(event.set)
 
-                # Calculate effective volume
-                effective_volume = volume * default_volume
+                # Calculate effective volume (read from config dynamically for hot-reload support)
+                from bot.config import config
+                effective_volume = volume * config.default_volume
 
-                # Get ducking config
-                config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
+                # Get ducking config (use global config as default)
+                from bot.config import config as bot_config
+                config = self.ducking_config.get(
+                    guild_id,
+                    {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
+                )
 
                 # Create ducked audio source
                 try:
@@ -342,8 +378,13 @@ class VoiceSpeechCog(BaseCog):
                     except Exception as e:
                         logger.error(f"[Guild {guild_id}] Failed to track user trigger stats: {e}", exc_info=True)
 
+                # Get playback timeout from guild config
+                playback_timeout = 30.0  # default
+                if hasattr(self.bot, 'guild_config'):
+                    playback_timeout = self.bot.guild_config.get_guild_config(guild_id, "sound_playback_timeout")
+
                 try:
-                    await asyncio.wait_for(event.wait(), timeout=30.0)
+                    await asyncio.wait_for(event.wait(), timeout=playback_timeout)
                 except asyncio.TimeoutError:
                     logger.error(f"[Guild {guild_id}] Playback timeout for '{soundfile}'")
                     if vc.is_playing():
@@ -365,8 +406,18 @@ class VoiceSpeechCog(BaseCog):
             self.queue_tasks[guild_id] = asyncio.create_task(self._process_sound_queue(guild_id))
 
         await self.sound_queues[guild_id].put((soundfile, sound_key, volume, user.guild.voice_client, user.id, trigger_word, channel_id, user.display_name))
+
+        queue_size = self.sound_queues[guild_id].qsize()
         logger.debug(
-            f"[Guild {guild_id}] Queued '{soundfile}' (volume: {volume:.2f}, queue size: {self.sound_queues[guild_id].qsize()})")
+            f"[Guild {guild_id}] Queued '{soundfile}' (volume: {volume:.2f}, queue size: {queue_size})")
+
+        # Warn if queue size exceeds threshold
+        warning_threshold = 50  # default
+        if hasattr(self.bot, 'guild_config'):
+            warning_threshold = self.bot.guild_config.get_guild_config(guild_id, "sound_queue_warning_size")
+
+        if queue_size > warning_threshold:
+            logger.warning(f"[Guild {guild_id}] Sound queue size ({queue_size}) exceeds warning threshold ({warning_threshold})")
 
     async def _keepalive_loop(self):
         """Keepalive loop to prevent voice disconnection."""
@@ -389,7 +440,9 @@ class VoiceSpeechCog(BaseCog):
                         vc.send_audio_packet(silence, encode=False)
                     except Exception as e:
                         logger.error(f"[Guild {guild_id}] Keepalive error: {e}", exc_info=True)
-                await asyncio.sleep(self._keepalive_interval)
+                # Read from config dynamically for hot-reload support
+                from bot.config import config
+                await asyncio.sleep(config.keepalive_interval)
         except asyncio.CancelledError:
             logger.info("Keepalive loop cancelled")
             raise
@@ -534,9 +587,13 @@ class VoiceSpeechCog(BaseCog):
         # Add user to speaking set
         self.speaking_users[guild_id].add(user_id)
 
-        # Check if ducking is enabled
-        config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
-        if not config["enabled"]:
+        # Check if ducking is enabled (use global config as default)
+        from bot.config import config as bot_config
+        ducking_cfg = self.ducking_config.get(
+            guild_id,
+            {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
+        )
+        if not ducking_cfg["enabled"]:
             return
 
         # Duck current audio if playing
@@ -552,9 +609,13 @@ class VoiceSpeechCog(BaseCog):
         # Remove user from speaking set
         self.speaking_users[guild_id].discard(user_id)
 
-        # Check if ducking is enabled
-        config = self.ducking_config.get(guild_id, {"enabled": True, "level": 0.5})
-        if not config["enabled"]:
+        # Check if ducking is enabled (use global config as default)
+        from bot.config import config as bot_config
+        ducking_cfg = self.ducking_config.get(
+            guild_id,
+            {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
+        )
+        if not ducking_cfg["enabled"]:
             return
 
         # Unduck only if no one else is speaking
@@ -569,50 +630,72 @@ class VoiceSpeechCog(BaseCog):
 
         Usage:
             ~ducking - Show current settings
-            ~ducking on/off - Enable/disable ducking
-            ~ducking level <0-100> - Set ducking level (default 50%)
+            ~ducking on/off - Enable/disable ducking for this guild
+            ~ducking level <0-100> - Set ducking level for this guild
+            ~ducking reset - Reset to global default config
 
         Examples:
             ~ducking on
             ~ducking level 30
             ~ducking off
+            ~ducking reset
         """
         guild_id = ctx.guild.id
 
-        # Get current config
+        # Get current config (use global config as default)
+        from bot.config import config as bot_config
         if guild_id not in self.ducking_config:
-            self.ducking_config[guild_id] = {"enabled": True, "level": 0.5}
+            # Initialize with global config values
+            self.ducking_config[guild_id] = {
+                "enabled": bot_config.ducking_enabled,
+                "level": bot_config.ducking_level
+            }
 
-        config = self.ducking_config[guild_id]
+        ducking_cfg = self.ducking_config[guild_id]
 
         # Show current settings
         if setting is None:
-            status = "✅ Enabled" if config["enabled"] else "❌ Disabled"
-            level_percent = int(config["level"] * 100)
+            status = "✅ Enabled" if ducking_cfg["enabled"] else "❌ Disabled"
+            level_percent = int(ducking_cfg["level"] * 100)
+
+            # Check if using global default or guild override
+            using_global = (guild_id not in self.ducking_config or
+                          (ducking_cfg["enabled"] == bot_config.ducking_enabled and
+                           ducking_cfg["level"] == bot_config.ducking_level))
+            source = "(using global config)" if using_global else "(guild override)"
 
             embed = discord.Embed(
                 title="🔊 Audio Ducking Settings",
                 color=discord.Color.blue()
             )
-            embed.add_field(name="Status", value=status, inline=True)
+            embed.add_field(name="Status", value=f"{status} {source}", inline=False)
             embed.add_field(name="Duck Level", value=f"{level_percent}%", inline=True)
             embed.add_field(
                 name="ℹ️ Info",
-                value="Ducking automatically reduces audio volume when users speak.",
+                value="Ducking automatically reduces audio volume when users speak.\n"
+                      f"Global default: {'Enabled' if bot_config.ducking_enabled else 'Disabled'} @ {int(bot_config.ducking_level * 100)}%",
                 inline=False
             )
             embed.set_footer(text="Use ~ducking on/off or ~ducking level <0-100>")
 
             return await ctx.send(embed=embed)
 
+        # Handle reset to global default
+        if setting.lower() in ["reset", "default", "global"]:
+            if guild_id in self.ducking_config:
+                del self.ducking_config[guild_id]
+            await UserFeedback.success(ctx,
+                f"Reset to global default: {'Enabled' if bot_config.ducking_enabled else 'Disabled'} @ {int(bot_config.ducking_level * 100)}%")
+            return
+
         # Handle on/off
         if setting.lower() in ["on", "enable", "enabled", "yes"]:
-            config["enabled"] = True
-            await UserFeedback.success(ctx, f"Audio ducking **enabled** (level: {int(config['level'] * 100)}%)")
+            ducking_cfg["enabled"] = True
+            await UserFeedback.success(ctx, f"Audio ducking **enabled** (level: {int(ducking_cfg['level'] * 100)}%)")
             return
 
         if setting.lower() in ["off", "disable", "disabled", "no"]:
-            config["enabled"] = False
+            ducking_cfg["enabled"] = False
 
             # Unduck if currently ducked
             if guild_id in self.current_sources:
@@ -631,7 +714,7 @@ class VoiceSpeechCog(BaseCog):
                 if not 0 <= level_percent <= 100:
                     return await UserFeedback.error(ctx, "Level must be between 0 and 100")
 
-                config["level"] = level_percent / 100.0
+                ducking_cfg["level"] = level_percent / 100.0
                 await UserFeedback.success(ctx, f"Ducking level set to **{level_percent}%**")
 
             except ValueError:

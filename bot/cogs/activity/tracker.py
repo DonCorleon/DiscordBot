@@ -6,7 +6,9 @@ import re
 import asyncio
 import discord
 from discord.ext import commands, tasks
+from dataclasses import dataclass
 from bot.base_cog import BaseCog, logger
+from bot.core.config_base import ConfigBase, config_field
 from bot.core.stats.activity import (
     load_activity_stats, save_activity_stats, add_message_activity,
     add_reaction_activity, add_reply_activity, remove_message_activity,
@@ -15,12 +17,185 @@ from bot.core.stats.activity import (
 from bot.config import config
 
 
+# -------- Configuration Schema --------
+
+@dataclass
+class ActivityConfig(ConfigBase):
+    """Activity tracking and statistics configuration schema."""
+
+    # Voice Tracking Settings
+    voice_tracking_enabled: bool = config_field(
+        default=True,
+        description="Enable tracking of voice channel activity and time",
+        category="Stats",
+        guild_override=True
+    )
+
+    voice_points_per_minute: float = config_field(
+        default=0.0,
+        description="Points awarded per minute in voice (0.0 = disabled)",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    voice_time_display_mode: str = config_field(
+        default="ranges",
+        description="How to display voice time in stats",
+        category="Stats",
+        guild_override=True,
+        choices=["ranges", "descriptions", "points_only"]
+    )
+
+    voice_tracking_type: str = config_field(
+        default="total",
+        description="What voice time to track",
+        category="Stats",
+        guild_override=True,
+        choices=["total", "unmuted", "speaking"]
+    )
+
+    # Weekly Recap Settings
+    enable_weekly_recap: bool = config_field(
+        default=False,
+        description="Enable automatic weekly activity recap posts",
+        category="Stats",
+        guild_override=True
+    )
+
+    weekly_recap_channel_id: int = config_field(
+        default=0,
+        description="Channel ID to post weekly recaps (0 = disabled)",
+        category="Stats",
+        guild_override=True,
+        min_value=0
+    )
+
+    weekly_recap_day: int = config_field(
+        default=0,
+        description="Day of week for recap (0=Monday, 6=Sunday)",
+        category="Stats",
+        guild_override=True,
+        min_value=0,
+        max_value=6
+    )
+
+    weekly_recap_hour: int = config_field(
+        default=9,
+        description="Hour to post recap (24-hour format)",
+        category="Stats",
+        guild_override=True,
+        min_value=0,
+        max_value=23
+    )
+
+    # Activity Points Settings
+    activity_base_message_points_min: float = config_field(
+        default=0.8,
+        description="Minimum points awarded for a message",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    activity_base_message_points_max: float = config_field(
+        default=1.2,
+        description="Maximum points awarded for a message",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    activity_link_bonus_points: float = config_field(
+        default=2.0,
+        description="Bonus points for messages containing links",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    activity_attachment_bonus_points: float = config_field(
+        default=2.0,
+        description="Bonus points for messages with attachments",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    activity_reaction_points: float = config_field(
+        default=1.0,
+        description="Points awarded for adding reactions",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    activity_reply_points: float = config_field(
+        default=1.0,
+        description="Points awarded for replying to messages",
+        category="Stats",
+        guild_override=True,
+        min_value=0.0,
+        max_value=10.0
+    )
+
+    # Leaderboard Settings
+    leaderboard_default_limit: int = config_field(
+        default=10,
+        description="Default number of entries shown in leaderboard",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=50
+    )
+
+    user_stats_channel_breakdown_limit: int = config_field(
+        default=5,
+        description="Number of channels shown in user stats breakdown",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=20
+    )
+
+    user_stats_triggers_limit: int = config_field(
+        default=5,
+        description="Number of top triggers shown in user stats",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=20
+    )
+
+    leaderboard_bar_chart_length: int = config_field(
+        default=15,
+        description="Character length of bar charts in leaderboard",
+        category="Stats",
+        guild_override=True,
+        min_value=5,
+        max_value=50
+    )
+
+
 class ActivityTracker(BaseCog):
     """Track user activity across messages, reactions, and replies."""
 
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
+
+        # Register config schema
+        from bot.core.config_system import CogConfigSchema
+        schema = CogConfigSchema.from_dataclass("Activity", ActivityConfig)
+        bot.config_manager.register_schema("Activity", schema)
+        logger.info("Registered Activity config schema")
+
         # Track processed reactions to prevent duplicates: {(message_id, user_id, emoji): True}
         self.processed_reactions = {}
         # Cache activity stats in memory to avoid repeated file loads
