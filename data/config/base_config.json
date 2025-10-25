@@ -1,0 +1,5 @@
+{
+  "_comment": "Global configuration overrides (nested format)",
+  "_format": "CogName -> setting_key -> value",
+  "_note": "Only include settings that differ from defaults defined in code"
+}
