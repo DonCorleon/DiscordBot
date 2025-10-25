@@ -8,12 +8,49 @@ import tempfile
 import os
 import re
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from bot.base_cog import BaseCog, logger
 from bot.core.errors import UserFeedback
+from bot.core.config_base import ConfigBase, config_field
 
 # Preferences file
 PREFERENCES_FILE = "data/config/tts_preferences.json"
+
+
+# -------- Configuration Schema --------
+
+@dataclass
+class TTSConfig(ConfigBase):
+    """TTS (Text-to-Speech) configuration schema."""
+
+    tts_default_volume: float = config_field(
+        default=1.5,
+        description="Default TTS playback volume (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
+        category="TTS",
+        guild_override=True,
+        min_value=0.0,
+        max_value=2.0
+    )
+
+    tts_default_rate: int = config_field(
+        default=150,
+        description="Default TTS speech rate in words per minute",
+        category="TTS",
+        guild_override=True,
+        min_value=50,
+        max_value=400
+    )
+
+    tts_max_text_length: int = config_field(
+        default=500,
+        description="Maximum text length for TTS messages (prevents spam)",
+        category="TTS",
+        guild_override=True,
+        admin_only=True,
+        min_value=50,
+        max_value=2000
+    )
 
 
 class TtsCog(BaseCog):
@@ -59,7 +96,13 @@ class TtsCog(BaseCog):
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
-        self.volume = 1.5
+
+        # Register config schema
+        from bot.core.config_system import CogConfigSchema
+        schema = CogConfigSchema.from_dataclass("TTS", TTSConfig)
+        bot.config_manager.register_schema("TTS", schema)
+        logger.info("Registered TTS config schema")
+
         self.user_preferences = {}
         self.load_preferences()
 
@@ -85,12 +128,18 @@ class TtsCog(BaseCog):
         except Exception as e:
             logger.error(f"Failed to save TTS preferences: {e}", exc_info=True)
 
-    def get_user_preferences(self, user_id: int) -> dict:
-        """Get preferences for a user, or return defaults."""
+    def get_user_preferences(self, user_id: int, guild_id: int = None) -> dict:
+        """Get preferences for a user, or return guild/global defaults."""
         user_id_str = str(user_id)
         if user_id_str in self.user_preferences:
             return self.user_preferences[user_id_str]
-        return {"name": None, "gender": None, "country": None, "rate": 150}
+
+        # Get default rate from guild config if available
+        default_rate = 150
+        if guild_id and hasattr(self.bot, 'guild_config'):
+            default_rate = self.bot.guild_config.get_guild_config(guild_id, "tts_default_rate")
+
+        return {"name": None, "gender": None, "country": None, "rate": default_rate}
 
     def set_user_preferences(self, user_id: int, **kwargs):
         """Set preferences for a user."""
@@ -178,7 +227,7 @@ class TtsCog(BaseCog):
 
         return chunks if chunks else [text]
 
-    async def generate_tts_file(self, text: str, name=None, gender=None, country=None, rate=150) -> str:
+    async def generate_tts_file(self, text: str, name=None, gender=None, country=None, rate=150, volume=1.5) -> str:
         """Generate TTS and save to temp file. Returns filepath."""
         loop = asyncio.get_running_loop()
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
@@ -187,7 +236,7 @@ class TtsCog(BaseCog):
         def generate_tts():
             engine = pyttsx3.init()
             engine.setProperty("rate", rate)
-            engine.setProperty("volume", self.volume)
+            engine.setProperty("volume", volume)
             voice_id = self._select_voice(name=name, gender=gender, country=country)
             if voice_id:
                 engine.setProperty("voice", voice_id)
@@ -205,14 +254,21 @@ class TtsCog(BaseCog):
             logger.error("VoiceSpeechCog not found!")
             return await UserFeedback.error(ctx, "Voice system not available!")
 
-        chunks = self.split_text(text)
+        # Get guild config for volume and max text length
+        volume = 1.5  # default
+        max_length = 500  # default
+        if hasattr(self.bot, 'guild_config'):
+            volume = self.bot.guild_config.get_guild_config(ctx.guild.id, "tts_default_volume")
+            max_length = self.bot.guild_config.get_guild_config(ctx.guild.id, "tts_max_text_length")
+
+        chunks = self.split_text(text, max_length=max_length)
 
         if len(chunks) > 1:
             await UserFeedback.info(ctx, f"Splitting message into {len(chunks)} parts...")
 
         for i, chunk in enumerate(chunks):
             try:
-                filepath = await self.generate_tts_file(chunk, name=name, gender=gender, country=country, rate=rate)
+                filepath = await self.generate_tts_file(chunk, name=name, gender=gender, country=country, rate=rate, volume=volume)
 
                 # CRITICAL FIX: Pass ctx.guild.id to queue_sound for guild isolation
                 await voice_cog.queue_sound(ctx.guild.id, filepath, ctx.author, None, 1.0)
@@ -230,7 +286,7 @@ class TtsCog(BaseCog):
         if not vc:
             return await UserFeedback.warning(ctx, "I'm not connected to a voice channel! Use ~join first.")
 
-        prefs = self.get_user_preferences(ctx.author.id)
+        prefs = self.get_user_preferences(ctx.author.id, guild_id=ctx.guild.id)
         gender = prefs["gender"]
         country = prefs["country"]
         name = prefs["name"]
@@ -295,7 +351,7 @@ class TtsCog(BaseCog):
             return
 
         if not settings:
-            prefs = self.get_user_preferences(ctx.author.id)
+            prefs = self.get_user_preferences(ctx.author.id, guild_id=ctx.guild.id)
             embed = discord.Embed(title="Your TTS Voice Preferences", color=discord.Color.blue())
             embed.add_field(name="Name", value=prefs["name"] or "Not set", inline=True)
             embed.add_field(name="Gender", value=prefs["gender"] or "Not set", inline=True)
@@ -331,7 +387,7 @@ class TtsCog(BaseCog):
             return await UserFeedback.error(ctx, "No valid settings provided! Use --name, --gender, --country, or --rate")
 
         self.set_user_preferences(ctx.author.id, **updates)
-        prefs = self.get_user_preferences(ctx.author.id)
+        prefs = self.get_user_preferences(ctx.author.id, guild_id=ctx.guild.id)
 
         embed = discord.Embed(title="Voice Preferences Updated", color=discord.Color.green())
         embed.add_field(name="Name", value=prefs["name"] or "Not set", inline=True)

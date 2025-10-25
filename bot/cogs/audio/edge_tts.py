@@ -4,16 +4,47 @@ from discord.ext import commands
 import edge_tts
 import io
 import asyncio
+from dataclasses import dataclass
 from bot.base_cog import BaseCog, logger
+from bot.core.config_base import ConfigBase, config_field
+
+
+# -------- Configuration Schema --------
+
+@dataclass
+class EdgeTTSConfig(ConfigBase):
+    """Edge TTS (Microsoft Text-to-Speech) configuration schema."""
+
+    edge_tts_default_volume: float = config_field(
+        default=1.5,
+        description="Default Edge TTS playback volume (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
+        category="TTS",
+        guild_override=True,
+        min_value=0.0,
+        max_value=2.0
+    )
+
+    edge_tts_default_voice: str = config_field(
+        default="en-US-AriaNeural",
+        description="Default Edge TTS voice (e.g., en-US-AriaNeural, en-GB-RyanNeural)",
+        category="TTS",
+        guild_override=True
+    )
 
 
 class EdgeTTS(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+        # Register config schema
+        from bot.core.config_system import CogConfigSchema
+        schema = CogConfigSchema.from_dataclass("EdgeTTS", EdgeTTSConfig)
+        bot.config_manager.register_schema("EdgeTTS", schema)
+        logger.info("Registered EdgeTTS config schema")
+
         self.voices = []
         self.voice_map = {}
         self.user_last_voice = {}  # user_id -> voice shortname
-        self.volume = 1.5
 
     async def load_voices(self):
         """Load available Edge TTS voices."""
@@ -52,6 +83,11 @@ class EdgeTTS(commands.Cog):
             voice_num = int(parts[-1])
             text = " ".join(parts[:-1])
 
+        # Get default voice from guild config
+        default_voice = "en-US-AriaNeural"
+        if hasattr(self.bot, 'guild_config'):
+            default_voice = self.bot.guild_config.get_guild_config(ctx.guild.id, "edge_tts_default_voice")
+
         # Determine voice
         if voice_num and voice_num in self.voice_map:
             voice = self.voice_map[voice_num]
@@ -59,7 +95,7 @@ class EdgeTTS(commands.Cog):
         elif user_id in self.user_last_voice:
             voice = self.user_last_voice[user_id]
         else:
-            voice = "en-US-AriaNeural"
+            voice = default_voice
 
         # CRITICAL: Use ctx.voice_client which is guild-specific
         if not ctx.voice_client:
@@ -83,9 +119,14 @@ class EdgeTTS(commands.Cog):
             logger.error(f"[Guild {ctx.guild.id}] Edge TTS generation failed: {e}", exc_info=True)
             return await ctx.send(f"❌ Failed to generate speech: {str(e)}")
 
+        # Get volume from guild config
+        volume = 1.5  # default
+        if hasattr(self.bot, 'guild_config'):
+            volume = self.bot.guild_config.get_guild_config(ctx.guild.id, "edge_tts_default_volume")
+
         # Play audio to THIS guild's voice client only
         source = discord.FFmpegPCMAudio(audio_data, pipe=True)
-        source = discord.PCMVolumeTransformer(source, volume=self.volume)
+        source = discord.PCMVolumeTransformer(source, volume=volume)
 
         # The vc.play() call only affects THIS guild because vc is guild-specific
         vc.play(source)
