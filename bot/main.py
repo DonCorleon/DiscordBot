@@ -244,13 +244,18 @@ async def on_ready():
         try:
             from web.websocket_manager import manager
             from web.app import set_bot_instance
-            from web.routes.config import set_guild_config_manager, set_bot_instance as set_config_bot
+            from web.routes.config import (
+                set_config_manager,
+                set_guild_config_manager,
+                set_bot_instance as set_config_bot
+            )
 
             data_collector.websocket_manager = manager
             set_bot_instance(bot)
 
-            # Register guild config manager and bot instance with web API
-            set_guild_config_manager(guild_config_mgr)
+            # Register config managers and bot instance with web API
+            set_config_manager(config_manager)  # New config system (Phase 1)
+            set_guild_config_manager(guild_config_mgr)  # Old system (will be deprecated)
             set_config_bot(bot)  # Register bot with config routes for guilds list
 
             logger.info("🌐 Web dashboard connected to data collector")

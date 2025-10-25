@@ -52,66 +52,50 @@ async def get_all_config():
     Get all configuration settings with metadata.
 
     Returns settings grouped by category with validation rules and current values.
+    Uses the new ConfigManager (Phase 2).
     """
-    # TODO: Replace with new ConfigManager in Phase 1
-    # For now, return a basic structure using guild_config_manager
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
-        from bot.core.guild_config_manager import GuildConfigManager
-        from bot.config import BotConfig
-        import inspect
-
-        # Get type hints from BotConfig to infer types
-        type_hints = BotConfig.__annotations__
-
-        # Build settings from GUILD_OVERRIDABLE_SETTINGS (it's a class attribute)
+        # Get all registered schemas from ConfigManager
         categorized = {}
-        for key in GuildConfigManager.GUILD_OVERRIDABLE_SETTINGS:
-            # Infer category from key prefix
-            if key.startswith("tts_") or key.startswith("edge_tts_"):
-                category = "TTS"
-            elif key.startswith("voice_"):
-                category = "Stats"
-            elif key.startswith("activity_"):
-                category = "Stats"
-            elif key.startswith("leaderboard_") or key.startswith("user_stats_"):
-                category = "Stats"
-            elif key.startswith("weekly_recap_"):
-                category = "Stats"
-            elif "ducking" in key or "volume" in key or "playback" in key or "queue" in key or key.startswith("sound_"):
-                category = "Playback"
-            elif "join" in key:
-                category = "Playback"
-            else:
-                category = "Admin"
 
-            if category not in categorized:
-                categorized[category] = {}
+        for cog_name, schema in config_manager.schemas.items():
+            for field_name, field_meta in schema.fields.items():
+                category = field_meta.category
 
-            # Get type from BotConfig
-            config_type = type_hints.get(key, str)
-            type_name = "string"
-            if config_type == bool:
-                type_name = "boolean"
-            elif config_type == int:
-                type_name = "number"
-            elif config_type == float:
-                type_name = "number"
+                if category not in categorized:
+                    categorized[category] = {}
 
-            # Get default value from guild_config_manager's global_config
-            default_value = getattr(guild_config_manager.global_config, key, None)
+                # Get current value (global default)
+                current_value = config_manager.get(cog_name, field_name)
 
-            categorized[category][key] = {
-                "key": key,
-                "value": default_value,
-                "type": type_name,
-                "description": f"Guild-overridable setting: {key.replace('_', ' ').title()}",
-                "category": category,
-                "guild_override": True,
-                "admin_only": False
-            }
+                # Map Python types to API types
+                type_name = "string"
+                if field_meta.type == bool:
+                    type_name = "boolean"
+                elif field_meta.type in (int, float):
+                    type_name = "number"
+
+                setting_key = f"{cog_name}.{field_name}"
+
+                categorized[category][setting_key] = {
+                    "key": setting_key,
+                    "cog": cog_name,
+                    "field": field_name,
+                    "value": current_value,
+                    "default": field_meta.default,
+                    "type": type_name,
+                    "description": field_meta.description,
+                    "category": category,
+                    "guild_override": field_meta.guild_override,
+                    "admin_only": field_meta.admin_only,
+                    "requires_restart": field_meta.requires_restart,
+                    "min": field_meta.min_value,
+                    "max": field_meta.max_value,
+                    "choices": field_meta.choices
+                }
 
         return {
             "categories": categorized,
