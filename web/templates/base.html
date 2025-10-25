@@ -13,11 +13,17 @@
             <span class="logo">🤖</span>
             Discord Bot Admin
         </div>
-        <div class="nav-links">
+        <button class="hamburger" id="hamburger" aria-label="Menu">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <div class="nav-links" id="nav-links">
             <a href="/" {% if active_page == 'dashboard' %}class="active"{% endif %}>Dashboard</a>
             <a href="/transcripts" {% if active_page == 'transcripts' %}class="active"{% endif %}>Transcripts</a>
             <a href="/logs" {% if active_page == 'logs' %}class="active"{% endif %}>Logs</a>
             <a href="/sounds" {% if active_page == 'sounds' %}class="active"{% endif %}>Sounds</a>
+            <a href="/config" {% if active_page == 'config' %}class="active"{% endif %}>Config</a>
             <a href="/docs" target="_blank">API Docs</a>
         </div>
         <div class="connection-status">
@@ -30,6 +36,32 @@
     </main>
 
     <script src="/static/js/websocket.js"></script>
+    <script>
+        // Mobile menu toggle
+        const hamburger = document.getElementById('hamburger');
+        const navLinks = document.getElementById('nav-links');
+
+        hamburger.addEventListener('click', () => {
+            hamburger.classList.toggle('active');
+            navLinks.classList.toggle('active');
+        });
+
+        // Close menu when clicking a link
+        navLinks.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', () => {
+                hamburger.classList.remove('active');
+                navLinks.classList.remove('active');
+            });
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!hamburger.contains(e.target) && !navLinks.contains(e.target)) {
+                hamburger.classList.remove('active');
+                navLinks.classList.remove('active');
+            }
+        });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

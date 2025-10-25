@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration Editor{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>⚙️ Configuration Editor</h1>
+    <p>Manage bot settings with live updates and validation</p>
+</div>
+
+<div class="config-mode-selector">
+    <button id="global-mode-btn" class="mode-btn active" onclick="switchToGlobalMode()">
+        🌐 Global Settings
+    </button>
+    <button id="guild-mode-btn" class="mode-btn" onclick="switchToGuildMode()">
+        🏰 Per-Guild Settings
+    </button>
+</div>
+
+<div id="guild-selector-container" class="guild-selector-container" style="display: none;">
+    <label for="guild-select">Select Guild:</label>
+    <select id="guild-select" onchange="loadGuildConfig()">
+        <option value="">Loading guilds...</option>
+    </select>
+</div>
+
+<div class="config-controls">
+    <button id="backup-btn" class="btn-secondary">
+        💾 Create Backup
+    </button>
+    <button id="restore-btn" class="btn-warning">
+        ⏮️ Restore from Backup
+    </button>
+    <button id="refresh-btn" class="btn-secondary">
+        🔄 Refresh
+    </button>
+</div>
+
+<div class="config-stats">
+    <div class="stat-item">
+        <span class="stat-label">Total Settings:</span>
+        <span id="total-settings">0</span>
+    </div>
+    <div class="stat-item">
+        <span class="stat-label">Modified:</span>
+        <span id="modified-count">0</span>
+    </div>
+</div>
+
+<div id="config-categories" class="config-categories">
+    <div class="config-loading">Loading configuration...</div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="modal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h2>⚠️ Confirm Change</h2>
+        </div>
+        <div class="modal-body">
+            <p id="confirm-message"></p>
+            <div class="confirm-details">
+                <strong>Setting:</strong> <span id="confirm-key"></span><br>
+                <strong>New Value:</strong> <span id="confirm-value"></span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+            <button class="btn-primary" onclick="confirmUpdate()">Confirm</button>
+        </div>
+    </div>
+</div>
+
+<!-- Restart Required Modal -->
+<div id="restart-modal" class="modal">
+    <div class="modal-content modal-small">
+        <div class="modal-header">
+            <h2>🔄 Restart Required</h2>
+        </div>
+        <div class="modal-body">
+            <p><strong id="restart-setting"></strong> has been updated successfully.</p>
+            <p class="warning-text">This setting requires a bot restart to take effect.</p>
+            <p>Please manually restart the bot to apply this change.</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-primary" onclick="closeRestartModal()">Got it</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: #2C2F33;
+    border-radius: 12px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.modal-small {
+    max-width: 400px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 2px solid #40444B;
+    background: #23272A;
+    border-radius: 12px 12px 0 0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #FFFFFF;
+    font-weight: 600;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    padding: 1.5rem;
+    border-top: 2px solid #40444B;
+    background: #23272A;
+    border-radius: 0 0 12px 12px;
+}
+
+.config-mode-selector {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    width: fit-content;
+}
+
+.mode-btn {
+    padding: 0.75rem 1.5rem;
+    background: transparent;
+    color: var(--text-secondary);
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.mode-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
+}
+
+.mode-btn.active {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.guild-selector-container {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.guild-selector-container label {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.guild-selector-container select {
+    flex: 1;
+    min-width: 300px;
+    max-width: 50%;
+    width: auto;
+    padding: 0.75rem;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.guild-selector-container select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.config-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.btn-secondary {
+    padding: 0.75rem 1.5rem;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--border-color);
+    transform: translateY(-2px);
+}
+
+.btn-warning {
+    padding: 0.75rem 1.5rem;
+    background: #F0A020;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.btn-warning:hover {
+    background: #D89010;
+    transform: translateY(-2px);
+}
+
+.config-stats {
+    display: flex;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.stat-item {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.config-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.config-loading {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-secondary);
+}
+
+.category-section {
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.category-header {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem 1.5rem;
+    align-items: start;
+}
+
+.setting-item {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-tertiary);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.setting-item:hover {
+    background: #2C2F33;
+    transform: translateX(2px);
+}
+
+.setting-item.restart-required {
+    border-left: 3px solid #F0A020;
+}
+
+.setting-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.setting-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    cursor: help;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.setting-name .restart-badge {
+    display: inline-block;
+    padding: 0.1rem 0.3rem;
+    background: #F0A020;
+    color: #000;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    margin-left: 0.3rem;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.setting-description {
+    display: none;
+}
+
+.setting-metadata {
+    display: none;
+}
+
+.guild-override-badge {
+    display: inline-block;
+    font-size: 0.9rem;
+    margin-left: 0.3rem;
+    opacity: 0.8;
+    vertical-align: middle;
+}
+
+.global-default-badge {
+    display: inline-block;
+    font-size: 0.9rem;
+    margin-left: 0.3rem;
+    opacity: 0.6;
+    vertical-align: middle;
+}
+
+.reset-guild-btn {
+    padding: 0.3rem 0.5rem;
+    background: #F04747;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.reset-guild-btn:hover {
+    background: #D83C3C;
+    transform: scale(1.1);
+}
+
+.setting-control {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-self: end;
+}
+
+.setting-control input[type="checkbox"] {
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.setting-control input[type="number"],
+.setting-control input[type="text"] {
+    padding: 0.4rem 0.6rem;
+    background: #2C2F33;
+    border: 1px solid #40444B;
+    border-radius: 4px;
+    color: #DCDDDE;
+    min-width: 140px;
+    max-width: 50%;
+    width: auto;
+    margin-left: auto;
+    font-size: 0.85rem;
+}
+
+.setting-control input:focus {
+    outline: none;
+    border-color: #5865F2;
+}
+
+.setting-control select {
+    padding: 0.4rem 0.6rem;
+    background: #2C2F33;
+    border: 1px solid #40444B;
+    border-radius: 4px;
+    color: #DCDDDE;
+    min-width: 140px;
+    max-width: 50%;
+    width: auto;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.setting-control select option {
+    background: #FFFFFF;
+    color: #000000;
+}
+
+.confirm-details {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #23272A;
+    border-radius: 6px;
+    font-family: monospace;
+}
+
+.warning-text {
+    color: #F04747;
+    font-weight: 500;
+    margin-top: 1rem;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .config-mode-selector {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .mode-btn {
+        width: 100%;
+        text-align: center;
+    }
+
+    .guild-selector-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .guild-selector-container select {
+        min-width: 100%;
+        max-width: 100%;
+    }
+
+    .config-controls {
+        flex-direction: column;
+    }
+
+    .config-controls button {
+        width: 100%;
+    }
+
+    .config-stats {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .settings-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .setting-item {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .setting-info {
+        margin-bottom: 0.25rem;
+    }
+
+    .setting-control {
+        justify-self: stretch;
+        width: 100%;
+    }
+
+    .setting-control input[type="number"],
+    .setting-control input[type="text"],
+    .setting-control select {
+        width: 100%;
+        max-width: 100%;
+        min-width: 100%;
+    }
+
+    .setting-control input[type="checkbox"] {
+        width: 36px;
+    }
+}
+</style>
+
+<script src="/static/js/config.js"></script>
+{% endblock %}

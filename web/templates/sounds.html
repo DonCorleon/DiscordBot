@@ -608,6 +608,75 @@
     color: var(--text-secondary);
     text-align: center;
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .sounds-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .control-group {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .filter-select {
+        width: 100%;
+        min-width: 100%;
+    }
+
+    #sound-search {
+        width: 100%;
+    }
+
+    .btn-primary {
+        width: 100%;
+        text-align: center;
+    }
+
+    .sounds-stats {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .sounds-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .sound-card {
+        padding: 1rem;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .modal-content {
+        width: 95%;
+        max-width: 95%;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+        padding: 1rem;
+    }
+
+    .modal-footer {
+        flex-direction: column;
+    }
+
+    .modal-footer button {
+        width: 100%;
+    }
+
+    .btn-secondary,
+    .btn-danger {
+        width: 100%;
+    }
+}
 </style>
 
 <script src="/static/js/sounds.js"></script>
