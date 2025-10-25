@@ -44,10 +44,21 @@ for name, log in logging.root.manager.loggerDict.items():
 
 # Configure YOUR bot's logger
 logger = logging.getLogger("discordbot")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.INFO)  # Default, will be updated from ConfigManager
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 logger.propagate = False
+
+
+def update_log_level(level_name: str):
+    """Update log level for all bot loggers dynamically."""
+    level = getattr(logging, level_name.upper(), logging.INFO)
+    logger.setLevel(level)
+    for name, log in logging.root.manager.loggerDict.items():
+        if name.startswith("discord"):
+            if isinstance(log, logging.Logger):
+                log.setLevel(level)
+    logger.info(f"Updated log level to {level_name.upper()}")
 
 
 class IgnoreRTCPFilter(logging.Filter):
@@ -234,10 +245,28 @@ async def on_ready():
         for filename in os.listdir(cogs_base):
             if filename.endswith(".py") and not filename.startswith("__"):
                 await bot.load_extension(f"bot.cogs.{filename[:-3]}")
-    if config.enable_admin_dashboard:
-        logger.info("📊 Admin dashboard enabled - Data exporting to data/admin/")
-    else:
-        logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
+
+    # Apply system config settings from ConfigManager
+    try:
+        sys_cfg = config_manager.for_guild("System")
+
+        # Update log level from config
+        update_log_level(sys_cfg.log_level)
+
+        # Log feature flags
+        if sys_cfg.enable_admin_dashboard:
+            logger.info("📊 Admin dashboard enabled - Data exporting to data/admin/")
+        else:
+            logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
+
+        if sys_cfg.enable_web_dashboard:
+            logger.info(f"🌐 Web dashboard enabled on {sys_cfg.web_host}:{sys_cfg.web_port}")
+
+        logger.info(f"🎮 Command prefix: {sys_cfg.command_prefix}")
+        logger.info(f"🔊 Keepalive interval: {sys_cfg.keepalive_interval}s")
+
+    except Exception as e:
+        logger.warning(f"Could not apply system config settings: {e}")
 
     # Connect web dashboard to data collector if enabled
     if config.enable_web_dashboard:
