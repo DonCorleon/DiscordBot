@@ -227,16 +227,29 @@ async def on_ready():
     else:
         logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
 
+    # Initialize guild config manager (always available)
+    from bot.core.guild_config_manager import GuildConfigManager
+    guild_config_mgr = GuildConfigManager(config)
+    bot.guild_config = guild_config_mgr  # Make accessible to cogs
+    logger.info("⚙️ Guild configuration manager initialized")
+
     # Connect web dashboard to data collector if enabled
     if config.enable_web_dashboard:
         try:
             from web.websocket_manager import manager
             from web.app import set_bot_instance
+            from web.routes.config import set_guild_config_manager, set_bot_instance as set_config_bot
+
             data_collector.websocket_manager = manager
             set_bot_instance(bot)
+
+            # Register guild config manager and bot instance with web API
+            set_guild_config_manager(guild_config_mgr)
+            set_config_bot(bot)  # Register bot with config routes for guilds list
+
             logger.info("🌐 Web dashboard connected to data collector")
         except Exception as e:
-            logger.error(f"Failed to connect web dashboard: {e}")
+            logger.error(f"Failed to connect web dashboard: {e}", exc_info=True)
 
     # Rejoin voice channels from saved state if users are present
     await rejoin_saved_voice_channels()

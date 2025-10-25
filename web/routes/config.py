@@ -53,23 +53,37 @@ async def get_all_config():
 
     Returns settings grouped by category with validation rules and current values.
     """
-    if not config_manager:
-        raise HTTPException(status_code=503, detail="Config manager not initialized")
+    # TODO: Replace with new ConfigManager in Phase 1
+    # For now, return a basic structure using guild_config_manager
+    if not guild_config_manager:
+        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
 
     try:
-        settings = config_manager.get_all_settings()
+        from bot.core.guild_config_manager import GUILD_OVERRIDABLE_SETTINGS
 
-        # Group by category
+        # Build settings from GUILD_OVERRIDABLE_SETTINGS
         categorized = {}
-        for key, data in settings.items():
-            category = data["category"]
+        for key, metadata in GUILD_OVERRIDABLE_SETTINGS.items():
+            category = metadata.get("category", "General")
             if category not in categorized:
                 categorized[category] = {}
-            categorized[category][key] = data
+
+            categorized[category][key] = {
+                "key": key,
+                "value": guild_config_manager.config_defaults.get(key),
+                "type": metadata.get("type", "string"),
+                "description": metadata.get("description", ""),
+                "category": category,
+                "guild_override": True,
+                "admin_only": metadata.get("admin_only", False),
+                "min": metadata.get("min"),
+                "max": metadata.get("max"),
+                "options": metadata.get("options")
+            }
 
         return {
             "categories": categorized,
-            "total_settings": len(settings)
+            "total_settings": sum(len(settings) for settings in categorized.values())
         }
 
     except Exception as e:
@@ -80,19 +94,29 @@ async def get_all_config():
 @router.get("/{key}")
 async def get_config_setting(key: str):
     """Get a specific configuration setting."""
-    if not config_manager:
-        raise HTTPException(status_code=503, detail="Config manager not initialized")
+    # TODO: Replace with new ConfigManager in Phase 1
+    if not guild_config_manager:
+        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
 
     try:
-        value = config_manager.get_config_value(key)
-        if value is None:
+        from bot.core.guild_config_manager import GUILD_OVERRIDABLE_SETTINGS
+
+        if key not in GUILD_OVERRIDABLE_SETTINGS:
             raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
 
-        settings = config_manager.get_all_settings()
-        if key not in settings:
-            raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
-
-        return settings[key]
+        metadata = GUILD_OVERRIDABLE_SETTINGS[key]
+        return {
+            "key": key,
+            "value": guild_config_manager.config_defaults.get(key),
+            "type": metadata.get("type", "string"),
+            "description": metadata.get("description", ""),
+            "category": metadata.get("category", "General"),
+            "guild_override": True,
+            "admin_only": metadata.get("admin_only", False),
+            "min": metadata.get("min"),
+            "max": metadata.get("max"),
+            "options": metadata.get("options")
+        }
 
     except HTTPException:
         raise
@@ -108,86 +132,32 @@ async def update_config_setting(request: Request):
 
     Validates the new value and applies it. Returns whether a restart is required.
     """
-    if not config_manager:
-        raise HTTPException(status_code=503, detail="Config manager not initialized")
-
-    try:
-        # Parse request body manually to debug
-        body = await request.json()
-        logger.info(f"Received raw body: {body}")
-
-        if body is None or "key" not in body or "value" not in body:
-            raise HTTPException(status_code=400, detail="Missing 'key' or 'value' in request body")
-
-        key = body["key"]
-        value = body["value"]
-
-        logger.info(f"Received config update: key={key}, value={value}, type={type(value)}")
-        success, requires_restart, error = config_manager.update_setting(
-            key,
-            value
-        )
-
-        if not success:
-            raise HTTPException(status_code=400, detail=error)
-
-        return {
-            "success": True,
-            "key": key,
-            "value": value,
-            "requires_restart": requires_restart,
-            "message": f"Successfully updated {key}" + (
-                " (restart required)" if requires_restart else " (applied immediately)"
-            )
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating setting: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # TODO: Implement with new ConfigManager in Phase 1
+    # For now, return not implemented
+    raise HTTPException(
+        status_code=501,
+        detail="Global config updates not implemented yet. Use per-guild config endpoints instead."
+    )
 
 
 @router.post("/backup")
 async def create_config_backup():
     """Create a backup of the current configuration."""
-    if not config_manager:
-        raise HTTPException(status_code=503, detail="Config manager not initialized")
-
-    try:
-        config_manager.create_backup()
-        return {
-            "success": True,
-            "message": "Configuration backup created"
-        }
-
-    except Exception as e:
-        logger.error(f"Error creating backup: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # TODO: Implement with new ConfigManager in Phase 1
+    raise HTTPException(
+        status_code=501,
+        detail="Config backup not implemented yet. Will be available in Phase 1."
+    )
 
 
 @router.post("/restore")
 async def restore_config_backup():
     """Restore configuration from the most recent backup."""
-    if not config_manager:
-        raise HTTPException(status_code=503, detail="Config manager not initialized")
-
-    try:
-        success = config_manager.restore_backup()
-
-        if not success:
-            raise HTTPException(status_code=404, detail="No backup file found")
-
-        return {
-            "success": True,
-            "message": "Configuration restored from backup"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error restoring backup: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    # TODO: Implement with new ConfigManager in Phase 1
+    raise HTTPException(
+        status_code=501,
+        detail="Config restore not implemented yet. Will be available in Phase 1."
+    )
 
 
 @router.post("/restart")
