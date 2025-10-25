@@ -128,7 +128,12 @@ def save_activity_stats(file_path: str, activity_stats: ActivityStatsData):
         # Create backup if file exists
         if Path(file_path).exists():
             import shutil
-            shutil.copy2(file_path, f"{file_path}.backup")
+            try:
+                # Use copy() instead of copy2() to avoid metadata permission issues
+                shutil.copy(file_path, f"{file_path}.backup")
+            except (PermissionError, OSError) as e:
+                # If backup fails, log warning but continue with save
+                logger.warning(f"Could not create backup file (continuing anyway): {e}")
 
         data = {"guilds": {k: asdict(v) for k, v in activity_stats.guilds.items()}}
 

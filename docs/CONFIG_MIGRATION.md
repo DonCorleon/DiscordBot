@@ -1,8 +1,44 @@
 # Configuration System Migration Plan
 
 **Branch:** `config-system-migration`
-**Status:** Planning Phase
+**Status:** Design Approved - Ready for Phase 1
 **Last Updated:** 2025-01-25
+
+---
+
+## Design Decisions - Finalized ✅
+
+The following design decisions have been approved and will guide the implementation:
+
+1. **File Format:** JSON with nested structure
+   - `base_config.json`: `{"CogName": {"key": value}}`
+   - Guild files named by ID: `123456789.json` (stable, won't change if guild renames)
+
+2. **Class Name:** `ConfigManager` (clear, conventional)
+
+3. **API Style:** Hybrid approach (Option A + C), **prefer Option C**
+   - **Primary (recommended):** `cfg = self.config.for_guild(guild_id); volume = cfg.default_volume`
+   - **Alternative:** `volume = self.config.get("default_volume", guild_id)` (for dynamic keys)
+   - Provides autocomplete, type hints, and Pythonic property access
+
+4. **Error Handling:** Minimal logging (can enhance later)
+   - Format: `ERROR: Invalid config 'key': value (constraint), using default: X`
+   - Log as error, use default value, continue execution
+
+5. **Web UI:** Auto-generate from schemas, show all settings
+   - Categories and fields discovered from config schemas
+   - Show all settings (defaults + overrides) with visual indicators
+   - Iterative approach: start simple, enhance based on feedback
+
+6. **Migration Priority:** Start with `SoundboardCog`
+   - Complex cog with guild overrides
+   - Well-tested and actively used
+   - Good proof-of-concept for the system
+
+7. **Timeline:** Quality over speed, no hard deadline
+   - Phase structure remains, but flexible
+   - User approval required at each phase
+   - Focus on correctness and maintainability
 
 ---
 
@@ -142,14 +178,21 @@ class ConfigManager:
         """Register a cog's config schema"""
 
     def get(self, cog_name: str, key: str, guild_id: Optional[int] = None) -> Any:
-        """Get config value with hierarchy"""
+        """Get config value with hierarchy (Option A - for dynamic keys)"""
+
+    def for_guild(self, cog_name: str, guild_id: Optional[int] = None):
+        """
+        Get config object with property access (Option C - recommended)
+        Returns object where cfg.default_volume accesses the value
+        Provides autocomplete and type hints
+        """
 
     def set(self, cog_name: str, key: str, value: Any,
             guild_id: Optional[int] = None) -> Tuple[bool, Optional[str]]:
         """Set config value with validation"""
 
     def save(self):
-        """Save all configs to disk"""
+        """Save all configs to disk (nested JSON format)"""
 
     def reload(self, guild_id: Optional[int] = None):
         """Reload configs from disk"""
@@ -348,11 +391,37 @@ bot/
     # ... etc
 
 data/config/
-  base_config.json                   # Global overrides only
+  base_config.json                   # Nested JSON: {"CogName": {"key": value}}
   guilds/
-    123456789.json                   # Guild-specific overrides
-    987654321.json
-    # ... one file per guild
+    123456789.json                   # Guild file named by ID (stable)
+    987654321.json                   # Only contains guild-specific overrides
+    # ... one file per guild (ID-based naming)
+```
+
+**Example `base_config.json` (nested structure):**
+```json
+{
+  "Soundboard": {
+    "default_volume": 0.7,
+    "ducking_enabled": true
+  },
+  "TTS": {
+    "default_rate": 160
+  }
+}
+```
+
+**Example `guilds/123456789.json` (guild-specific overrides):**
+```json
+{
+  "Soundboard": {
+    "default_volume": 0.5,
+    "sound_playback_timeout": 45.0
+  },
+  "ActivityTracker": {
+    "tracking_enabled": false
+  }
+}
 ```
 
 ---
@@ -421,8 +490,13 @@ class SoundboardCog(BaseCog):
         self.config = SoundboardConfig(bot.config_manager, "Soundboard")
 
     async def play_sound(self, guild_id: int, sound_name: str):
-        # Get guild-specific volume
-        volume = self.config.get("default_volume", guild_id)
+        # ✅ Recommended: Clean property access with autocomplete & type hints
+        cfg = self.config.for_guild(guild_id)
+        volume = cfg.default_volume
+        ducking = cfg.ducking_enabled
+
+        # Alternative: Direct lookup (useful for dynamic keys)
+        # volume = self.config.get("default_volume", guild_id)
 
         # Play sound at configured volume
         source = discord.PCMVolumeTransformer(source, volume=volume)
@@ -464,8 +538,13 @@ async def get_all_config():
 ### Config Manager API
 
 ```python
-# Get config value
-value = config_manager.get("Soundboard", "default_volume", guild_id=123456)
+# ✅ Recommended: Property access via for_guild() (Option C)
+cfg = config_manager.for_guild("Soundboard", guild_id=123456)
+volume = cfg.default_volume
+ducking = cfg.ducking_enabled
+
+# Alternative: Direct lookup (Option A - for dynamic keys)
+volume = config_manager.get("Soundboard", "default_volume", guild_id=123456)
 
 # Set config value (with validation)
 success, error = config_manager.set(
@@ -540,8 +619,8 @@ Reads:
 - data/config/guild_configs.json (guild overrides)
 
 Writes:
-- data/config/base_config.json (global overrides only)
-- data/config/guilds/{guild_id}.json (per-guild overrides)
+- data/config/base_config.json (nested JSON: {"CogName": {"key": value}})
+- data/config/guilds/{guild_id}.json (per-guild overrides, ID-based naming)
 """
 
 def migrate_config():
@@ -549,21 +628,27 @@ def migrate_config():
     old_runtime = load_json("data/config/runtime_config.json")
     old_guild_configs = load_json("data/config/guild_configs.json")
 
-    # 2. Create base_config.json (only changed globals)
-    base_config = {}
+    # 2. Create base_config.json (nested structure)
+    base_config = {}  # {"CogName": {"key": value}}
     for key, value in old_runtime.items():
         # Only save if different from default
         default = get_default_from_code(key)
         if value != default:
-            base_config[f"<cog_name>.{key}"] = value
+            cog_name, field_name = map_key_to_cog(key)
+            if cog_name not in base_config:
+                base_config[cog_name] = {}
+            base_config[cog_name][field_name] = value
 
     save_json("data/config/base_config.json", base_config)
 
-    # 3. Create per-guild configs
+    # 3. Create per-guild configs (ID-based naming)
     for guild_id, guild_settings in old_guild_configs.items():
-        guild_config = {}
+        guild_config = {}  # {"CogName": {"key": value}}
         for key, value in guild_settings.items():
-            guild_config[f"<cog_name>.{key}"] = value
+            cog_name, field_name = map_key_to_cog(key)
+            if cog_name not in guild_config:
+                guild_config[cog_name] = {}
+            guild_config[cog_name][field_name] = value
 
         save_json(f"data/config/guilds/{guild_id}.json", guild_config)
 
@@ -584,6 +669,7 @@ def test_config_field_validation():
     # Test type validation
     # Test min/max validation
     # Test choices validation
+    # Test error handling: should log minimal error and use default
 
 def test_config_manager_hierarchy():
     """Test config value hierarchy"""
@@ -603,7 +689,14 @@ def test_config_save():
     """Test saving configs to disk"""
     # Set values
     # Save
-    # Verify files written correctly
+    # Verify files written correctly (nested JSON format)
+
+def test_config_validation_errors():
+    """Test validation error handling"""
+    # Set invalid value (wrong type, out of range, etc.)
+    # Verify error logged: "ERROR: Invalid config 'key': value, using default: X"
+    # Verify default value used
+    # Verify bot continues running (no exception raised)
 ```
 
 ### Integration Tests
@@ -635,12 +728,17 @@ async def test_config_persistence():
 - [ ] Start bot with new config system
 - [ ] Verify all cogs load correctly
 - [ ] Change a config via web UI
-- [ ] Verify change applies immediately (no restart)
+- [ ] Verify change applies immediately (no restart for non-restart-required settings)
 - [ ] Set guild-specific override
 - [ ] Verify guild uses override, other guilds use global
 - [ ] Restart bot
-- [ ] Verify all configs persisted
-- [ ] Test invalid config value (should log error, use default)
+- [ ] Verify all configs persisted (check nested JSON structure in files)
+- [ ] Test invalid config value:
+  - [ ] Should log: `ERROR: Invalid config 'key': value, using default: X`
+  - [ ] Should use default value
+  - [ ] Bot should continue running normally
+- [ ] Test property access: `cfg = self.config.for_guild(guild_id); volume = cfg.default_volume`
+- [ ] Verify autocomplete works in IDE for config properties
 
 ---
 
@@ -733,53 +831,71 @@ During migration (both systems running):
 
 ## Timeline
 
-| Phase | Duration | Start | End | Status |
-|-------|----------|-------|-----|--------|
-| Phase 1: Core Infrastructure | 1 week | TBD | TBD | Not Started |
-| Phase 2: Migrate First Cog | 1 week | TBD | TBD | Not Started |
-| Phase 3: Migrate Remaining Cogs | 2 weeks | TBD | TBD | Not Started |
-| Phase 4: Remove Old System | 1 week | TBD | TBD | Not Started |
-| **Total** | **5 weeks** | | | |
+**Note:** Timeline is flexible - quality and correctness are prioritized over speed. User approval required at each phase before proceeding.
+
+| Phase | Estimated Duration | Start | End | Status |
+|-------|-------------------|-------|-----|--------|
+| Phase 1: Core Infrastructure | ~1 week | TBD | TBD | ⏳ Ready to Start |
+| Phase 2: Migrate First Cog | ~1 week | TBD | TBD | Not Started |
+| Phase 3: Migrate Remaining Cogs | ~2 weeks | TBD | TBD | Not Started |
+| Phase 4: Remove Old System | ~1 week | TBD | TBD | Not Started |
+| **Total** | **~5 weeks (flexible)** | | | |
+
+**Review Gates:**
+- End of Phase 1: Review core infrastructure before migrating any cogs
+- End of Phase 2: Review migration pattern with SoundboardCog example
+- End of Phase 3: Full system review before removing old code
+- End of Phase 4: Final approval before merge to master
 
 ---
 
 ## Questions for User
 
-Before starting Phase 1, please provide input on:
+~~Before starting Phase 1, please provide input on:~~ ✅ **All questions answered - see Design Decisions section**
 
-1. **Config file format:**
-   - JSON (current) or TOML (more readable)?
-   - Nested structure or flat keys (`Soundboard.default_volume` vs `{"Soundboard": {"default_volume": 0.5}}`)?
+1. **Config file format:** ✅ **ANSWERED**
+   - ~~JSON (current) or TOML (more readable)?~~ → **JSON**
+   - ~~Nested structure or flat keys?~~ → **Nested structure: `{"CogName": {"key": value}}`**
+   - See Design Decision #1
 
-2. **Naming convention:**
-   - `self.config.get("key")` or `self.config.key` (direct attribute access)?
-   - `ConfigManager` or `ConfigSystem`?
+2. **Naming convention:** ✅ **ANSWERED**
+   - ~~`self.config.get("key")` or `self.config.key`?~~ → **Both (hybrid), prefer property access**
+   - ~~`ConfigManager` or `ConfigSystem`?~~ → **ConfigManager**
+   - See Design Decisions #2 and #3
 
-3. **Error handling:**
-   - Log error and use default (proposed), or raise exception?
-   - How verbose should error messages be?
+3. **Error handling:** ✅ **ANSWERED**
+   - ~~Log error and use default, or raise exception?~~ → **Log error, use default**
+   - ~~How verbose should error messages be?~~ → **Minimal: `ERROR: Invalid config 'key': value, using default: X`**
+   - See Design Decision #4
 
-4. **Web UI:**
-   - Keep current UI layout, or redesign with auto-generated sections?
-   - Show only changed values, or show all with "default" indicator?
+4. **Web UI:** ✅ **ANSWERED**
+   - ~~Keep current UI or redesign?~~ → **Auto-generate from schemas**
+   - ~~Show only changed values, or show all?~~ → **Show all with indicators**
+   - See Design Decision #5
 
-5. **Migration priority:**
-   - Start with SoundboardCog, or different cog?
-   - Any cogs that are lower priority for migration?
+5. **Migration priority:** ✅ **ANSWERED**
+   - ~~Start with SoundboardCog, or different cog?~~ → **Start with SoundboardCog**
+   - ~~Any cogs lower priority?~~ → **No, standard order by complexity**
+   - See Design Decision #6
 
-6. **Timeline:**
-   - 5 weeks acceptable, or need faster/slower?
-   - Specific dates for review points?
+6. **Timeline:** ✅ **ANSWERED**
+   - ~~5 weeks acceptable, or need faster/slower?~~ → **Flexible, quality over speed**
+   - ~~Specific dates for review points?~~ → **User approval required at each phase**
+   - See Design Decision #7
 
 ---
 
 ## Next Steps
 
-1. **User reviews this plan** - Provide feedback, answer questions above
-2. **Adjust plan based on feedback**
-3. **Get approval to start Phase 1**
-4. **Create Phase 1 branch**: `config-system-migration/phase-1`
-5. **Begin implementation**
+1. ✅ ~~**User reviews this plan**~~ - Complete, all questions answered
+2. ✅ ~~**Adjust plan based on feedback**~~ - Complete, design decisions finalized
+3. ✅ ~~**Get approval to start Phase 1**~~ - Ready to proceed
+4. ⏳ **Begin Phase 1 implementation** - Create core infrastructure
+   - Implement `ConfigManager` class in `bot/core/config_system.py`
+   - Implement `ConfigBase` and helpers in `bot/core/config_base.py`
+   - Create data structure (`base_config.json`, `guilds/` directory)
+   - Write comprehensive unit tests
+5. 📋 **Phase 1 Review** - User approval before Phase 2
 
 ---
 
@@ -793,7 +909,8 @@ Before starting Phase 1, please provide input on:
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0 (Design Approved)
 **Author:** Claude Code
-**Last Reviewed By:** [User to review]
-**Next Review Date:** [After user feedback]
+**Last Reviewed By:** User (2025-01-25)
+**Status:** ✅ Design finalized, ready for Phase 1 implementation
+**Next Review Date:** End of Phase 1 (after core infrastructure complete)

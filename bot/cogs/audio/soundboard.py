@@ -169,7 +169,12 @@ def save_soundboard(file_path: str, soundboard: SoundboardData):
 
         if Path(file_path).exists():
             import shutil
-            shutil.copy2(file_path, f"{file_path}.backup")
+            try:
+                # Use copy() instead of copy2() to avoid metadata permission issues
+                shutil.copy(file_path, f"{file_path}.backup")
+            except (PermissionError, OSError) as e:
+                # If backup fails, log warning but continue with save
+                logger.warning(f"Could not create backup file (continuing anyway): {e}")
 
         data = {"sounds": {k: asdict(v) for k, v in validated_sounds.items()}}
 

@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "discordbot"
 version = "0.1.0"
-description = "Add your description here"
+description = "Discord bot with voice recognition, soundboard, and activity tracking"
 requires-python = ">=3.13"
 dependencies = [
     "discord-ext-voice-recv==0.5.2a179",
@@ -20,3 +24,8 @@ dependencies = [
     "uvicorn==0.38.0",
     "vosk>=0.3.45",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["bot*", "web*"]
+exclude = ["data*", "logs*", "admin_data*", "models*", "tests*"]
