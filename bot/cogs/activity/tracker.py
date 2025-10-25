@@ -14,7 +14,6 @@ from bot.core.stats.activity import (
     add_reaction_activity, add_reply_activity, remove_message_activity,
     process_voice_minute_tick, ACTIVITY_STATS_FILE
 )
-from bot.config import config
 
 
 # -------- Configuration Schema --------
@@ -201,8 +200,10 @@ class ActivityTracker(BaseCog):
         # Cache activity stats in memory to avoid repeated file loads
         self._cached_stats = None
         self._stats_dirty = False  # Track if cache needs to be saved
-        # Start voice time background task
-        if config.voice_tracking_enabled:
+
+        # Start voice time background task (use ConfigManager)
+        cfg = bot.config_manager.for_guild("Activity")
+        if cfg.voice_tracking_enabled:
             self.voice_time_task.start()
             logger.info("[ActivityTracker] Voice time tracking task started")
 
@@ -450,10 +451,10 @@ class ActivityTracker(BaseCog):
         from bot.core.stats.activity import (
             start_voice_session, end_voice_session, update_voice_state
         )
-        from bot.config import config
 
-        # Skip if voice tracking is disabled
-        if not config.voice_tracking_enabled:
+        # Skip if voice tracking is disabled (use ConfigManager)
+        cfg = self.bot.config_manager.for_guild("Activity")
+        if not cfg.voice_tracking_enabled:
             return
 
         try:
@@ -573,7 +574,7 @@ class ActivityTracker(BaseCog):
                         activity_stats = process_voice_minute_tick(
                             activity_stats,
                             guild_id=guild_id_str,
-                            points_per_minute=config.voice_points_per_minute
+                            points_per_minute=cfg.voice_points_per_minute
                         )
                         changes_made = True
 
