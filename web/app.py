@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 import uvicorn
 
 from web.websocket_manager import manager
-from web.routes import api, websocket, logs, transcripts, sounds
+from web.routes import api, websocket, logs, transcripts, sounds, config
 
 # Configure logger
 logger = logging.getLogger("discordbot.web.app")
@@ -41,18 +41,28 @@ app.include_router(websocket.router)
 app.include_router(logs.router)
 app.include_router(transcripts.router)
 app.include_router(sounds.router)
+app.include_router(config.router)
 
 # Background task reference
 data_pusher_task: Optional[asyncio.Task] = None
 
 # Global bot reference (set by bot on startup)
 bot_instance = None
+config_manager_instance = None
 
 def set_bot_instance(bot):
     """Set the bot instance for web routes to access."""
     global bot_instance
     bot_instance = bot
     logger.info("Bot instance registered with web app")
+
+def set_config_manager(manager):
+    """Set the config manager instance for web routes to access."""
+    global config_manager_instance
+    config_manager_instance = manager
+    from web.routes import config as config_routes
+    config_routes.set_config_manager(manager)
+    logger.info("Config manager registered with web app")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -85,6 +95,14 @@ async def sounds_page(request: Request):
     Sound management page for uploading, editing, and deleting soundboard files.
     """
     return templates.TemplateResponse("sounds.html", {"request": request, "active_page": "sounds"})
+
+
+@app.get("/config", response_class=HTMLResponse)
+async def config_page(request: Request):
+    """
+    Configuration editor page for managing bot settings.
+    """
+    return templates.TemplateResponse("config.html", {"request": request, "active_page": "config"})
 
 
 async def data_pusher():
