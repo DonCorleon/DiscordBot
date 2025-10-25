@@ -155,16 +155,66 @@ async def get_config_setting(key: str):
 @router.patch("/")
 async def update_config_setting(request: Request):
     """
-    Update a configuration setting.
+    Update a global configuration setting.
 
     Validates the new value and applies it. Returns whether a restart is required.
     """
-    # TODO: Implement with new ConfigManager in Phase 1
-    # For now, return not implemented
-    raise HTTPException(
-        status_code=501,
-        detail="Global config updates not implemented yet. Use per-guild config endpoints instead."
-    )
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
+
+    try:
+        body = await request.json()
+        logger.info(f"Received global config update: body={body}")
+
+        if body is None or "key" not in body or "value" not in body:
+            raise HTTPException(status_code=400, detail="Missing 'key' or 'value' in request body")
+
+        full_key = body["key"]  # e.g., "Soundboard.default_volume"
+        value = body["value"]
+
+        # Parse the key into cog_name and field_name
+        if "." not in full_key:
+            raise HTTPException(status_code=400, detail=f"Invalid key format. Expected 'CogName.field_name', got '{full_key}'")
+
+        cog_name, field_name = full_key.split(".", 1)
+
+        # Validate the setting exists
+        if cog_name not in config_manager.schemas:
+            raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found")
+
+        schema = config_manager.schemas[cog_name]
+        if field_name not in schema.fields:
+            raise HTTPException(status_code=404, detail=f"Setting '{field_name}' not found in cog '{cog_name}'")
+
+        field_meta = schema.fields[field_name]
+
+        # Check if setting requires restart
+        requires_restart = field_meta.requires_restart
+
+        # Set the value (validates automatically)
+        success, error = config_manager.set(cog_name, field_name, value)
+
+        if not success:
+            raise HTTPException(status_code=400, detail=f"Validation failed: {error}")
+
+        # Save to disk
+        config_manager.save()
+
+        return {
+            "success": True,
+            "key": full_key,
+            "cog": cog_name,
+            "field": field_name,
+            "value": value,
+            "requires_restart": requires_restart,
+            "message": f"Successfully updated {full_key}" + (" (restart required)" if requires_restart else "")
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating global config: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/backup")
