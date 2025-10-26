@@ -130,49 +130,83 @@ async function loadGuildConfig() {
 
 function displayConfiguration(categories) {
     const container = document.getElementById('config-categories');
-
-    container.innerHTML = Object.keys(categories).map(categoryName => {
-        const settings = categories[categoryName];
-
-        return `
-            <div class="category-section">
-                <div class="category-header">${escapeHtml(categoryName)}</div>
-                <div class="settings-grid">
-                    ${Object.keys(settings).map(key => {
-                        const setting = settings[key];
-                        return renderSetting(key, setting);
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Attach event listeners to controls
+    container.innerHTML = renderCategories(categories);
     attachControlListeners();
+}
+
+function renderCategories(categories, depth = 0) {
+    return Object.keys(categories).map(categoryName => {
+        const categoryData = categories[categoryName];
+
+        // Check if this is a settings object (has setting keys) or a nested category
+        const isSettings = Object.keys(categoryData).some(key =>
+            categoryData[key] && typeof categoryData[key] === 'object' && categoryData[key].key
+        );
+
+        if (isSettings) {
+            // This is a leaf category with settings
+            return `
+                <div class="category-section" style="margin-left: ${depth * 20}px;">
+                    <div class="category-header">${escapeHtml(categoryName)}</div>
+                    <div class="settings-grid">
+                        ${Object.keys(categoryData).map(key => {
+                            const setting = categoryData[key];
+                            return renderSetting(key, setting);
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            // This is a parent category with subcategories
+            return `
+                <div class="category-group" style="margin-left: ${depth * 20}px;">
+                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
+                    ${renderCategories(categoryData, depth + 1)}
+                </div>
+            `;
+        }
+    }).join('');
 }
 
 function displayGuildConfiguration(categories, guildId) {
     const container = document.getElementById('config-categories');
-
-    container.innerHTML = Object.keys(categories).map(categoryName => {
-        const settings = categories[categoryName];
-
-        return `
-            <div class="category-section">
-                <div class="category-header">${escapeHtml(categoryName)}</div>
-                <div class="settings-grid">
-                    ${Object.keys(settings).map(key => {
-                        const setting = settings[key];
-                        return renderGuildSetting(key, setting, guildId);
-                    }).join('')}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    // Attach event listeners to controls
+    container.innerHTML = renderGuildCategories(categories, guildId, 0);
     attachControlListeners();
     attachGuildResetListeners();
+}
+
+function renderGuildCategories(categories, guildId, depth = 0) {
+    return Object.keys(categories).map(categoryName => {
+        const categoryData = categories[categoryName];
+
+        // Check if this is a settings object (has setting keys) or a nested category
+        const isSettings = Object.keys(categoryData).some(key =>
+            categoryData[key] && typeof categoryData[key] === 'object' && categoryData[key].key
+        );
+
+        if (isSettings) {
+            // This is a leaf category with settings
+            return `
+                <div class="category-section" style="margin-left: ${depth * 20}px;">
+                    <div class="category-header">${escapeHtml(categoryName)}</div>
+                    <div class="settings-grid">
+                        ${Object.keys(categoryData).map(key => {
+                            const setting = categoryData[key];
+                            return renderGuildSetting(key, setting, guildId);
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            // This is a parent category with subcategories
+            return `
+                <div class="category-group" style="margin-left: ${depth * 20}px;">
+                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
+                    ${renderGuildCategories(categoryData, guildId, depth + 1)}
+                </div>
+            `;
+        }
+    }).join('');
 }
 
 function renderSetting(key, setting) {

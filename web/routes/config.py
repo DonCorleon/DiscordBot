@@ -11,26 +11,33 @@ from pydantic import BaseModel
 
 logger = logging.getLogger("discordbot.web.config")
 
+
+def safe_serialize_value(value: Any, is_large_int: bool = False) -> Any:
+    """
+    Serialize config values safely for JSON/JavaScript.
+    Converts large integers (like Discord IDs) to strings to prevent precision loss.
+
+    Args:
+        value: The value to serialize
+        is_large_int: Whether this is marked as a large int field (Discord IDs, etc.)
+    """
+    # Convert large integers to strings if flagged or if value is very large
+    if isinstance(value, int) and (is_large_int or abs(value) > 9007199254740991):
+        return str(value)
+    return value
+
 router = APIRouter(prefix="/api/v1/config", tags=["Configuration"])
 
 # Will be set by main app
 config_manager = None
-guild_config_manager = None
 bot_instance = None
 
 
 def set_config_manager(manager):
-    """Set the config manager instance."""
+    """Set the unified config manager instance."""
     global config_manager
     config_manager = manager
-    logger.info("Config manager registered with API")
-
-
-def set_guild_config_manager(manager):
-    """Set the guild config manager instance."""
-    global guild_config_manager
-    guild_config_manager = manager
-    logger.info("Guild config manager registered with API")
+    logger.info("Unified config manager registered with API")
 
 
 def set_bot_instance(bot):
@@ -59,14 +66,31 @@ async def get_all_config():
 
     try:
         # Get all registered schemas from ConfigManager
+        # Build hierarchical category structure: {"Admin": {"Web": {...}, "System": {...}}}
         categorized = {}
 
         for cog_name, schema in config_manager.schemas.items():
             for field_name, field_meta in schema.fields.items():
                 category = field_meta.category
 
-                if category not in categorized:
-                    categorized[category] = {}
+                # Parse hierarchical category (e.g., "Admin/Web" → ["Admin", "Web"])
+                category_parts = category.split("/") if "/" in category else [category]
+
+                # Navigate/create nested structure
+                current_level = categorized
+                for i, part in enumerate(category_parts):
+                    if i == len(category_parts) - 1:
+                        # Last part - this is where settings go
+                        if part not in current_level:
+                            current_level[part] = {}
+                    else:
+                        # Intermediate part - create nested dict if needed
+                        if part not in current_level:
+                            current_level[part] = {}
+                        elif not isinstance(current_level[part], dict):
+                            # Convert to dict with _settings key if it was a settings dict
+                            current_level[part] = {"_settings": current_level[part]}
+                        current_level = current_level[part]
 
                 # Get current value (global default)
                 current_value = config_manager.get(cog_name, field_name)
@@ -80,12 +104,19 @@ async def get_all_config():
 
                 setting_key = f"{cog_name}.{field_name}"
 
-                categorized[category][setting_key] = {
+                # Add setting to the correct nested location
+                target_category = categorized
+                for part in category_parts[:-1]:
+                    target_category = target_category[part]
+
+                # Add to the final category level
+                final_category = category_parts[-1]
+                target_category[final_category][setting_key] = {
                     "key": setting_key,
                     "cog": cog_name,
                     "field": field_name,
-                    "value": current_value,
-                    "default": field_meta.default,
+                    "value": safe_serialize_value(current_value, field_meta.is_large_int),
+                    "default": safe_serialize_value(field_meta.default, field_meta.is_large_int),
                     "type": type_name,
                     "description": field_meta.description,
                     "category": category,
@@ -94,7 +125,8 @@ async def get_all_config():
                     "requires_restart": field_meta.requires_restart,
                     "min": field_meta.min_value,
                     "max": field_meta.max_value,
-                    "choices": field_meta.choices
+                    "choices": field_meta.choices,
+                    "is_large_int": field_meta.is_large_int
                 }
 
         return {
@@ -109,40 +141,52 @@ async def get_all_config():
 
 @router.get("/{key}")
 async def get_config_setting(key: str):
-    """Get a specific configuration setting."""
-    # TODO: Replace with new ConfigManager in Phase 1
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    """Get a specific configuration setting (global)."""
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
-        from bot.core.guild_config_manager import GuildConfigManager
-        from bot.config import BotConfig
+        # Parse key: "CogName.field_name"
+        if "." not in key:
+            raise HTTPException(status_code=400, detail=f"Invalid key format. Expected 'CogName.field_name', got '{key}'")
 
-        if key not in GuildConfigManager.GUILD_OVERRIDABLE_SETTINGS:
-            raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
+        cog_name, field_name = key.split(".", 1)
 
-        # Get type from BotConfig
-        type_hints = BotConfig.__annotations__
-        config_type = type_hints.get(key, str)
+        # Validate the setting exists
+        if cog_name not in config_manager.schemas:
+            raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found")
+
+        schema = config_manager.schemas[cog_name]
+        if field_name not in schema.fields:
+            raise HTTPException(status_code=404, detail=f"Setting '{field_name}' not found in cog '{cog_name}'")
+
+        field_meta = schema.fields[field_name]
+
+        # Get current global value
+        current_value = config_manager.get(cog_name, field_name)
+
+        # Map Python types to API types
         type_name = "string"
-        if config_type == bool:
+        if field_meta.type == bool:
             type_name = "boolean"
-        elif config_type == int:
+        elif field_meta.type in (int, float):
             type_name = "number"
-        elif config_type == float:
-            type_name = "number"
-
-        # Get default value
-        default_value = getattr(guild_config_manager.global_config, key, None)
 
         return {
             "key": key,
-            "value": default_value,
+            "cog": cog_name,
+            "field": field_name,
+            "value": current_value,
+            "default": field_meta.default,
             "type": type_name,
-            "description": f"Guild-overridable setting: {key.replace('_', ' ').title()}",
-            "category": "General",
-            "guild_override": True,
-            "admin_only": False
+            "description": field_meta.description,
+            "category": field_meta.category,
+            "guild_override": field_meta.guild_override,
+            "admin_only": field_meta.admin_only,
+            "requires_restart": field_meta.requires_restart,
+            "min": field_meta.min_value,
+            "max": field_meta.max_value,
+            "choices": field_meta.choices
         }
 
     except HTTPException:
@@ -190,6 +234,13 @@ async def update_config_setting(request: Request):
 
         # Check if setting requires restart
         requires_restart = field_meta.requires_restart
+
+        # Convert string back to int if needed (for large Discord IDs and other large ints)
+        if field_meta.type == int and isinstance(value, str) and field_meta.is_large_int:
+            try:
+                value = int(value)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid integer value: {value}")
 
         # Set the value (validates automatically)
         success, error = config_manager.set(cog_name, field_name, value)
@@ -263,47 +314,81 @@ async def get_guild_config(guild_id: int):
 
     Returns both guild-specific overrides and global defaults.
     """
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
-        settings = guild_config_manager.get_all_guild_config(guild_id)
-
-        # Group by category matching user's specification
-        categories = {
-            "Playback": [
-                "default_volume", "ducking_enabled", "ducking_level",
-                "ducking_transition_ms", "auto_join_enabled", "auto_join_timeout",
-                "sound_playback_timeout", "sound_queue_warning_size"
-            ],
-            "TTS": [
-                "tts_default_volume", "tts_default_rate", "tts_max_text_length",
-                "edge_tts_default_volume", "edge_tts_default_voice"
-            ],
-            "Stats": [
-                "voice_tracking_enabled", "voice_points_per_minute",
-                "voice_time_display_mode", "voice_tracking_type",
-                "enable_weekly_recap", "weekly_recap_channel_id",
-                "weekly_recap_day", "weekly_recap_hour",
-                "activity_base_message_points_min", "activity_base_message_points_max",
-                "activity_link_bonus_points", "activity_attachment_bonus_points",
-                "activity_reaction_points", "activity_reply_points",
-                "leaderboard_default_limit", "user_stats_channel_breakdown_limit",
-                "user_stats_triggers_limit", "leaderboard_bar_chart_length"
-            ]
-        }
-
+        # Get all settings from all registered schemas
+        # Build hierarchical category structure
         categorized = {}
-        for category, keys in categories.items():
-            categorized[category] = {}
-            for key in keys:
-                if key in settings:
-                    categorized[category][key] = settings[key]
+        total_settings = 0
+
+        for cog_name, schema in config_manager.schemas.items():
+            for field_name, field_meta in schema.fields.items():
+                # Only include guild-overridable settings
+                if not field_meta.guild_override:
+                    continue
+
+                category = field_meta.category
+
+                # Parse hierarchical category (e.g., "Admin/Web" → ["Admin", "Web"])
+                category_parts = category.split("/") if "/" in category else [category]
+
+                # Navigate/create nested structure
+                current_level = categorized
+                for i, part in enumerate(category_parts):
+                    if i == len(category_parts) - 1:
+                        # Last part - this is where settings go
+                        if part not in current_level:
+                            current_level[part] = {}
+                    else:
+                        # Intermediate part - create nested dict if needed
+                        if part not in current_level:
+                            current_level[part] = {}
+                        elif not isinstance(current_level[part], dict):
+                            # Convert to dict with _settings key if it was a settings dict
+                            current_level[part] = {"_settings": current_level[part]}
+                        current_level = current_level[part]
+
+                # Get guild-specific value (with hierarchy: default -> global -> guild)
+                current_value = config_manager.get(cog_name, field_name, guild_id)
+                global_value = config_manager.get(cog_name, field_name)
+
+                # Check if this is a guild override
+                is_override = False
+                if guild_id in config_manager.guild_overrides:
+                    if cog_name in config_manager.guild_overrides[guild_id]:
+                        if field_name in config_manager.guild_overrides[guild_id][cog_name]:
+                            is_override = True
+
+                setting_key = f"{cog_name}.{field_name}"
+
+                # Add setting to the correct nested location
+                target_category = categorized
+                for part in category_parts[:-1]:
+                    target_category = target_category[part]
+
+                # Add to the final category level
+                final_category = category_parts[-1]
+                target_category[final_category][setting_key] = {
+                    "key": setting_key,
+                    "cog": cog_name,
+                    "field": field_name,
+                    "value": current_value,
+                    "is_override": is_override,
+                    "global_default": global_value,
+                    "type": field_meta.type.__name__,
+                    "description": field_meta.description,
+                    "min": field_meta.min_value,
+                    "max": field_meta.max_value,
+                    "choices": field_meta.choices
+                }
+                total_settings += 1
 
         return {
             "guild_id": guild_id,
             "categories": categorized,
-            "total_settings": len(settings)
+            "total_settings": total_settings
         }
 
     except Exception as e:
@@ -314,22 +399,46 @@ async def get_guild_config(guild_id: int):
 @router.get("/guild/{guild_id}/{key}")
 async def get_guild_config_setting(guild_id: int, key: str):
     """Get a specific configuration setting for a guild."""
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
-        value = guild_config_manager.get_guild_config(guild_id, key)
-        is_override = guild_config_manager.is_guild_override(guild_id, key)
+        # Parse key: "CogName.field_name"
+        if "." not in key:
+            raise HTTPException(status_code=400, detail=f"Invalid key format. Expected 'CogName.field_name', got '{key}'")
 
-        all_settings = guild_config_manager.get_all_guild_config(guild_id)
-        if key not in all_settings:
-            raise HTTPException(status_code=404, detail=f"Setting '{key}' not found or not overridable")
+        cog_name, field_name = key.split(".", 1)
+
+        # Validate the setting exists
+        if cog_name not in config_manager.schemas:
+            raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found")
+
+        schema = config_manager.schemas[cog_name]
+        if field_name not in schema.fields:
+            raise HTTPException(status_code=404, detail=f"Setting '{field_name}' not found in cog '{cog_name}'")
+
+        field_meta = schema.fields[field_name]
+
+        # Check if guild-overridable
+        if not field_meta.guild_override:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' cannot be overridden per-guild")
+
+        # Get values
+        guild_value = config_manager.get(cog_name, field_name, guild_id)
+        global_value = config_manager.get(cog_name, field_name)
+
+        # Check if guild override exists
+        is_override = False
+        if guild_id in config_manager.guild_overrides:
+            if cog_name in config_manager.guild_overrides[guild_id]:
+                if field_name in config_manager.guild_overrides[guild_id][cog_name]:
+                    is_override = True
 
         return {
             "key": key,
-            "value": value,
+            "value": guild_value,
             "is_override": is_override,
-            "global_default": all_settings[key]["global_default"]
+            "global_default": global_value
         }
 
     except HTTPException:
@@ -346,8 +455,8 @@ async def update_guild_config_setting(guild_id: int, request: Request):
 
     Creates an override for the specified guild.
     """
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
         body = await request.json()
@@ -356,27 +465,46 @@ async def update_guild_config_setting(guild_id: int, request: Request):
         if body is None or "key" not in body or "value" not in body:
             raise HTTPException(status_code=400, detail="Missing 'key' or 'value' in request body")
 
-        key = body["key"]
+        full_key = body["key"]  # e.g., "Soundboard.default_volume"
         value = body["value"]
 
-        # Validate through global config manager if available
-        if config_manager:
-            valid, error = config_manager.validate_setting(key, value)
-            if not valid:
-                raise HTTPException(status_code=400, detail=f"Validation failed: {error}")
+        # Parse the key
+        if "." not in full_key:
+            raise HTTPException(status_code=400, detail=f"Invalid key format. Expected 'CogName.field_name', got '{full_key}'")
 
-        # Set guild config
-        success, error = guild_config_manager.set_guild_config(guild_id, key, value)
+        cog_name, field_name = full_key.split(".", 1)
+
+        # Validate the setting exists
+        if cog_name not in config_manager.schemas:
+            raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found")
+
+        schema = config_manager.schemas[cog_name]
+        if field_name not in schema.fields:
+            raise HTTPException(status_code=404, detail=f"Setting '{field_name}' not found in cog '{cog_name}'")
+
+        field_meta = schema.fields[field_name]
+
+        # Check if guild-overridable
+        if not field_meta.guild_override:
+            raise HTTPException(status_code=400, detail=f"Setting '{full_key}' cannot be overridden per-guild")
+
+        # Set the guild-specific value (validates automatically)
+        success, error = config_manager.set(cog_name, field_name, value, guild_id)
 
         if not success:
-            raise HTTPException(status_code=400, detail=error)
+            raise HTTPException(status_code=400, detail=f"Validation failed: {error}")
+
+        # Save to disk
+        config_manager.save()
 
         return {
             "success": True,
             "guild_id": guild_id,
-            "key": key,
+            "key": full_key,
+            "cog": cog_name,
+            "field": field_name,
             "value": value,
-            "message": f"Successfully updated {key} for guild {guild_id}"
+            "message": f"Successfully updated {full_key} for guild {guild_id}"
         }
 
     except HTTPException:
@@ -393,17 +521,51 @@ async def reset_guild_config_setting(guild_id: int, key: str):
 
     Removes the guild override for this setting.
     """
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
-        success, error = guild_config_manager.reset_guild_config(guild_id, key)
+        # Parse key: "CogName.field_name"
+        if "." not in key:
+            raise HTTPException(status_code=400, detail=f"Invalid key format. Expected 'CogName.field_name', got '{key}'")
 
-        if not success:
-            raise HTTPException(status_code=400, detail=error)
+        cog_name, field_name = key.split(".", 1)
 
-        # Get new value after reset
-        new_value = guild_config_manager.get_guild_config(guild_id, key)
+        # Validate the setting exists
+        if cog_name not in config_manager.schemas:
+            raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found")
+
+        schema = config_manager.schemas[cog_name]
+        if field_name not in schema.fields:
+            raise HTTPException(status_code=404, detail=f"Setting '{field_name}' not found in cog '{cog_name}'")
+
+        # Check if guild override exists
+        if guild_id not in config_manager.guild_overrides:
+            raise HTTPException(status_code=400, detail=f"No overrides found for guild {guild_id}")
+
+        if cog_name not in config_manager.guild_overrides[guild_id]:
+            raise HTTPException(status_code=400, detail=f"No overrides for cog '{cog_name}' in guild {guild_id}")
+
+        if field_name not in config_manager.guild_overrides[guild_id][cog_name]:
+            raise HTTPException(status_code=400, detail=f"Setting '{key}' is not overridden for guild {guild_id}")
+
+        # Remove the override
+        del config_manager.guild_overrides[guild_id][cog_name][field_name]
+
+        # Clean up empty dicts
+        if not config_manager.guild_overrides[guild_id][cog_name]:
+            del config_manager.guild_overrides[guild_id][cog_name]
+        if not config_manager.guild_overrides[guild_id]:
+            del config_manager.guild_overrides[guild_id]
+
+        # Invalidate cache
+        config_manager._invalidate_cache(cog_name, field_name, guild_id)
+
+        # Save to disk
+        config_manager.save()
+
+        # Get new value after reset (will use global default)
+        new_value = config_manager.get(cog_name, field_name, guild_id)
 
         return {
             "success": True,
@@ -423,13 +585,19 @@ async def reset_guild_config_setting(guild_id: int, key: str):
 @router.get("/guilds/overridable")
 async def get_overridable_settings():
     """Get list of all settings that can be overridden per-guild."""
-    if not guild_config_manager:
-        raise HTTPException(status_code=503, detail="Guild config manager not initialized")
+    if not config_manager:
+        raise HTTPException(status_code=503, detail="Config manager not initialized")
 
     try:
-        settings = guild_config_manager.get_overridable_settings()
+        settings = []
+
+        for cog_name, schema in config_manager.schemas.items():
+            for field_name, field_meta in schema.fields.items():
+                if field_meta.guild_override:
+                    settings.append(f"{cog_name}.{field_name}")
+
         return {
-            "settings": settings,
+            "settings": sorted(settings),
             "count": len(settings)
         }
 
