@@ -17,7 +17,7 @@ from fastapi.templating import Jinja2Templates
 import uvicorn
 
 from web.websocket_manager import manager
-from web.routes import api, websocket, logs, transcripts, sounds, config
+from web.routes import api, websocket, logs, transcripts, sounds, config, json_editor
 
 # Configure logger
 logger = logging.getLogger("discordbot.web.app")
@@ -42,6 +42,7 @@ app.include_router(logs.router)
 app.include_router(transcripts.router)
 app.include_router(sounds.router)
 app.include_router(config.router)
+app.include_router(json_editor.router)
 
 # Background task reference
 data_pusher_task: Optional[asyncio.Task] = None
@@ -103,6 +104,14 @@ async def config_page(request: Request):
     Configuration editor page for managing bot settings.
     """
     return templates.TemplateResponse("config.html", {"request": request, "active_page": "config"})
+
+
+@app.get("/json-editor", response_class=HTMLResponse)
+async def json_editor_page(request: Request):
+    """
+    Generic JSON file editor for managing JSON configuration files.
+    """
+    return templates.TemplateResponse("json_editor.html", {"request": request, "active_page": "json_editor"})
 
 
 async def data_pusher():

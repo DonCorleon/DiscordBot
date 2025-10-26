@@ -1,0 +1,1082 @@
+[
+  {
+    "var_name": "backup_count",
+    "files_where_used": [
+      "bot/main.py:27"
+    ],
+    "hardcoded_value": "7",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Number of daily log backup files to retain",
+    "cog_name": "System",
+    "per_guild": false,
+    "_notes": "testing"
+  },
+  {
+    "var_name": "log_rotation_interval",
+    "files_where_used": [
+      "bot/main.py:26"
+    ],
+    "hardcoded_value": "1",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Days between log file rotation (midnight rotation)",
+    "cog_name": "System",
+    "per_guild": false
+  },
+  {
+    "var_name": "message_bonus_link_points",
+    "files_where_used": [
+      "bot/cogs/activity/tracker.py:328",
+      "bot/core/stats/activity.py:164"
+    ],
+    "hardcoded_value": "2.0",
+    "value_type": "float",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Bonus points awarded when editing a message to add a link",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "message_bonus_attachment_points",
+    "files_where_used": [
+      "bot/cogs/activity/tracker.py:330",
+      "bot/core/stats/activity.py:167"
+    ],
+    "hardcoded_value": "2.0",
+    "value_type": "float",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Bonus points awarded when editing a message to add an attachment",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_base_message_points_min",
+    "files_where_used": [
+      "bot/core/stats/activity.py:160"
+    ],
+    "hardcoded_value": "0.8",
+    "value_type": "float",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Minimum randomized points for a basic message",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_base_message_points_max",
+    "files_where_used": [
+      "bot/core/stats/activity.py:160"
+    ],
+    "hardcoded_value": "1.2",
+    "value_type": "float",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Maximum randomized points for a basic message",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_reaction_points",
+    "files_where_used": [
+      "bot/core/stats/activity.py:294",
+      "bot/core/stats/activity.py:314"
+    ],
+    "hardcoded_value": "1.0",
+    "value_type": "float",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Points awarded for giving or receiving a reaction",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_reply_points",
+    "files_where_used": [
+      "bot/core/stats/activity.py:364",
+      "bot/core/stats/activity.py:382"
+    ],
+    "hardcoded_value": "1.0",
+    "value_type": "float",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Points awarded for giving or receiving a reply",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "monitor_health_interval",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:228"
+    ],
+    "hardcoded_value": "60",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Seconds between health monitoring checks (CPU/memory warnings)",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "high_memory_threshold",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:237"
+    ],
+    "hardcoded_value": "80",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Memory usage percentage threshold for warnings",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "high_cpu_threshold",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:239"
+    ],
+    "hardcoded_value": "80",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "CPU usage percentage threshold for warnings",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "large_queue_warning_size",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:246"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Sound queue size threshold for warnings in health monitoring",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "health_color_warning_memory",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:347"
+    ],
+    "hardcoded_value": "80",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Memory percentage threshold for red health status color",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "health_color_warning_cpu",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:347"
+    ],
+    "hardcoded_value": "80",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "CPU percentage threshold for red health status color",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "health_color_caution_memory",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:349"
+    ],
+    "hardcoded_value": "60",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Memory percentage threshold for orange health status color",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "health_color_caution_cpu",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:349"
+    ],
+    "hardcoded_value": "60",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "CPU percentage threshold for orange health status color",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "logs_max_lines",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:469"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Maximum number of log lines to return in logs command",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "logs_chunk_char_limit",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:499"
+    ],
+    "hardcoded_value": "1900",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Character limit per Discord embed for log chunks",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "log_message_truncate_length",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:496"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Maximum characters to show per log message in logs command",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "ping_excellent_threshold",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:610"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Milliseconds threshold for 'Excellent' ping status",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "ping_good_threshold",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:613"
+    ],
+    "hardcoded_value": "200",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Milliseconds threshold for 'Good' ping status",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "ping_fair_threshold",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:616"
+    ],
+    "hardcoded_value": "300",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Milliseconds threshold for 'Fair' ping status",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "update_git_output_truncate",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:752"
+    ],
+    "hardcoded_value": "400",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Maximum characters to show from git pull output",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "update_shutdown_delay",
+    "files_where_used": [
+      "bot/cogs/admin/monitoring.py:761"
+    ],
+    "hardcoded_value": "2",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Seconds to wait before shutting down after update",
+    "cog_name": "Monitoring",
+    "per_guild": false
+  },
+  {
+    "var_name": "soundboard_pagination_size",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:690"
+    ],
+    "hardcoded_value": "10",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Number of sounds shown per page in soundboard browser",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_upload_modal_timeout",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:336"
+    ],
+    "hardcoded_value": "180",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Seconds before sound upload modal times out",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_edit_modal_timeout",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:348"
+    ],
+    "hardcoded_value": "300",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Seconds before sound edit modal times out",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_browser_timeout",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:685"
+    ],
+    "hardcoded_value": "300",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Seconds before soundboard browser UI times out",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_volume_min",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:646"
+    ],
+    "hardcoded_value": "0",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Minimum volume percentage for sounds (0%)",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_volume_max",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:646"
+    ],
+    "hardcoded_value": "200",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum volume percentage for sounds (200%)",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_title_max_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:273"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum characters for sound title",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_description_max_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:277",
+      "bot/cogs/audio/soundboard.py:585"
+    ],
+    "hardcoded_value": "500",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum characters for sound description in upload modal",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_description_edit_max_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:585"
+    ],
+    "hardcoded_value": "1000",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum characters for sound description when editing",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_triggers_max_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:282",
+      "bot/cogs/audio/soundboard.py:537"
+    ],
+    "hardcoded_value": "500",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum characters for trigger words list",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_flags_max_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:287"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum characters for sound flags input",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_volume_input_max_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:631"
+    ],
+    "hardcoded_value": "3",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum characters for volume input field (0-200)",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_select_truncate_triggers",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:707"
+    ],
+    "hardcoded_value": "3",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Number of triggers to show in sound selection dropdown before truncating",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "leaderboard_default_limit",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:1177"
+    ],
+    "hardcoded_value": "10",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Default number of users shown in leaderboard",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "leaderboard_bar_chart_length",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:1215"
+    ],
+    "hardcoded_value": "15",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Character length of bar charts in leaderboards",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "user_stats_channel_breakdown_limit",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:1383"
+    ],
+    "hardcoded_value": "5",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Number of top channels shown in user stats breakdown",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "user_stats_triggers_limit",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:1395"
+    ],
+    "hardcoded_value": "5",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": true,
+    "description": "Number of top triggers shown in user stats",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "mystats_progress_milestones",
+    "files_where_used": [
+      "bot/cogs/audio/soundboard.py:1367"
+    ],
+    "hardcoded_value": "[10, 25, 50, 100, 250, 500, 1000, 2500, 5000]",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Milestone values for progress bar in mystats command",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "tts_default_rate",
+    "files_where_used": [
+      "bot/cogs/audio/tts.py:142",
+      "bot/cogs/audio/tts.py:148",
+      "bot/cogs/audio/tts.py:330"
+    ],
+    "hardcoded_value": "150",
+    "value_type": "int",
+    "suggested_category": "TTS",
+    "new_existing": true,
+    "description": "Default TTS speech rate in words per minute",
+    "cog_name": "TTS",
+    "per_guild": false
+  },
+  {
+    "var_name": "tts_default_volume",
+    "files_where_used": [
+      "bot/cogs/audio/tts.py:239"
+    ],
+    "hardcoded_value": "1.5",
+    "value_type": "float",
+    "suggested_category": "TTS",
+    "new_existing": true,
+    "description": "Default volume for TTS playback",
+    "cog_name": "TTS",
+    "per_guild": false
+  },
+  {
+    "var_name": "tts_max_text_length",
+    "files_where_used": [
+      "bot/cogs/audio/tts.py:180",
+      "bot/cogs/audio/tts.py:264"
+    ],
+    "hardcoded_value": "500",
+    "value_type": "int",
+    "suggested_category": "TTS",
+    "new_existing": true,
+    "description": "Maximum character length for TTS text input",
+    "cog_name": "TTS",
+    "per_guild": false
+  },
+  {
+    "var_name": "edge_tts_default_voice",
+    "files_where_used": [
+      "bot/cogs/audio/edge_tts.py:87",
+      "bot/cogs/audio/edge_tts.py:98"
+    ],
+    "hardcoded_value": "en-US-AriaNeural",
+    "value_type": "str",
+    "suggested_category": "TTS",
+    "new_existing": true,
+    "description": "Default voice name for Edge TTS",
+    "cog_name": "EdgeTTS",
+    "per_guild": false
+  },
+  {
+    "var_name": "edge_tts_default_volume",
+    "files_where_used": [
+      "bot/cogs/audio/edge_tts.py:123"
+    ],
+    "hardcoded_value": "1.5",
+    "value_type": "float",
+    "suggested_category": "TTS",
+    "new_existing": true,
+    "description": "Default volume for Edge TTS playback",
+    "cog_name": "EdgeTTS",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_speech_phrase_time_limit",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:550"
+    ],
+    "hardcoded_value": "10",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Maximum seconds of speech to process for speech recognition",
+    "cog_name": "VoiceSpeech",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_speech_error_log_threshold",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:565"
+    ],
+    "hardcoded_value": "10",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Number of audio errors before logging warning",
+    "cog_name": "VoiceSpeech",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_speech_chunk_size",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:45"
+    ],
+    "hardcoded_value": "3840",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Audio chunk size in bytes (960 samples * 2 channels * 2 bytes)",
+    "cog_name": "VoiceSpeech",
+    "per_guild": false
+  },
+  {
+    "var_name": "ducking_transition_ms",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:354",
+      "bot/core/audio/sources.py:19"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Milliseconds for smooth volume transition when ducking",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "default_volume",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:339"
+    ],
+    "hardcoded_value": "0.5",
+    "value_type": "float",
+    "suggested_category": "Playback",
+    "new_existing": true,
+    "description": "Default playback volume multiplier for sounds",
+    "cog_name": "Soundboard",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_playback_timeout",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:405"
+    ],
+    "hardcoded_value": "30.0",
+    "value_type": "float",
+    "suggested_category": "Playback",
+    "new_existing": true,
+    "description": "Maximum seconds to wait for sound playback completion",
+    "cog_name": "Voice",
+    "per_guild": false
+  },
+  {
+    "var_name": "sound_queue_warning_size",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:437"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": true,
+    "description": "Sound queue size that triggers warnings",
+    "cog_name": "Voice",
+    "per_guild": false
+  },
+  {
+    "var_name": "keepalive_interval",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:463"
+    ],
+    "hardcoded_value": "30",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Seconds between voice keepalive packets",
+    "cog_name": "System",
+    "per_guild": false
+  },
+  {
+    "var_name": "auto_join_timeout",
+    "files_where_used": [
+      "bot/cogs/audio/voice_speech.py:180"
+    ],
+    "hardcoded_value": "300",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": true,
+    "description": "Seconds to wait before disconnecting from empty voice channel",
+    "cog_name": "Voice",
+    "per_guild": false
+  },
+  {
+    "var_name": "pyaudio_sample_rate",
+    "files_where_used": [
+      "bot/core/audio/player.py:29"
+    ],
+    "hardcoded_value": "48000",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Audio sample rate in Hz (Discord standard)",
+    "cog_name": null,
+    "per_guild": false
+  },
+  {
+    "var_name": "pyaudio_channels",
+    "files_where_used": [
+      "bot/core/audio/player.py:30"
+    ],
+    "hardcoded_value": "2",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Number of audio channels (stereo)",
+    "cog_name": null,
+    "per_guild": false
+  },
+  {
+    "var_name": "pyaudio_chunk_size",
+    "files_where_used": [
+      "bot/core/audio/player.py:31"
+    ],
+    "hardcoded_value": "960",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Audio chunk size in frames (20ms at 48kHz)",
+    "cog_name": null,
+    "per_guild": false
+  },
+  {
+    "var_name": "pyaudio_ducking_level",
+    "files_where_used": [
+      "bot/core/audio/player.py:32"
+    ],
+    "hardcoded_value": "0.5",
+    "value_type": "float",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Volume multiplier when audio is ducked (50%)",
+    "cog_name": null,
+    "per_guild": false
+  },
+  {
+    "var_name": "pyaudio_duck_transition_ms",
+    "files_where_used": [
+      "bot/core/audio/player.py:33"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Playback",
+    "new_existing": false,
+    "description": "Transition time for ducking in milliseconds",
+    "cog_name": null,
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_tier_diamond",
+    "files_where_used": [
+      "bot/core/stats/activity.py:449"
+    ],
+    "hardcoded_value": "1000",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Activity score threshold for Diamond tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_tier_gold",
+    "files_where_used": [
+      "bot/core/stats/activity.py:451"
+    ],
+    "hardcoded_value": "500",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Activity score threshold for Gold tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_tier_silver",
+    "files_where_used": [
+      "bot/core/stats/activity.py:453"
+    ],
+    "hardcoded_value": "250",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Activity score threshold for Silver tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_tier_bronze",
+    "files_where_used": [
+      "bot/core/stats/activity.py:455"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Activity score threshold for Bronze tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "activity_tier_contributor",
+    "files_where_used": [
+      "bot/core/stats/activity.py:457"
+    ],
+    "hardcoded_value": "25",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Activity score threshold for Contributor tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_1h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:886"
+    ],
+    "hardcoded_value": "1",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for first range bracket",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_5h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:888"
+    ],
+    "hardcoded_value": "5",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 1-5 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_10h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:890"
+    ],
+    "hardcoded_value": "10",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 5-10 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_25h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:892"
+    ],
+    "hardcoded_value": "25",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 10-25 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_50h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:894"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 25-50 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_100h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:896"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 50-100 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_250h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:898"
+    ],
+    "hardcoded_value": "250",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 100-250 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_time_range_500h",
+    "files_where_used": [
+      "bot/core/stats/activity.py:900"
+    ],
+    "hardcoded_value": "500",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice time hours threshold for 250-500 hours range",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_tier_lurker",
+    "files_where_used": [
+      "bot/core/stats/activity.py:918"
+    ],
+    "hardcoded_value": "1",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice hours threshold for Lurker tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_tier_listener",
+    "files_where_used": [
+      "bot/core/stats/activity.py:920"
+    ],
+    "hardcoded_value": "10",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice hours threshold for Listener tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_tier_regular",
+    "files_where_used": [
+      "bot/core/stats/activity.py:922"
+    ],
+    "hardcoded_value": "50",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice hours threshold for Regular tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_tier_active",
+    "files_where_used": [
+      "bot/core/stats/activity.py:924"
+    ],
+    "hardcoded_value": "100",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice hours threshold for Active Member tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_tier_champion",
+    "files_where_used": [
+      "bot/core/stats/activity.py:926"
+    ],
+    "hardcoded_value": "250",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Voice hours threshold for Voice Champion tier",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "voice_activity_bar_chart_default_length",
+    "files_where_used": [
+      "bot/core/stats/activity.py:973"
+    ],
+    "hardcoded_value": "20",
+    "value_type": "int",
+    "suggested_category": "Stats",
+    "new_existing": false,
+    "description": "Default character length for activity bar charts",
+    "cog_name": "Activity",
+    "per_guild": false
+  },
+  {
+    "var_name": "bot_owner_id",
+    "files_where_used": [
+      "bot/config.py:59"
+    ],
+    "hardcoded_value": "696940351977422878",
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": true,
+    "description": "Discord user ID of the bot owner",
+    "cog_name": "System",
+    "per_guild": false
+  },
+  {
+    "var_name": "default_admin_user_ids",
+    "files_where_used": [
+      "bot/config.py:140"
+    ],
+    "hardcoded_value": [
+      696940351977422800
+    ],
+    "value_type": "int",
+    "suggested_category": "Admin",
+    "new_existing": false,
+    "description": "Initial admin user IDs (starts with owner)",
+    "cog_name": "System",
+    "per_guild": false
+  }
+]
