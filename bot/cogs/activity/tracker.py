@@ -26,14 +26,14 @@ class ActivityConfig(ConfigBase):
     voice_tracking_enabled: bool = config_field(
         default=True,
         description="Enable tracking of voice channel activity and time",
-        category="Stats",
+        category="Stats/Voice Tracking",
         guild_override=True
     )
 
     voice_points_per_minute: float = config_field(
         default=0.0,
         description="Points awarded per minute in voice (0.0 = disabled)",
-        category="Stats",
+        category="Stats/Voice Tracking",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -42,7 +42,7 @@ class ActivityConfig(ConfigBase):
     voice_time_display_mode: str = config_field(
         default="ranges",
         description="How to display voice time in stats",
-        category="Stats",
+        category="Stats/Voice Tracking",
         guild_override=True,
         choices=["ranges", "descriptions", "points_only"]
     )
@@ -50,7 +50,7 @@ class ActivityConfig(ConfigBase):
     voice_tracking_type: str = config_field(
         default="total",
         description="What voice time to track",
-        category="Stats",
+        category="Stats/Voice Tracking",
         guild_override=True,
         choices=["total", "unmuted", "speaking"]
     )
@@ -59,7 +59,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_1: int = config_field(
         default=1,
         description="Voice time threshold in hours for level 1 (< 1 hour)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=0,
         max_value=1000
@@ -68,7 +68,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_2: int = config_field(
         default=5,
         description="Voice time threshold in hours for level 2 (1-5 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -77,7 +77,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_3: int = config_field(
         default=10,
         description="Voice time threshold in hours for level 3 (5-10 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -86,7 +86,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_4: int = config_field(
         default=25,
         description="Voice time threshold in hours for level 4 (10-25 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -95,7 +95,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_5: int = config_field(
         default=50,
         description="Voice time threshold in hours for level 5 (25-50 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -104,7 +104,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_6: int = config_field(
         default=100,
         description="Voice time threshold in hours for level 6 (50-100 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -113,7 +113,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_7: int = config_field(
         default=250,
         description="Voice time threshold in hours for level 7 (100-250 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -122,7 +122,7 @@ class ActivityConfig(ConfigBase):
     voice_time_level_8: int = config_field(
         default=500,
         description="Voice time threshold in hours for level 8 (250-500 hours)",
-        category="Stats",
+        category="Stats/Voice Time Levels",
         guild_override=True,
         min_value=1,
         max_value=1000
@@ -132,14 +132,14 @@ class ActivityConfig(ConfigBase):
     enable_weekly_recap: bool = config_field(
         default=False,
         description="Enable automatic weekly activity recap posts",
-        category="Stats",
+        category="Stats/Weekly Recap",
         guild_override=True
     )
 
     weekly_recap_channel_id: int = config_field(
         default=0,
         description="Channel ID to post weekly recaps (0 = disabled)",
-        category="Stats",
+        category="Stats/Weekly Recap",
         guild_override=True,
         min_value=0
     )
@@ -147,7 +147,7 @@ class ActivityConfig(ConfigBase):
     weekly_recap_day: int = config_field(
         default=0,
         description="Day of week for recap (0=Monday, 6=Sunday)",
-        category="Stats",
+        category="Stats/Weekly Recap",
         guild_override=True,
         min_value=0,
         max_value=6
@@ -156,7 +156,7 @@ class ActivityConfig(ConfigBase):
     weekly_recap_hour: int = config_field(
         default=9,
         description="Hour to post recap (24-hour format)",
-        category="Stats",
+        category="Stats/Weekly Recap",
         guild_override=True,
         min_value=0,
         max_value=23
@@ -166,7 +166,7 @@ class ActivityConfig(ConfigBase):
     activity_base_message_points_min: float = config_field(
         default=0.8,
         description="Minimum points awarded for a message",
-        category="Stats",
+        category="Stats/Activity Points",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -175,7 +175,7 @@ class ActivityConfig(ConfigBase):
     activity_base_message_points_max: float = config_field(
         default=1.2,
         description="Maximum points awarded for a message",
-        category="Stats",
+        category="Stats/Activity Points",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -184,7 +184,7 @@ class ActivityConfig(ConfigBase):
     activity_link_bonus_points: float = config_field(
         default=2.0,
         description="Bonus points for messages containing links",
-        category="Stats",
+        category="Stats/Activity Points",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -193,7 +193,7 @@ class ActivityConfig(ConfigBase):
     activity_attachment_bonus_points: float = config_field(
         default=2.0,
         description="Bonus points for messages with attachments",
-        category="Stats",
+        category="Stats/Activity Points",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -202,7 +202,7 @@ class ActivityConfig(ConfigBase):
     activity_reaction_points: float = config_field(
         default=1.0,
         description="Points awarded for adding reactions",
-        category="Stats",
+        category="Stats/Activity Points",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -211,7 +211,7 @@ class ActivityConfig(ConfigBase):
     activity_reply_points: float = config_field(
         default=1.0,
         description="Points awarded for replying to messages",
-        category="Stats",
+        category="Stats/Activity Points",
         guild_override=True,
         min_value=0.0,
         max_value=10.0
@@ -221,7 +221,7 @@ class ActivityConfig(ConfigBase):
     leaderboard_default_limit: int = config_field(
         default=10,
         description="Default number of entries shown in leaderboard",
-        category="Stats",
+        category="Stats/Display",
         guild_override=True,
         min_value=1,
         max_value=50
@@ -230,7 +230,7 @@ class ActivityConfig(ConfigBase):
     user_stats_channel_breakdown_limit: int = config_field(
         default=5,
         description="Number of channels shown in user stats breakdown",
-        category="Stats",
+        category="Stats/Display",
         guild_override=True,
         min_value=1,
         max_value=20
@@ -239,7 +239,7 @@ class ActivityConfig(ConfigBase):
     user_stats_triggers_limit: int = config_field(
         default=5,
         description="Number of top triggers shown in user stats",
-        category="Stats",
+        category="Stats/Display",
         guild_override=True,
         min_value=1,
         max_value=20
@@ -248,7 +248,7 @@ class ActivityConfig(ConfigBase):
     leaderboard_bar_chart_length: int = config_field(
         default=15,
         description="Character length of bar charts in leaderboard",
-        category="Stats",
+        category="Stats/Display",
         guild_override=True,
         min_value=5,
         max_value=50
@@ -257,7 +257,7 @@ class ActivityConfig(ConfigBase):
     voice_activity_bar_chart_length: int = config_field(
         default=20,
         description="Character length for voice activity bar charts",
-        category="Stats",
+        category="Stats/Display",
         guild_override=True,
         min_value=5,
         max_value=50
@@ -267,7 +267,7 @@ class ActivityConfig(ConfigBase):
     activity_tier_diamond: int = config_field(
         default=1000,
         description="Activity score threshold for Diamond tier",
-        category="Stats",
+        category="Stats/Activity Tiers",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -276,7 +276,7 @@ class ActivityConfig(ConfigBase):
     activity_tier_gold: int = config_field(
         default=500,
         description="Activity score threshold for Gold tier",
-        category="Stats",
+        category="Stats/Activity Tiers",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -285,7 +285,7 @@ class ActivityConfig(ConfigBase):
     activity_tier_silver: int = config_field(
         default=250,
         description="Activity score threshold for Silver tier",
-        category="Stats",
+        category="Stats/Activity Tiers",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -294,7 +294,7 @@ class ActivityConfig(ConfigBase):
     activity_tier_bronze: int = config_field(
         default=100,
         description="Activity score threshold for Bronze tier",
-        category="Stats",
+        category="Stats/Activity Tiers",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -303,7 +303,7 @@ class ActivityConfig(ConfigBase):
     activity_tier_contributor: int = config_field(
         default=25,
         description="Activity score threshold for Contributor tier",
-        category="Stats",
+        category="Stats/Activity Tiers",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -313,7 +313,7 @@ class ActivityConfig(ConfigBase):
     voice_tier_lurker: int = config_field(
         default=1,
         description="Voice hours threshold for Lurker tier",
-        category="Stats",
+        category="Stats/Voice Tiers",
         guild_override=True,
         min_value=0,
         max_value=10000
@@ -322,7 +322,7 @@ class ActivityConfig(ConfigBase):
     voice_tier_listener: int = config_field(
         default=10,
         description="Voice hours threshold for Listener tier",
-        category="Stats",
+        category="Stats/Voice Tiers",
         guild_override=True,
         min_value=1,
         max_value=10000
@@ -331,7 +331,7 @@ class ActivityConfig(ConfigBase):
     voice_tier_regular: int = config_field(
         default=50,
         description="Voice hours threshold for Regular tier",
-        category="Stats",
+        category="Stats/Voice Tiers",
         guild_override=True,
         min_value=1,
         max_value=10000
@@ -340,7 +340,7 @@ class ActivityConfig(ConfigBase):
     voice_tier_active: int = config_field(
         default=100,
         description="Voice hours threshold for Active Member tier",
-        category="Stats",
+        category="Stats/Voice Tiers",
         guild_override=True,
         min_value=1,
         max_value=10000
@@ -349,7 +349,7 @@ class ActivityConfig(ConfigBase):
     voice_tier_champion: int = config_field(
         default=250,
         description="Voice hours threshold for Voice Champion tier",
-        category="Stats",
+        category="Stats/Voice Tiers",
         guild_override=True,
         min_value=1,
         max_value=10000
@@ -360,7 +360,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_1: int = config_field(
         default=10,
         description="First trigger milestone (10 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -369,7 +369,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_2: int = config_field(
         default=25,
         description="Second trigger milestone (25 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -378,7 +378,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_3: int = config_field(
         default=50,
         description="Third trigger milestone (50 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -387,7 +387,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_4: int = config_field(
         default=100,
         description="Fourth trigger milestone (100 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -396,7 +396,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_5: int = config_field(
         default=250,
         description="Fifth trigger milestone (250 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -405,7 +405,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_6: int = config_field(
         default=500,
         description="Sixth trigger milestone (500 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -414,7 +414,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_7: int = config_field(
         default=1000,
         description="Seventh trigger milestone (1000 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -423,7 +423,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_8: int = config_field(
         default=2500,
         description="Eighth trigger milestone (2500 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
@@ -432,7 +432,7 @@ class ActivityConfig(ConfigBase):
     mystats_milestone_9: int = config_field(
         default=5000,
         description="Ninth trigger milestone (5000 triggers)",
-        category="Stats",
+        category="Stats/Milestones",
         guild_override=True,
         min_value=1,
         max_value=100000
