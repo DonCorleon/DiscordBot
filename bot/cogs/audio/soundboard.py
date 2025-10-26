@@ -1367,8 +1367,9 @@ class Soundboard(BaseCog):
                         medals = {1: "🥇", 2: "🥈", 3: "🥉"}
                         medal = medals.get(i, "")
 
-                        # Render bar chart
-                        bar = render_bar_chart(count, max_count, bar_length=15)
+                        # Render bar chart (get length from config)
+                        activity_cfg = self.bot.config_manager.for_guild("Activity", guild_id_str)
+                        bar = render_bar_chart(count, max_count, bar_length=activity_cfg.leaderboard_bar_chart_length)
 
                         # Format value
                         value_text = f"{bar} **{count}** trigger{'s' if count != 1 else ''}"
@@ -1519,8 +1520,19 @@ class Soundboard(BaseCog):
                 )
                 embed.add_field(name="🏆 Trigger Rankings", value=rank_value, inline=False)
 
-                # Add progress to next milestone
-                milestones = [10, 25, 50, 100, 250, 500, 1000, 2500, 5000]
+                # Add progress to next milestone (get from config)
+                activity_cfg = self.bot.config_manager.for_guild("Activity", guild_id_str)
+                milestones = [
+                    activity_cfg.mystats_milestone_1,
+                    activity_cfg.mystats_milestone_2,
+                    activity_cfg.mystats_milestone_3,
+                    activity_cfg.mystats_milestone_4,
+                    activity_cfg.mystats_milestone_5,
+                    activity_cfg.mystats_milestone_6,
+                    activity_cfg.mystats_milestone_7,
+                    activity_cfg.mystats_milestone_8,
+                    activity_cfg.mystats_milestone_9
+                ]
                 next_milestone = None
                 for milestone in milestones:
                     if count_total < milestone:
@@ -1584,7 +1596,16 @@ class Soundboard(BaseCog):
                     embed.add_field(name="⚡ Activity Stats (Exact)", value=activity_value, inline=False)
                 else:
                     # Show ambiguous stats for regular users
-                    tier_name, tier_emoji, tier_desc = get_activity_tier(activity_score)
+                    # Get activity config for tier thresholds
+                    activity_cfg = self.bot.config_manager.for_guild("Activity", guild_id_str)
+                    tier_name, tier_emoji, tier_desc = get_activity_tier(
+                        activity_score,
+                        tier_diamond=activity_cfg.activity_tier_diamond,
+                        tier_gold=activity_cfg.activity_tier_gold,
+                        tier_silver=activity_cfg.activity_tier_silver,
+                        tier_bronze=activity_cfg.activity_tier_bronze,
+                        tier_contributor=activity_cfg.activity_tier_contributor
+                    )
                     from bot.core.stats.activity import render_bar_chart, get_voice_time_display
                     from bot.config import config
 
@@ -1595,7 +1616,7 @@ class Soundboard(BaseCog):
                             if u_stat.activity_stats.activity_score > max_score:
                                 max_score = u_stat.activity_stats.activity_score
 
-                    bar = render_bar_chart(int(activity_score), int(max_score))
+                    bar = render_bar_chart(int(activity_score), int(max_score), bar_length=activity_cfg.voice_activity_bar_chart_length)
 
                     # Get voice time based on configured tracking type
                     voice_minutes = 0
@@ -1804,8 +1825,17 @@ class Soundboard(BaseCog):
                         from bot.core.stats.activity import get_voice_time_display
                         from bot.config import config
 
-                        tier_name, tier_emoji, tier_desc = get_activity_tier(score)
-                        bar = render_bar_chart(int(score), int(max_score), bar_length=15)
+                        # Get activity config for tier thresholds and bar chart length
+                        activity_cfg = self.bot.config_manager.for_guild("Activity", guild_id_str)
+                        tier_name, tier_emoji, tier_desc = get_activity_tier(
+                            score,
+                            tier_diamond=activity_cfg.activity_tier_diamond,
+                            tier_gold=activity_cfg.activity_tier_gold,
+                            tier_silver=activity_cfg.activity_tier_silver,
+                            tier_bronze=activity_cfg.activity_tier_bronze,
+                            tier_contributor=activity_cfg.activity_tier_contributor
+                        )
+                        bar = render_bar_chart(int(score), int(max_score), bar_length=activity_cfg.leaderboard_bar_chart_length)
                         value_text = f"{bar} {tier_emoji} **{tier_name}**\n{tier_desc} (Score: {int(score)})"
 
                         # Add voice time if enabled

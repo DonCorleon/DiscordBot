@@ -439,22 +439,37 @@ def remove_message_activity(
     return activity_stats
 
 
-def get_activity_tier(score: float) -> Tuple[str, str, str]:
+def get_activity_tier(
+    score: float,
+    tier_diamond: int = 1000,
+    tier_gold: int = 500,
+    tier_silver: int = 250,
+    tier_bronze: int = 100,
+    tier_contributor: int = 25
+) -> Tuple[str, str, str]:
     """
     Get activity tier based on score (ambiguous display).
+
+    Args:
+        score: Activity score
+        tier_diamond: Threshold for Diamond tier (default: 1000)
+        tier_gold: Threshold for Gold tier (default: 500)
+        tier_silver: Threshold for Silver tier (default: 250)
+        tier_bronze: Threshold for Bronze tier (default: 100)
+        tier_contributor: Threshold for Contributor tier (default: 25)
 
     Returns:
         Tuple of (tier_name, tier_emoji, tier_description)
     """
-    if score >= 1000:
+    if score >= tier_diamond:
         return ("💎 Diamond", "💎", "Legendary Activity")
-    elif score >= 500:
+    elif score >= tier_gold:
         return ("🥇 Gold", "🥇", "Very Active")
-    elif score >= 250:
+    elif score >= tier_silver:
         return ("🥈 Silver", "🥈", "Active")
-    elif score >= 100:
+    elif score >= tier_bronze:
         return ("🥉 Bronze", "🥉", "Moderate")
-    elif score >= 25:
+    elif score >= tier_contributor:
         return ("📝 Contributor", "📝", "Getting Started")
     else:
         return ("👋 Newcomer", "👋", "Just Joined")
@@ -920,27 +935,39 @@ def format_voice_time_ranges(
         return f"{level_8}+ hours"
 
 
-def format_voice_time_description(minutes: int) -> Tuple[str, str]:
+def format_voice_time_description(
+    minutes: int,
+    tier_lurker: int = 1,
+    tier_listener: int = 10,
+    tier_regular: int = 50,
+    tier_active: int = 100,
+    tier_champion: int = 250
+) -> Tuple[str, str]:
     """
-    Format voice time as vague descriptions.
+    Format voice time as vague descriptions (tiers).
 
     Args:
         minutes: Total minutes
+        tier_lurker: Threshold for Lurker tier in hours (default: 1)
+        tier_listener: Threshold for Listener tier in hours (default: 10)
+        tier_regular: Threshold for Regular tier in hours (default: 50)
+        tier_active: Threshold for Active Member tier in hours (default: 100)
+        tier_champion: Threshold for Voice Champion tier in hours (default: 250)
 
     Returns:
         Tuple of (tier_name, tier_description)
     """
     hours = minutes / 60
 
-    if hours < 1:
+    if hours < tier_lurker:
         return ("👂 Lurker", "Rarely in voice")
-    elif hours < 10:
+    elif hours < tier_listener:
         return ("🎧 Listener", "Occasionally present")
-    elif hours < 50:
+    elif hours < tier_regular:
         return ("💬 Regular", "Frequently in voice")
-    elif hours < 100:
+    elif hours < tier_active:
         return ("🎤 Active Member", "Very active in voice")
-    elif hours < 250:
+    elif hours < tier_champion:
         return ("⭐ Voice Champion", "Always around")
     else:
         return ("🏆 Voice Legend", "Lives in voice chat")

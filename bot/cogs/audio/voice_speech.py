@@ -583,12 +583,16 @@ class VoiceSpeechCog(BaseCog):
             except Exception as e:
                 logger.error(f"Error in text_callback: {e}", exc_info=True)
 
+        # Get voice config for speech recognition settings
+        voice_cfg = self.bot.config_manager.for_guild("Voice")
+
         class SRListener(dsr.SpeechRecognitionSink):
-            def __init__(self, parent_cog):
-                super().__init__(default_recognizer="vosk", phrase_time_limit=10, text_cb=text_callback)
+            def __init__(self, parent_cog, phrase_time_limit, error_log_threshold):
+                super().__init__(default_recognizer="vosk", phrase_time_limit=phrase_time_limit, text_cb=text_callback)
                 self.parent_cog = parent_cog
                 self.error_count = 0
-                self.max_errors = 10
+                self.max_errors = error_log_threshold
+                self.error_log_interval = error_log_threshold  # Log every Nth error
 
             def write(self, user, data):
                 """Override write to add error handling for corrupted audio data."""
@@ -599,8 +603,8 @@ class VoiceSpeechCog(BaseCog):
                 except Exception as e:
                     self.error_count += 1
 
-                    # Log first error and every 10th error to avoid spam
-                    if self.error_count == 1 or self.error_count % 10 == 0:
+                    # Log first error and every Nth error to avoid spam
+                    if self.error_count == 1 or self.error_count % self.error_log_interval == 0:
                         logger.warning(
                             f"[Guild {guild_id}] Audio write error (count: {self.error_count}): {type(e).__name__}"
                         )
@@ -632,7 +636,11 @@ class VoiceSpeechCog(BaseCog):
                 except Exception as e:
                     logger.error(f"Error in speaking_stop: {e}", exc_info=True)
 
-        return SRListener(self)
+        return SRListener(
+            self,
+            phrase_time_limit=voice_cfg.voice_speech_phrase_time_limit,
+            error_log_threshold=voice_cfg.voice_speech_error_log_threshold
+        )
 
     def _handle_user_speaking_start(self, guild_id: int, user_id: int):
         """Handle when a user starts speaking - duck the audio."""
