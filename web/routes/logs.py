@@ -44,6 +44,22 @@ def parse_log_line(line: str) -> Optional[dict]:
     }
 
 
+def get_log_level_value(level: str) -> int:
+    """
+    Get numeric value for log level.
+    Higher numbers = higher severity.
+    """
+    levels = {
+        "DEBUG": 10,
+        "INFO": 20,
+        "WARNING": 30,
+        "ERROR": 40,
+        "CRITICAL": 50,
+        "UNKNOWN": 0
+    }
+    return levels.get(level.upper(), 0)
+
+
 @router.get("/files")
 async def list_log_files():
     """
@@ -131,9 +147,11 @@ async def read_logs(
 
             log_entry = parse_log_line(line)
 
-            # Filter by level
+            # Filter by level (show selected level and higher severity levels)
             if level and level.upper() != "ALL":
-                if log_entry["level"] != level.upper():
+                min_level_value = get_log_level_value(level)
+                entry_level_value = get_log_level_value(log_entry["level"])
+                if entry_level_value < min_level_value:
                     continue
 
             # Filter by search term

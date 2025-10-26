@@ -6,6 +6,7 @@ let currentFile = null;
 let currentLevel = 'ALL';
 let currentSearch = '';
 let liveMode = false;
+let autoScroll = true;
 let liveInterval = null;
 let allLogFiles = [];
 
@@ -61,6 +62,11 @@ function setupEventListeners() {
     // Live mode toggle
     document.getElementById('live-btn').addEventListener('click', () => {
         toggleLiveMode();
+    });
+
+    // Auto-scroll checkbox
+    document.getElementById('auto-scroll-checkbox').addEventListener('change', (e) => {
+        autoScroll = e.target.checked;
     });
 }
 
@@ -137,8 +143,15 @@ function displayLogs(logs) {
 
     container.innerHTML = logs.map(log => {
         const level = log.level || 'UNKNOWN';
+        const fullMessage = log.message || '';
+        // Use the raw log line if available, otherwise construct it
+        const fullText = log.raw || `${log.timestamp ? '[' + log.timestamp + '] ' : ''}[${level}] ${log.logger ? log.logger + ': ' : ''}${fullMessage}`;
+
+        // Escape for attribute - replace double quotes with single quotes to avoid breaking the title attribute
+        const titleText = fullText.replace(/"/g, "'");
+
         return `
-            <div class="log-entry ${level}">
+            <div class="log-entry ${level}" title="${escapeHtml(titleText)}">
                 ${log.timestamp ? `<span class="log-timestamp">[${log.timestamp}]</span>` : ''}
                 <span class="log-level">[${level}]</span>
                 ${log.logger ? `<span class="log-logger">${escapeHtml(log.logger)}:</span>` : ''}
@@ -147,8 +160,10 @@ function displayLogs(logs) {
         `;
     }).join('');
 
-    // Scroll to bottom
-    container.scrollTop = container.scrollHeight;
+    // Auto-scroll to bottom if enabled
+    if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 function updateStats(data) {

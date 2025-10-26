@@ -160,3 +160,40 @@ async def list_channels(
     except Exception as e:
         logger.error(f"Error listing channels: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/all-channels")
+async def list_all_channels():
+    """
+    Get list of all channels that have transcriptions across all guilds.
+    Returns channels in "Guild:Channel" format.
+    """
+    try:
+        import json
+
+        transcripts_file = Path("data/admin/transcriptions.json")
+
+        if not transcripts_file.exists():
+            return {"channels": []}
+
+        with open(transcripts_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            transcriptions = data.get("transcriptions", [])
+
+        # Get unique channels across all guilds
+        channels_dict = {}
+        for t in transcriptions:
+            channel_id = t.get("channel_id")
+            if channel_id and channel_id not in channels_dict:
+                channels_dict[channel_id] = {
+                    "channel_id": str(channel_id),  # Convert to string for JavaScript
+                    "channel_name": t.get("channel", "Unknown"),
+                    "guild_id": str(t.get("guild_id")),  # Include guild_id
+                    "guild_name": t.get("guild", "Unknown")
+                }
+
+        return {"channels": list(channels_dict.values())}
+
+    except Exception as e:
+        logger.error(f"Error listing all channels: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

@@ -6,6 +6,7 @@ let currentGuild = '';
 let currentChannel = '';
 let currentSearch = '';
 let liveMode = false;
+let autoScroll = true;
 let allGuilds = [];
 let allChannels = [];
 let transcripts = [];
@@ -13,6 +14,7 @@ let transcripts = [];
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadGuilds();
+    loadChannels(); // Load all channels on initial load
     loadTranscripts();
     setupEventListeners();
 
@@ -37,8 +39,21 @@ function setupEventListeners() {
 
     // Channel selection
     document.getElementById('channel-select').addEventListener('change', (e) => {
-        currentChannel = e.target.value;
-        loadTranscripts();
+        const selectedOption = e.target.options[e.target.selectedIndex];
+
+        // If no guild is selected and a channel is chosen, auto-select the guild
+        if (!currentGuild && e.target.value && selectedOption.dataset.guildId) {
+            const guildId = selectedOption.dataset.guildId;
+            currentGuild = guildId;
+            document.getElementById('guild-select').value = guildId;
+            currentChannel = e.target.value;
+            // Reload channels for the selected guild
+            loadChannels();
+            loadTranscripts();
+        } else {
+            currentChannel = e.target.value;
+            loadTranscripts();
+        }
     });
 
     // Search input (with debounce)
@@ -66,6 +81,11 @@ function setupEventListeners() {
     // Live mode toggle
     document.getElementById('live-btn').addEventListener('click', () => {
         toggleLiveMode();
+    });
+
+    // Auto-scroll checkbox
+    document.getElementById('auto-scroll-checkbox').addEventListener('change', (e) => {
+        autoScroll = e.target.checked;
     });
 }
 
@@ -112,6 +132,24 @@ async function loadChannels() {
     select.innerHTML = '<option value="">All Channels</option>';
 
     if (!currentGuild) {
+        // When no guild is selected, show all channels across all guilds in "Guild:Channel" format
+        try {
+            const response = await fetch('/api/v1/transcripts/all-channels');
+            const data = await response.json();
+
+            allChannels = data.channels || [];
+
+            allChannels.forEach(channel => {
+                const option = document.createElement('option');
+                option.value = channel.channel_id;
+                option.dataset.guildId = channel.guild_id; // Store guild_id for later use
+                option.textContent = `${channel.guild_name}:${channel.channel_name}`;
+                select.appendChild(option);
+            });
+
+        } catch (error) {
+            console.error('Error loading all channels:', error);
+        }
         return;
     }
 
@@ -174,25 +212,44 @@ function displayTranscripts(transcriptList) {
         return;
     }
 
-    container.innerHTML = transcriptList.map(t => {
+    // Reverse to show oldest first (newest at bottom)
+    const reversed = [...transcriptList].reverse();
+
+    container.innerHTML = reversed.map(t => {
         const timestamp = new Date(t.timestamp).toLocaleString();
         const triggers = t.triggers && t.triggers.length > 0
-            ? `<div class="transcript-triggers">Triggers: ${t.triggers.map(tr => `<span class="trigger-badge">${escapeHtml(tr.word)} → ${escapeHtml(tr.sound)}</span>`).join(' ')}</div>`
+            ? ` | 🔊 ${t.triggers.map(tr => `${escapeHtml(tr.word)}→${escapeHtml(tr.sound)}`).join(', ')}`
+            : '';
+
+        // Only show guild if no specific guild is selected
+        const showGuild = !currentGuild;
+        const guildHtml = showGuild ? `<span class="transcript-guild">${escapeHtml(t.guild || 'Unknown')}</span>` : '';
+
+        // Only show channel if no specific channel is selected
+        const showChannel = !currentChannel;
+        const channelHtml = showChannel ? `<span class="transcript-channel">#${escapeHtml(t.channel || 'Unknown')}</span>` : '';
+
+        // Add avatar if available
+        const avatarHtml = t.user_avatar_url
+            ? `<img src="${escapeHtml(t.user_avatar_url)}" class="transcript-avatar" alt="${escapeHtml(t.user)}" onerror="this.style.display='none'">`
             : '';
 
         return `
             <div class="transcript-entry">
-                <div class="transcript-header">
-                    <span class="transcript-timestamp">${timestamp}</span>
-                    <span class="transcript-guild">${escapeHtml(t.guild || 'Unknown')}</span>
-                    <span class="transcript-channel">#${escapeHtml(t.channel || 'Unknown')}</span>
-                    <span class="transcript-user">${escapeHtml(t.user || 'Unknown')}</span>
-                </div>
-                <div class="transcript-text">${escapeHtml(t.text)}</div>
-                ${triggers}
+                <span class="transcript-timestamp">${timestamp}</span>
+                ${guildHtml}
+                ${channelHtml}
+                <span class="transcript-user">${escapeHtml(t.user || 'Unknown')}</span>
+                ${avatarHtml}
+                <span class="transcript-text">${escapeHtml(t.text)}</span>${triggers}
             </div>
         `;
     }).join('');
+
+    // Auto-scroll to bottom if enabled
+    if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 function addTranscriptionToView(transcription) {
@@ -220,18 +277,66 @@ function addTranscriptionToView(transcription) {
 
     console.log('✅ Transcription passed filters, adding to view');
 
-    // Add to beginning of transcripts array
+    // Add to beginning of transcripts array (newest first in array)
     transcripts.unshift(transcription);
 
     // Keep only last 100
     if (transcripts.length > 100) {
-        transcripts = transcripts.slice(0, 100);
+        transcripts.pop(); // Remove oldest
     }
 
     console.log('Transcripts array now has', transcripts.length, 'items');
 
-    // Re-display
-    displayTranscripts(transcripts);
+    // Append to end of display (newest at bottom) without flicker
+    const container = document.getElementById('transcripts-content');
+
+    // Clear empty message if present
+    if (container.querySelector('.transcripts-empty')) {
+        container.innerHTML = '';
+    }
+
+    const timestamp = new Date(transcription.timestamp).toLocaleString();
+    const triggers = transcription.triggers && transcription.triggers.length > 0
+        ? ` | 🔊 ${transcription.triggers.map(tr => `${escapeHtml(tr.word)}→${escapeHtml(tr.sound)}`).join(', ')}`
+        : '';
+
+    // Only show guild if no specific guild is selected
+    const showGuild = !currentGuild;
+    const guildHtml = showGuild ? `<span class="transcript-guild">${escapeHtml(transcription.guild || 'Unknown')}</span>` : '';
+
+    // Only show channel if no specific channel is selected
+    const showChannel = !currentChannel;
+    const channelHtml = showChannel ? `<span class="transcript-channel">#${escapeHtml(transcription.channel || 'Unknown')}</span>` : '';
+
+    // Add avatar if available
+    const avatarHtml = transcription.user_avatar_url
+        ? `<img src="${escapeHtml(transcription.user_avatar_url)}" class="transcript-avatar" alt="${escapeHtml(transcription.user)}" onerror="this.style.display='none'">`
+        : '';
+
+    const entry = document.createElement('div');
+    entry.className = 'transcript-entry';
+    entry.innerHTML = `
+        <span class="transcript-timestamp">${timestamp}</span>
+        ${guildHtml}
+        ${channelHtml}
+        <span class="transcript-user">${escapeHtml(transcription.user || 'Unknown')}</span>
+        ${avatarHtml}
+        <span class="transcript-text">${escapeHtml(transcription.text)}</span>${triggers}
+    `;
+
+    // Append to end (newest at bottom)
+    container.appendChild(entry);
+
+    // Remove oldest entry if too many displayed
+    const entries = container.querySelectorAll('.transcript-entry');
+    if (entries.length > 100) {
+        entries[0].remove();
+    }
+
+    // Auto-scroll to bottom if enabled
+    if (autoScroll) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 function updateStats(data) {

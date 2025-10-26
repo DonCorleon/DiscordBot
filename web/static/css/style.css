@@ -597,11 +597,14 @@ canvas {
 }
 
 .log-entry {
-    padding: 0.25rem 0.5rem;
+    padding: 0.3rem 0.5rem;
     border-left: 3px solid transparent;
-    margin-bottom: 2px;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    margin-bottom: 1px;
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    font-size: 0.85rem;
+    line-height: 1.4;
 }
 
 .log-entry:hover {
@@ -610,23 +613,30 @@ canvas {
 
 .log-timestamp {
     color: #888;
-    margin-right: 0.5rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 .log-level {
     display: inline-block;
-    width: 70px;
+    width: 60px;
     font-weight: bold;
-    margin-right: 0.5rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 .log-logger {
     color: #b0b0b0;
-    margin-right: 0.5rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
 }
 
 .log-message {
     color: #e0e0e0;
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Log Level Colors */
@@ -739,72 +749,63 @@ canvas {
 }
 
 .transcript-entry {
-    padding: 1rem;
-    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.75rem;
+    margin-bottom: 2px;
     background: #1a1a1a;
-    border-radius: 8px;
     border-left: 3px solid #5865F2;
-    animation: slideIn 0.3s ease-out;
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .transcript-entry:hover {
     background: #242424;
 }
 
-.transcript-header {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    flex-wrap: wrap;
+.transcript-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
 }
 
 .transcript-timestamp {
     color: #888;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
+    flex-shrink: 0;
 }
 
 .transcript-guild {
     color: #5865F2;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
 }
 
 .transcript-channel {
     color: #43b581;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
 }
 
 .transcript-user {
     color: #faa61a;
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
 }
 
 .transcript-text {
     color: #e0e0e0;
-    font-size: 1rem;
-    line-height: 1.5;
-    padding-left: 0.5rem;
-}
-
-.transcript-triggers {
-    margin-top: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid #3a3a3a;
-    font-size: 0.85rem;
-    color: #b0b0b0;
-}
-
-.trigger-badge {
-    display: inline-block;
-    background: #3a3a3a;
-    color: #faa61a;
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    margin-right: 0.5rem;
-    font-family: monospace;
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* Notifications */

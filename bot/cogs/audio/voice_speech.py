@@ -527,6 +527,7 @@ class VoiceSpeechCog(BaseCog):
                     "channel": channel_name,
                     "user_id": str(user.id),
                     "user": user.display_name,
+                    "user_avatar_url": user.display_avatar.url if user.display_avatar else None,
                     "text": transcribed_text,
                     "triggers": []
                 }
