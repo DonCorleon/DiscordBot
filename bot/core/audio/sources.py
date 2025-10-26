@@ -16,7 +16,16 @@ class DuckedAudioSource(discord.AudioSource):
     Integrates PyAudioPlayer's ducking with Discord's audio streaming.
     """
 
-    def __init__(self, file_path: str, volume: float = 1.0, ducking_level: float = 0.5, duck_transition_ms: int = 50):
+    def __init__(
+        self,
+        file_path: str,
+        volume: float = 1.0,
+        ducking_level: float = 0.5,
+        duck_transition_ms: int = 50,
+        sample_rate: int = 48000,
+        channels: int = 2,
+        chunk_size: int = 960
+    ):
         """
         Initialize ducked audio source.
 
@@ -25,9 +34,15 @@ class DuckedAudioSource(discord.AudioSource):
             volume: Base volume (0.0-1.0)
             ducking_level: Volume multiplier when ducked (0.0-1.0)
             duck_transition_ms: Transition time for volume changes
+            sample_rate: Audio sample rate in Hz (default: 48000)
+            channels: Number of audio channels (default: 2)
+            chunk_size: Audio chunk size in frames (default: 960)
         """
         self.file_path = file_path
         self.player = PyAudioPlayer(
+            sample_rate=sample_rate,
+            channels=channels,
+            chunk_size=chunk_size,
             ducking_level=ducking_level,
             duck_transition_ms=duck_transition_ms
         )

@@ -496,46 +496,55 @@
     "_notes": "shouldn't need to be changed."
   },
   {
-    "var_name": "pyaudio_sample_rate",
+    "var_name": "audio_sample_rate",
     "files_where_used": [
-      "bot/core/audio/player.py:29"
+      "bot/core/audio/player.py:29",
+      "bot/core/system_config.py:190-199",
+      "bot/core/audio/sources.py:25,42",
+      "bot/cogs/audio/voice_speech.py:358"
     ],
     "hardcoded_value": "48000",
     "value_type": "int",
-    "suggested_category": "Admin/Playback",
-    "new_existing": false,
-    "description": "Audio sample rate in Hz (Discord standard)",
-    "cog_name": null,
+    "suggested_category": "Admin/Audio",
+    "new_existing": "existing",
+    "description": "Audio sample rate in Hz (Discord standard is 48000)",
+    "cog_name": "System",
     "per_guild": false,
-    "_notes": "shouldn't need to be changed."
+    "_notes": ""
   },
   {
-    "var_name": "pyaudio_channels",
+    "var_name": "audio_channels",
     "files_where_used": [
-      "bot/core/audio/player.py:30"
+      "bot/core/audio/player.py:30",
+      "bot/core/system_config.py:201-210",
+      "bot/core/audio/sources.py:26,43",
+      "bot/cogs/audio/voice_speech.py:359"
     ],
     "hardcoded_value": "2",
     "value_type": "int",
-    "suggested_category": "Admin/Playback",
-    "new_existing": false,
-    "description": "Number of audio channels (stereo)",
-    "cog_name": null,
+    "suggested_category": "Admin/Audio",
+    "new_existing": "existing",
+    "description": "Number of audio channels (1=mono, 2=stereo)",
+    "cog_name": "System",
     "per_guild": false,
-    "_notes": "shouldn't need to be changed."
+    "_notes": ""
   },
   {
-    "var_name": "pyaudio_chunk_size",
+    "var_name": "audio_chunk_size",
     "files_where_used": [
-      "bot/core/audio/player.py:31"
+      "bot/core/audio/player.py:31",
+      "bot/core/system_config.py:212-221",
+      "bot/core/audio/sources.py:27,44",
+      "bot/cogs/audio/voice_speech.py:360"
     ],
     "hardcoded_value": "960",
     "value_type": "int",
-    "suggested_category": "AdminPlayback",
-    "new_existing": false,
-    "description": "Audio chunk size in frames (20ms at 48kHz)",
-    "cog_name": null,
+    "suggested_category": "Admin/Audio",
+    "new_existing": "existing",
+    "description": "Audio chunk size in frames (960 = 20ms at 48kHz)",
+    "cog_name": "System",
     "per_guild": false,
-    "_notes": "shouldn't need to be changed."
+    "_notes": ""
   },
   {
     "var_name": "pyaudio_ducking_level",
@@ -552,18 +561,21 @@
     "_notes": ""
   },
   {
-    "var_name": "pyaudio_duck_transition_ms",
+    "var_name": "audio_duck_transition_ms",
     "files_where_used": [
-      "bot/core/audio/player.py:33"
+      "bot/core/audio/player.py:33",
+      "bot/core/system_config.py:223-231",
+      "bot/core/audio/sources.py:24,46",
+      "bot/cogs/audio/voice_speech.py:357"
     ],
     "hardcoded_value": "50",
     "value_type": "int",
-    "suggested_category": "Playback",
-    "new_existing": false,
-    "description": "Transition time for ducking in milliseconds",
-    "cog_name": null,
-    "per_guild": true,
-    "_notes": "shouldn't need to be changed."
+    "suggested_category": "Admin/Audio",
+    "new_existing": "existing",
+    "description": "Transition time for volume ducking in milliseconds",
+    "cog_name": "System",
+    "per_guild": false,
+    "_notes": ""
   },
   {
     "var_name": "activity_tier_diamond",

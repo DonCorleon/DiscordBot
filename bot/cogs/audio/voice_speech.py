@@ -37,6 +37,24 @@ class VoiceConfig(ConfigBase):
         max_value=3600
     )
 
+    sound_playback_timeout: float = config_field(
+        default=30.0,
+        description="Maximum seconds to wait for sound playback to complete",
+        category="Playback",
+        guild_override=True,
+        min_value=5.0,
+        max_value=120.0
+    )
+
+    sound_queue_warning_size: int = config_field(
+        default=50,
+        description="Warn when sound queue exceeds this size",
+        category="Playback",
+        guild_override=True,
+        min_value=10,
+        max_value=500
+    )
+
 
 # Monkey patch for discord-ext-voice-recv bug
 def _patched_remove_ssrc(self, *, user_id: int):
@@ -327,13 +345,19 @@ class VoiceSpeechCog(BaseCog):
                     {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
                 )
 
+                # Get audio engine config from SystemConfig
+                sys_cfg = self.bot.config_manager.for_guild("System")
+
                 # Create ducked audio source
                 try:
                     source = DuckedAudioSource(
                         soundfile,
                         volume=effective_volume,
                         ducking_level=config["level"],
-                        duck_transition_ms=50
+                        duck_transition_ms=sys_cfg.audio_duck_transition_ms,
+                        sample_rate=sys_cfg.audio_sample_rate,
+                        channels=sys_cfg.audio_channels,
+                        chunk_size=sys_cfg.audio_chunk_size
                     )
                 except Exception as e:
                     logger.error(f"[Guild {guild_id}] Failed to create audio source for '{soundfile}': {e}",
@@ -378,10 +402,10 @@ class VoiceSpeechCog(BaseCog):
                     except Exception as e:
                         logger.error(f"[Guild {guild_id}] Failed to track user trigger stats: {e}", exc_info=True)
 
-                # Get playback timeout from guild config
+                # Get playback timeout from unified config manager
                 playback_timeout = 30.0  # default
-                if hasattr(self.bot, 'guild_config'):
-                    playback_timeout = self.bot.guild_config.get_guild_config(guild_id, "sound_playback_timeout")
+                if hasattr(self.bot, 'config_manager'):
+                    playback_timeout = self.bot.config_manager.get("Voice", "sound_playback_timeout", guild_id)
 
                 try:
                     await asyncio.wait_for(event.wait(), timeout=playback_timeout)
@@ -413,8 +437,8 @@ class VoiceSpeechCog(BaseCog):
 
         # Warn if queue size exceeds threshold
         warning_threshold = 50  # default
-        if hasattr(self.bot, 'guild_config'):
-            warning_threshold = self.bot.guild_config.get_guild_config(guild_id, "sound_queue_warning_size")
+        if hasattr(self.bot, 'config_manager'):
+            warning_threshold = self.bot.config_manager.get("Voice", "sound_queue_warning_size", guild_id)
 
         if queue_size > warning_threshold:
             logger.warning(f"[Guild {guild_id}] Sound queue size ({queue_size}) exceeds warning threshold ({warning_threshold})")

@@ -175,7 +175,7 @@ class SystemConfig(ConfigBase):
         requires_restart=True
     )
 
-    # Voice Settings
+    # Voice/Audio Settings
     keepalive_interval: int = config_field(
         default=30,
         description="Seconds between keepalive packets in voice channels",
@@ -184,4 +184,48 @@ class SystemConfig(ConfigBase):
         admin_only=True,
         min_value=10,
         max_value=300
+    )
+
+    # Audio Engine Settings (Technical - shouldn't need changing)
+    audio_sample_rate: int = config_field(
+        default=48000,
+        description="Audio sample rate in Hz (Discord standard is 48000)",
+        category="Admin/Audio",
+        guild_override=False,
+        admin_only=True,
+        requires_restart=True,
+        min_value=8000,
+        max_value=192000
+    )
+
+    audio_channels: int = config_field(
+        default=2,
+        description="Number of audio channels (1=mono, 2=stereo)",
+        category="Admin/Audio",
+        guild_override=False,
+        admin_only=True,
+        requires_restart=True,
+        min_value=1,
+        max_value=2
+    )
+
+    audio_chunk_size: int = config_field(
+        default=960,
+        description="Audio chunk size in frames (960 = 20ms at 48kHz)",
+        category="Admin/Audio",
+        guild_override=False,
+        admin_only=True,
+        requires_restart=True,
+        min_value=480,
+        max_value=4800
+    )
+
+    audio_duck_transition_ms: int = config_field(
+        default=50,
+        description="Transition time for volume ducking in milliseconds",
+        category="Admin/Audio",
+        guild_override=False,
+        admin_only=True,
+        min_value=10,
+        max_value=500
     )
