@@ -7,9 +7,9 @@
 
 ## 📍 Current Focus
 
-**Status**: ✅ Config Migration Phase 1 - First 3 Tasks COMPLETE
+**Status**: ✅ Config Migration Phase 1 - First 3 Tasks COMPLETE + Environment Variables + SystemConfig Organization
 
-**Latest Work**: Removed obsolete pygame dashboard, implemented dynamic UI controls (checkboxes/dropdowns), and added IP address validation.
+**Latest Work**: Completed environment variable support (.env integration), large integer handling (Discord IDs), env_only security fields, and separated SystemConfig into dedicated file.
 
 ### Recent Accomplishments
 
@@ -171,8 +171,40 @@ Default (in code) → Global Override → Guild Override
 ### ✅ Task 3: Add IP Address Validation
 - Created `validate_ip_address()` function in config_system.py
 - Added `validator` parameter to ConfigField
-- Applied validator to `web_host` field in monitoring.py
+- Applied validator to `web_host` field in SystemConfig
 - Validation runs in ConfigField.validate() method
+
+### ✅ Additional: Environment Variable Support
+- Added full .env integration to ConfigManager
+- Config hierarchy: Default → Global JSON → .env → Guild JSON
+- Created legacy env var mappings (DISCORD_TOKEN, BOT_OWNER, etc.)
+- Implemented type conversion for env vars (string→int, string→bool, etc.)
+- Added `env_only` flag for security-critical fields (token, bot_owner_id, log_level)
+- Updated main.py to load .env early and read LOG_LEVEL before logging setup
+- Fixed all startup errors related to config changes
+
+### ✅ Additional: Large Integer Handling
+- Created `is_large_int` flag for Discord snowflake IDs
+- Implemented `safe_serialize_value()` to convert large ints to strings for JavaScript
+- Added string-to-int conversion on save for large int fields
+- Prevents JavaScript precision loss for values > 2^53-1
+
+### ✅ Additional: UI Improvements
+- Fixed boolean fields rendering as text inputs (frontend type check)
+- Fixed dropdown alignment (added margin-left: auto)
+- Added tooltip display for truncated cell contents
+
+### ✅ Additional: Config Organization
+- **NEW FILE**: `bot/core/system_config.py`
+- Separated SystemConfig from MonitoringCog for better separation of concerns
+- SystemConfig now contains:
+  - Bot Owner Settings (token, command_prefix, bot_owner_id)
+  - Admin System Settings (log_level, log_dir, admin_data_dir)
+  - Monitoring Settings (max_history, health_collection_interval, data_export_interval)
+  - Feature Flags (enable_auto_disconnect, enable_speech_recognition)
+  - Web Dashboard Settings (enable_web_dashboard, web_host, web_port, web_reload)
+  - Voice Settings (keepalive_interval)
+- MonitoringCog now imports SystemConfig instead of defining it
 
 ## 🎯 Next Steps (Remaining Config Migration Tasks)
 

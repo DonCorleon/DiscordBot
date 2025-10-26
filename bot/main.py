@@ -5,6 +5,11 @@ from datetime import datetime, UTC
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file FIRST (before any config imports)
+load_dotenv()
+
 from bot.config import config
 from bot.core.admin.data_collector import initialize_data_collector
 
@@ -42,12 +47,21 @@ for name, log in logging.root.manager.loggerDict.items():
             log.addHandler(file_handler)
             log.propagate = False
 
-# Configure YOUR bot's logger
+# Configure YOUR bot's logger with log level from environment
+log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+log_level = getattr(logging, log_level_name, logging.INFO)
+
 logger = logging.getLogger("discordbot")
-logger.setLevel(logging.INFO)  # Default, will be updated from ConfigManager
+logger.setLevel(log_level)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 logger.propagate = False
+
+# Also apply to discord loggers
+for name, log in logging.root.manager.loggerDict.items():
+    if name.startswith("discord"):
+        if isinstance(log, logging.Logger):
+            log.setLevel(log_level)
 
 
 def update_log_level(level_name: str):
@@ -248,13 +262,10 @@ async def on_ready():
         update_log_level(sys_cfg.log_level)
 
         # Log feature flags
-        if sys_cfg.enable_admin_dashboard:
-            logger.info("📊 Admin dashboard enabled - Data exporting to data/admin/")
-        else:
-            logger.info("🖥️  Running in headless mode - Admin dashboard disabled")
-
         if sys_cfg.enable_web_dashboard:
             logger.info(f"🌐 Web dashboard enabled on {sys_cfg.web_host}:{sys_cfg.web_port}")
+        else:
+            logger.info("🖥️  Running in headless mode - Web dashboard disabled")
 
         logger.info(f"🎮 Command prefix: {sys_cfg.command_prefix}")
         logger.info(f"🔊 Keepalive interval: {sys_cfg.keepalive_interval}s")

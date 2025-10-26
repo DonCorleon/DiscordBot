@@ -189,12 +189,49 @@ async def run_server(host: str = "0.0.0.0", port: int = 8000, reload: bool = Fal
         port: Port to listen on
         reload: Enable auto-reload on code changes (development only)
     """
+    # Configure Uvicorn to use our logging format
+    # Get the root logger's handler format
+    root_logger = logging.getLogger("discordbot")
+    if root_logger.handlers:
+        formatter = root_logger.handlers[0].formatter
+
+        # Apply our format to uvicorn loggers with friendly names
+        # Map uvicorn's internal logger names to friendlier display names
+        uvicorn_loggers = {
+            "uvicorn.error": "discordbot.web.server",  # Server lifecycle events
+            "uvicorn.access": "discordbot.web.access",  # HTTP/WebSocket access logs
+            "uvicorn": "discordbot.web.uvicorn"  # General uvicorn messages
+        }
+
+        for uvicorn_name, friendly_name in uvicorn_loggers.items():
+            uvicorn_logger = logging.getLogger(uvicorn_name)
+            uvicorn_logger.handlers.clear()
+
+            # Create a custom handler that remaps the logger name
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+
+            # Use a filter to change the logger name in the record
+            class LoggerNameFilter(logging.Filter):
+                def __init__(self, new_name):
+                    self.new_name = new_name
+
+                def filter(self, record):
+                    record.name = self.new_name
+                    return True
+
+            handler.addFilter(LoggerNameFilter(friendly_name))
+            uvicorn_logger.addHandler(handler)
+            uvicorn_logger.setLevel(root_logger.level)
+            uvicorn_logger.propagate = False
+
     config = uvicorn.Config(
         app,
         host=host,
         port=port,
         reload=reload,
-        log_level="info"
+        log_level="info",
+        log_config=None  # Disable uvicorn's default logging config
     )
     server = uvicorn.Server(config)
     await server.serve()
