@@ -870,36 +870,54 @@ def process_voice_minute_tick(
     return activity_stats
 
 
-def format_voice_time_ranges(minutes: int) -> str:
+def format_voice_time_ranges(
+    minutes: int,
+    level_1: int = 1,
+    level_2: int = 5,
+    level_3: int = 10,
+    level_4: int = 25,
+    level_5: int = 50,
+    level_6: int = 100,
+    level_7: int = 250,
+    level_8: int = 500
+) -> str:
     """
     Format voice time in ambiguous ranges.
 
     Args:
         minutes: Total minutes
+        level_1: Threshold in hours for level 1 (default: 1)
+        level_2: Threshold in hours for level 2 (default: 5)
+        level_3: Threshold in hours for level 3 (default: 10)
+        level_4: Threshold in hours for level 4 (default: 25)
+        level_5: Threshold in hours for level 5 (default: 50)
+        level_6: Threshold in hours for level 6 (default: 100)
+        level_7: Threshold in hours for level 7 (default: 250)
+        level_8: Threshold in hours for level 8 (default: 500)
 
     Returns:
         String representation of time range
     """
     hours = minutes / 60
 
-    if hours < 1:
-        return "< 1 hour"
-    elif hours < 5:
-        return "1-5 hours"
-    elif hours < 10:
-        return "5-10 hours"
-    elif hours < 25:
-        return "10-25 hours"
-    elif hours < 50:
-        return "25-50 hours"
-    elif hours < 100:
-        return "50-100 hours"
-    elif hours < 250:
-        return "100-250 hours"
-    elif hours < 500:
-        return "250-500 hours"
+    if hours < level_1:
+        return f"< {level_1} hour"
+    elif hours < level_2:
+        return f"{level_1}-{level_2} hours"
+    elif hours < level_3:
+        return f"{level_2}-{level_3} hours"
+    elif hours < level_4:
+        return f"{level_3}-{level_4} hours"
+    elif hours < level_5:
+        return f"{level_4}-{level_5} hours"
+    elif hours < level_6:
+        return f"{level_5}-{level_6} hours"
+    elif hours < level_7:
+        return f"{level_6}-{level_7} hours"
+    elif hours < level_8:
+        return f"{level_7}-{level_8} hours"
     else:
-        return "500+ hours"
+        return f"{level_8}+ hours"
 
 
 def format_voice_time_description(minutes: int) -> Tuple[str, str]:

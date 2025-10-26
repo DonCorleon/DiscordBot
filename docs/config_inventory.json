@@ -630,7 +630,7 @@
     "per_guild": true
   },
   {
-    "var_name": "voice_time_range_1h",
+    "var_name": "voice_time_level_1",
     "files_where_used": [
       "bot/core/stats/activity.py:886"
     ],
@@ -638,13 +638,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for first range bracket",
+    "description": "Voice time threshold in hours for level 1 (< 1 hour)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_5h",
+    "var_name": "voice_time_level_2",
     "files_where_used": [
       "bot/core/stats/activity.py:888"
     ],
@@ -652,13 +652,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 1-5 hours range",
+    "description": "Voice time threshold in hours for level 2 (1-5 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_10h",
+    "var_name": "voice_time_level_3",
     "files_where_used": [
       "bot/core/stats/activity.py:890"
     ],
@@ -666,13 +666,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 5-10 hours range",
+    "description": "Voice time threshold in hours for level 3 (5-10 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_25h",
+    "var_name": "voice_time_level_4",
     "files_where_used": [
       "bot/core/stats/activity.py:892"
     ],
@@ -680,13 +680,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 10-25 hours range",
+    "description": "Voice time threshold in hours for level 4 (10-25 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_50h",
+    "var_name": "voice_time_level_5",
     "files_where_used": [
       "bot/core/stats/activity.py:894"
     ],
@@ -694,13 +694,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 25-50 hours range",
+    "description": "Voice time threshold in hours for level 5 (25-50 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_100h",
+    "var_name": "voice_time_level_6",
     "files_where_used": [
       "bot/core/stats/activity.py:896"
     ],
@@ -708,13 +708,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 50-100 hours range",
+    "description": "Voice time threshold in hours for level 6 (50-100 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_250h",
+    "var_name": "voice_time_level_7",
     "files_where_used": [
       "bot/core/stats/activity.py:898"
     ],
@@ -722,13 +722,13 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 100-250 hours range",
+    "description": "Voice time threshold in hours for level 7 (100-250 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
-    "var_name": "voice_time_range_500h",
+    "var_name": "voice_time_level_8",
     "files_where_used": [
       "bot/core/stats/activity.py:900"
     ],
@@ -736,10 +736,10 @@
     "value_type": "int",
     "suggested_category": "Voice/Stats",
     "new_existing": false,
-    "description": "Voice time hours threshold for 250-500 hours range",
+    "description": "Voice time threshold in hours for level 8 (250-500 hours)",
     "cog_name": "Activity",
     "per_guild": true,
-    "_notes": "these should probably be renamed to levels rather than hours"
+    "_notes": ""
   },
   {
     "var_name": "voice_tier_lurker",

@@ -55,6 +55,79 @@ class ActivityConfig(ConfigBase):
         choices=["total", "unmuted", "speaking"]
     )
 
+    # Voice Time Level Thresholds (for range display)
+    voice_time_level_1: int = config_field(
+        default=1,
+        description="Voice time threshold in hours for level 1 (< 1 hour)",
+        category="Stats",
+        guild_override=True,
+        min_value=0,
+        max_value=1000
+    )
+
+    voice_time_level_2: int = config_field(
+        default=5,
+        description="Voice time threshold in hours for level 2 (1-5 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
+    voice_time_level_3: int = config_field(
+        default=10,
+        description="Voice time threshold in hours for level 3 (5-10 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
+    voice_time_level_4: int = config_field(
+        default=25,
+        description="Voice time threshold in hours for level 4 (10-25 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
+    voice_time_level_5: int = config_field(
+        default=50,
+        description="Voice time threshold in hours for level 5 (25-50 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
+    voice_time_level_6: int = config_field(
+        default=100,
+        description="Voice time threshold in hours for level 6 (50-100 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
+    voice_time_level_7: int = config_field(
+        default=250,
+        description="Voice time threshold in hours for level 7 (100-250 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
+    voice_time_level_8: int = config_field(
+        default=500,
+        description="Voice time threshold in hours for level 8 (250-500 hours)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=1000
+    )
+
     # Weekly Recap Settings
     enable_weekly_recap: bool = config_field(
         default=False,
