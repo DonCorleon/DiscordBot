@@ -254,6 +254,190 @@ class ActivityConfig(ConfigBase):
         max_value=50
     )
 
+    voice_activity_bar_chart_length: int = config_field(
+        default=20,
+        description="Character length for voice activity bar charts",
+        category="Stats",
+        guild_override=True,
+        min_value=5,
+        max_value=50
+    )
+
+    # Activity Tier Thresholds
+    activity_tier_diamond: int = config_field(
+        default=1000,
+        description="Activity score threshold for Diamond tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    activity_tier_gold: int = config_field(
+        default=500,
+        description="Activity score threshold for Gold tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    activity_tier_silver: int = config_field(
+        default=250,
+        description="Activity score threshold for Silver tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    activity_tier_bronze: int = config_field(
+        default=100,
+        description="Activity score threshold for Bronze tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    activity_tier_contributor: int = config_field(
+        default=25,
+        description="Activity score threshold for Contributor tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    # Voice Time Tier Thresholds
+    voice_tier_lurker: int = config_field(
+        default=1,
+        description="Voice hours threshold for Lurker tier",
+        category="Stats",
+        guild_override=True,
+        min_value=0,
+        max_value=10000
+    )
+
+    voice_tier_listener: int = config_field(
+        default=10,
+        description="Voice hours threshold for Listener tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=10000
+    )
+
+    voice_tier_regular: int = config_field(
+        default=50,
+        description="Voice hours threshold for Regular tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=10000
+    )
+
+    voice_tier_active: int = config_field(
+        default=100,
+        description="Voice hours threshold for Active Member tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=10000
+    )
+
+    voice_tier_champion: int = config_field(
+        default=250,
+        description="Voice hours threshold for Voice Champion tier",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=10000
+    )
+
+    # Progress Milestones for mystats command
+    # Note: These are shown sequentially - user progresses through them in order
+    mystats_milestone_1: int = config_field(
+        default=10,
+        description="First trigger milestone (10 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_2: int = config_field(
+        default=25,
+        description="Second trigger milestone (25 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_3: int = config_field(
+        default=50,
+        description="Third trigger milestone (50 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_4: int = config_field(
+        default=100,
+        description="Fourth trigger milestone (100 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_5: int = config_field(
+        default=250,
+        description="Fifth trigger milestone (250 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_6: int = config_field(
+        default=500,
+        description="Sixth trigger milestone (500 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_7: int = config_field(
+        default=1000,
+        description="Seventh trigger milestone (1000 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_8: int = config_field(
+        default=2500,
+        description="Eighth trigger milestone (2500 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
+    mystats_milestone_9: int = config_field(
+        default=5000,
+        description="Ninth trigger milestone (5000 triggers)",
+        category="Stats",
+        guild_override=True,
+        min_value=1,
+        max_value=100000
+    )
+
 
 class ActivityTracker(BaseCog):
     """Track user activity across messages, reactions, and replies."""

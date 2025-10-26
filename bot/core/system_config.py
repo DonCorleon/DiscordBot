@@ -67,6 +67,28 @@ class SystemConfig(ConfigBase):
         requires_restart=True
     )
 
+    log_rotation_interval: int = config_field(
+        default=1,
+        description="Days between log file rotation (midnight rotation)",
+        category="Admin/System",
+        guild_override=False,
+        admin_only=True,
+        requires_restart=True,
+        min_value=1,
+        max_value=30
+    )
+
+    log_backup_count: int = config_field(
+        default=7,
+        description="Number of daily log backup files to retain",
+        category="Admin/System",
+        guild_override=False,
+        admin_only=True,
+        requires_restart=True,
+        min_value=1,
+        max_value=365
+    )
+
     admin_data_dir: str = config_field(
         default="data/admin",
         description="Directory for admin dashboard data",
