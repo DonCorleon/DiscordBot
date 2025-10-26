@@ -14,15 +14,30 @@ Design decisions:
 
 import json
 import logging
+import ipaddress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 logger = logging.getLogger("discordbot.config_system")
 
 # Config file paths
 BASE_CONFIG_FILE = Path("data/config/base_config.json")
 GUILDS_CONFIG_DIR = Path("data/config/guilds")
+
+
+def validate_ip_address(value: str) -> Tuple[bool, str]:
+    """
+    Validate IP address format (IPv4 or IPv6).
+
+    Returns:
+        (is_valid, error_message)
+    """
+    try:
+        ipaddress.ip_address(value)
+        return True, ""
+    except ValueError as e:
+        return False, f"Invalid IP address: {e}"
 
 
 @dataclass
@@ -42,6 +57,7 @@ class ConfigField:
         min_value: Minimum value (for numeric types)
         max_value: Maximum value (for numeric types)
         choices: List of valid choices (for enums)
+        validator: Custom validation function (value -> (bool, error_msg))
     """
     name: str
     type: Type
@@ -54,6 +70,7 @@ class ConfigField:
     min_value: Optional[Union[int, float]] = None
     max_value: Optional[Union[int, float]] = None
     choices: Optional[List[Any]] = None
+    validator: Optional[Callable[[Any], Tuple[bool, str]]] = None
 
     def validate(self, value: Any) -> Tuple[bool, Optional[str]]:
         """
@@ -80,6 +97,12 @@ class ConfigField:
         # Choice validation
         if self.choices is not None and value not in self.choices:
             return False, f"Value {value} not in valid choices: {self.choices}"
+
+        # Custom validator
+        if self.validator is not None:
+            is_valid, error_msg = self.validator(value)
+            if not is_valid:
+                return False, error_msg
 
         return True, None
 

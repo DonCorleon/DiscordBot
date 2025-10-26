@@ -19,10 +19,6 @@ class BotConfig:
     token: str
     command_prefix: str | list[str] = "~"
 
-    # Admin Interface Configuration
-    # Set to False for headless servers (no pygame dashboard)
-    enable_admin_dashboard: bool = True
-
     # Monitoring Configuration
     max_history: int = 1000
     health_collection_interval: int = 5
@@ -76,6 +72,33 @@ class BotConfig:
     web_port: int = 8000  # Port for web dashboard
     web_reload: bool = False  # Auto-reload on code changes (development only)
 
+    # TTS Configuration (per-guild configurable)
+    tts_default_volume: float = 1.5  # Default TTS playback volume
+    tts_default_rate: int = 150  # Default TTS speech rate (words per minute)
+    tts_max_text_length: int = 500  # Maximum text length for TTS
+
+    # Edge TTS Configuration (per-guild configurable)
+    edge_tts_default_volume: float = 1.5  # Default Edge TTS volume
+    edge_tts_default_voice: str = "en-US-AriaNeural"  # Default Edge TTS voice
+
+    # Audio Playback Configuration
+    sound_playback_timeout: float = 30.0  # Max seconds to wait for sound playback
+    sound_queue_warning_size: int = 50  # Queue size threshold for warnings
+
+    # Activity Points Configuration (per-guild configurable)
+    activity_base_message_points_min: float = 0.8  # Min points for a message
+    activity_base_message_points_max: float = 1.2  # Max points for a message
+    activity_link_bonus_points: float = 2.0  # Bonus points for message with link
+    activity_attachment_bonus_points: float = 2.0  # Bonus points for attachment
+    activity_reaction_points: float = 1.0  # Points for reactions
+    activity_reply_points: float = 1.0  # Points for replies
+
+    # Leaderboard Configuration (per-guild configurable)
+    leaderboard_default_limit: int = 10  # Default number of leaderboard entries
+    user_stats_channel_breakdown_limit: int = 5  # Channel breakdown limit in user stats
+    user_stats_triggers_limit: int = 5  # Top triggers limit in user stats
+    leaderboard_bar_chart_length: int = 15  # Bar chart length in leaderboard
+
     @classmethod
     def from_env(cls):
         """Create config from environment variables."""
@@ -90,7 +113,6 @@ class BotConfig:
         return cls(
             token=os.getenv("DISCORD_TOKEN"),
             command_prefix=command_prefix,
-            enable_admin_dashboard=os.getenv("ENABLE_ADMIN_DASHBOARD", "true").lower() == "true",
             max_history=int(os.getenv("MAX_HISTORY", "1000")),
             health_collection_interval=int(os.getenv("HEALTH_COLLECTION_INTERVAL", "5")),
             data_export_interval=int(os.getenv("DATA_EXPORT_INTERVAL", "10")),
@@ -125,6 +147,28 @@ class BotConfig:
             web_host=os.getenv("WEB_HOST", "0.0.0.0"),
             web_port=int(os.getenv("WEB_PORT", "8000")),
             web_reload=os.getenv("WEB_RELOAD", "false").lower() == "true",
+            # TTS settings
+            tts_default_volume=float(os.getenv("TTS_DEFAULT_VOLUME", "1.5")),
+            tts_default_rate=int(os.getenv("TTS_DEFAULT_RATE", "150")),
+            tts_max_text_length=int(os.getenv("TTS_MAX_TEXT_LENGTH", "500")),
+            # Edge TTS settings
+            edge_tts_default_volume=float(os.getenv("EDGE_TTS_DEFAULT_VOLUME", "1.5")),
+            edge_tts_default_voice=os.getenv("EDGE_TTS_DEFAULT_VOICE", "en-US-AriaNeural"),
+            # Audio playback settings
+            sound_playback_timeout=float(os.getenv("SOUND_PLAYBACK_TIMEOUT", "30.0")),
+            sound_queue_warning_size=int(os.getenv("SOUND_QUEUE_WARNING_SIZE", "50")),
+            # Activity points settings
+            activity_base_message_points_min=float(os.getenv("ACTIVITY_BASE_MESSAGE_POINTS_MIN", "0.8")),
+            activity_base_message_points_max=float(os.getenv("ACTIVITY_BASE_MESSAGE_POINTS_MAX", "1.2")),
+            activity_link_bonus_points=float(os.getenv("ACTIVITY_LINK_BONUS_POINTS", "2.0")),
+            activity_attachment_bonus_points=float(os.getenv("ACTIVITY_ATTACHMENT_BONUS_POINTS", "2.0")),
+            activity_reaction_points=float(os.getenv("ACTIVITY_REACTION_POINTS", "1.0")),
+            activity_reply_points=float(os.getenv("ACTIVITY_REPLY_POINTS", "1.0")),
+            # Leaderboard settings
+            leaderboard_default_limit=int(os.getenv("LEADERBOARD_DEFAULT_LIMIT", "10")),
+            user_stats_channel_breakdown_limit=int(os.getenv("USER_STATS_CHANNEL_BREAKDOWN_LIMIT", "5")),
+            user_stats_triggers_limit=int(os.getenv("USER_STATS_TRIGGERS_LIMIT", "5")),
+            leaderboard_bar_chart_length=int(os.getenv("LEADERBOARD_BAR_CHART_LENGTH", "15")),
         )
 
     def display(self):
@@ -135,10 +179,9 @@ class BotConfig:
 Bot Configuration:
 ==================
 Command Prefix: {prefix_display}
-Admin Dashboard: {'Enabled' if self.enable_admin_dashboard else 'Disabled (Headless Mode)'}
 Max History: {self.max_history} entries
 Health Collection: Every {self.health_collection_interval}s
-Data Export: {'Every ' + str(self.data_export_interval) + 's' if self.enable_admin_dashboard else 'Disabled'}
+Data Export: Every {self.data_export_interval}s
 Default Volume: {self.default_volume}
 Audio Ducking: {'Enabled' if self.ducking_enabled else 'Disabled'} (Level: {int(self.ducking_level * 100)}%)
 Log Level: {self.log_level}

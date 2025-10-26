@@ -1,7 +1,7 @@
 # utils/admin_data_collector.py
 """
-Data collector for admin monitoring interface.
-Collects and stores metrics, logs, health data, and user info for pygame admin panel.
+Data collector for admin monitoring and web dashboard.
+Collects and stores metrics, logs, health data, and user info for real-time monitoring.
 VERSION 3: Uses user_id as primary key to prevent duplicates from name changes.
 """
 

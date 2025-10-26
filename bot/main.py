@@ -119,7 +119,7 @@ bot.start_time = datetime.now(UTC)
 data_collector = initialize_data_collector(
     bot,
     max_history=config.max_history,
-    enable_export=config.enable_admin_dashboard
+    enable_export=True  # Always enable export for web dashboard and debugging
 )
 
 
@@ -217,17 +217,11 @@ async def on_ready():
     # Start data collection
     await data_collector.start()
 
-    # Initialize guild config manager (always available)
-    from bot.core.guild_config_manager import GuildConfigManager
-    guild_config_mgr = GuildConfigManager(config)
-    bot.guild_config = guild_config_mgr  # Make accessible to cogs
-    logger.info("⚙️ Guild configuration manager initialized")
-
-    # Initialize new config system BEFORE loading cogs (Phase 2)
+    # Initialize unified config system BEFORE loading cogs
     from bot.core.config_system import ConfigManager
     config_manager = ConfigManager()
     bot.config_manager = config_manager  # Make accessible to cogs
-    logger.info("⚙️  New configuration system initialized")
+    logger.info("⚙️ Unified configuration system initialized")
 
     # Load cogs from new structure (cogs can now register schemas)
     cog_domains = ["activity", "audio", "admin", "utility"]
@@ -275,16 +269,14 @@ async def on_ready():
             from web.app import set_bot_instance
             from web.routes.config import (
                 set_config_manager,
-                set_guild_config_manager,
                 set_bot_instance as set_config_bot
             )
 
             data_collector.websocket_manager = manager
             set_bot_instance(bot)
 
-            # Register config managers and bot instance with web API
-            set_config_manager(config_manager)  # New config system (Phase 1)
-            set_guild_config_manager(guild_config_mgr)  # Old system (will be deprecated)
+            # Register config manager and bot instance with web API
+            set_config_manager(config_manager)  # Unified config system
             set_config_bot(bot)  # Register bot with config routes for guilds list
 
             logger.info("🌐 Web dashboard connected to data collector")

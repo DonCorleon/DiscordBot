@@ -11,12 +11,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 python bot/main.py
 ```
 
-**Running admin dashboard:**
-```bash
-python bot/ui/dashboard_full.py      # Full dashboard with all features
-python bot/ui/dashboard_minimal.py   # Lightweight version
-```
-
 **Installing dependencies:**
 ```bash
 uv sync                            # Using uv package manager

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from bot.base_cog import BaseCog, logger
 from bot.core.config_base import ConfigBase, config_field
+from bot.core.config_system import validate_ip_address
 from bot.core.errors import handle_errors, ErrorCategory, UserFeedback
 from bot.core.admin.data_collector import get_data_collector
 from bot.core.admin.manager import is_admin
@@ -116,15 +117,6 @@ class SystemConfig(ConfigBase):
     )
 
     # Feature Flags
-    enable_admin_dashboard: bool = config_field(
-        default=True,
-        description="Enable pygame admin dashboard (disable for headless servers)",
-        category="Admin",
-        guild_override=False,
-        admin_only=True,
-        requires_restart=True
-    )
-
     enable_auto_disconnect: bool = config_field(
         default=True,
         description="Enable auto-disconnect from empty voice channels",
@@ -158,7 +150,8 @@ class SystemConfig(ConfigBase):
         category="Admin",
         guild_override=False,
         admin_only=True,
-        requires_restart=True
+        requires_restart=True,
+        validator=validate_ip_address
     )
 
     web_port: int = config_field(

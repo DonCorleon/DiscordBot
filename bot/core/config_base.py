@@ -18,7 +18,7 @@ Example usage:
 """
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 
 def config_field(
@@ -31,6 +31,7 @@ def config_field(
     min_value: Optional[Union[int, float]] = None,
     max_value: Optional[Union[int, float]] = None,
     choices: Optional[List[Any]] = None,
+    validator: Optional[Callable[[Any], Tuple[bool, str]]] = None,
 ) -> Any:
     """
     Helper function to define a config field with metadata.
@@ -48,6 +49,7 @@ def config_field(
         min_value: Minimum value (for numeric types)
         max_value: Maximum value (for numeric types)
         choices: List of valid choices (for enum-like fields)
+        validator: Custom validation function (value -> (bool, error_msg))
 
     Returns:
         A dataclass field with metadata attached
@@ -73,6 +75,7 @@ def config_field(
         "min_value": min_value,
         "max_value": max_value,
         "choices": choices,
+        "validator": validator,
     }
 
     return field(default=default, metadata=metadata)
