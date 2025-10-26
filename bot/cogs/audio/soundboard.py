@@ -401,21 +401,24 @@ class SoundUploadModal(discord.ui.Modal, title="Upload Sound"):
         self.guild_id = guild_id
         self.attachment = attachment
 
-        self.title_input = discord.ui.TextInput(label="Title", required=True, max_length=100)
+        # Get config limits
+        cfg = cog.bot.config_manager.for_guild("Soundboard", guild_id)
+
+        self.title_input = discord.ui.TextInput(label="Title", required=True, max_length=cfg.sound_title_max_length)
         self.add_item(self.title_input)
 
         self.description_input = discord.ui.TextInput(
-            label="Description", style=discord.TextStyle.paragraph, required=False, max_length=500
+            label="Description", style=discord.TextStyle.paragraph, required=False, max_length=cfg.sound_description_max_length
         )
         self.add_item(self.description_input)
 
         self.triggers_input = discord.ui.TextInput(
-            label="Triggers (comma separated)", placeholder="e.g., hello, hi, hey", required=True, max_length=500
+            label="Triggers (comma separated)", placeholder="e.g., hello, hi, hey", required=True, max_length=cfg.sound_triggers_max_length
         )
         self.add_item(self.triggers_input)
 
         self.flags_input = discord.ui.TextInput(
-            label="Flags (optional)", placeholder="private, disabled", required=False, max_length=100
+            label="Flags (optional)", placeholder="private, disabled", required=False, max_length=cfg.sound_flags_max_length
         )
         self.add_item(self.flags_input)
 
@@ -464,7 +467,8 @@ class SoundUploadModal(discord.ui.Modal, title="Upload Sound"):
 
 class SoundUploadView(View):
     def __init__(self, cog, guild_id: str, attachment: discord.Attachment):
-        super().__init__(timeout=180)
+        cfg = cog.bot.config_manager.for_guild("Soundboard", guild_id)
+        super().__init__(timeout=cfg.sound_upload_modal_timeout)
         self.cog = cog
         self.guild_id = guild_id
         self.attachment = attachment
@@ -476,7 +480,11 @@ class SoundUploadView(View):
 
 class SoundEditView(View):
     def __init__(self, cog, sound_key: str, sound: SoundEntry, message: discord.Message = None):
-        super().__init__(timeout=300)
+        # Get config for timeout
+        sound_entry = cog.soundboard.sounds.get(sound_key)
+        guild_id = sound_entry.guild_id if sound_entry else None
+        cfg = cog.bot.config_manager.for_guild("Soundboard", guild_id)
+        super().__init__(timeout=cfg.sound_edit_modal_timeout)
         self.cog = cog
         self.sound_key = sound_key
         self.sound = sound
@@ -661,11 +669,14 @@ class TriggersModal(discord.ui.Modal, title="Edit Triggers"):
         self.sound = sound
         self.parent_view = parent_view
 
+        # Get config limits
+        cfg = cog.bot.config_manager.for_guild("Soundboard", sound.guild_id)
+
         self.triggers_input = discord.ui.TextInput(
             label="Triggers (comma-separated)",
             default=", ".join(sound.triggers),
             style=discord.TextStyle.short,
-            max_length=500,
+            max_length=cfg.sound_triggers_max_length,
             required=True
         )
         self.add_item(self.triggers_input)
@@ -709,11 +720,14 @@ class DescriptionModal(discord.ui.Modal, title="Edit Description"):
         self.sound = sound
         self.parent_view = parent_view
 
+        # Get config limits
+        cfg = cog.bot.config_manager.for_guild("Soundboard", sound.guild_id)
+
         self.description_input = discord.ui.TextInput(
             label="Description",
             default=sound.description,
             style=discord.TextStyle.paragraph,
-            max_length=1000,
+            max_length=cfg.sound_description_edit_max_length,
             required=False
         )
         self.add_item(self.description_input)
@@ -751,15 +765,20 @@ class VolumeModal(discord.ui.Modal, title="Edit Volume"):
         self.sound = sound
         self.parent_view = parent_view
 
+        # Get config limits
+        cfg = cog.bot.config_manager.for_guild("Soundboard", sound.guild_id)
+        self.volume_min = cfg.sound_volume_min
+        self.volume_max = cfg.sound_volume_max
+
         # Convert current volume to percentage for display
         current_percent = int(sound.audio_metadata.volume_adjust * 100)
 
         self.volume_input = discord.ui.TextInput(
-            label="Volume (0 to 200)",
+            label=f"Volume ({self.volume_min} to {self.volume_max})",
             default=str(current_percent),
             style=discord.TextStyle.short,
             placeholder="100 = normal, 50 = half, 200 = double",
-            max_length=3,
+            max_length=cfg.sound_volume_input_max_length,
             required=True
         )
         self.add_item(self.volume_input)
@@ -774,8 +793,8 @@ class VolumeModal(discord.ui.Modal, title="Edit Volume"):
             except ValueError:
                 return await interaction.response.send_message("❌ Volume must be a whole number!", ephemeral=True)
 
-            if volume_percent < 0 or volume_percent > 200:
-                return await interaction.response.send_message("❌ Volume must be between 0 and 200!", ephemeral=True)
+            if volume_percent < self.volume_min or volume_percent > self.volume_max:
+                return await interaction.response.send_message(f"❌ Volume must be between {self.volume_min} and {self.volume_max}!", ephemeral=True)
 
             # Convert percentage to decimal (50 -> 0.5, 100 -> 1.0, 200 -> 2.0)
             volume_decimal = volume_percent / 100.0
@@ -813,12 +832,14 @@ class VolumeModal(discord.ui.Modal, title="Edit Volume"):
 
 class SoundboardView(View):
     def __init__(self, cog, guild_id: str, sounds: dict[str, SoundEntry], page: int = 0):
-        super().__init__(timeout=300)
+        # Get config for timeout and pagination
+        cfg = cog.bot.config_manager.for_guild("Soundboard", guild_id)
+        super().__init__(timeout=cfg.sound_browser_timeout)
         self.cog = cog
         self.guild_id = guild_id
         self.sounds = sounds
         self.page = page
-        self.sounds_per_page = 10
+        self.sounds_per_page = cfg.soundboard_pagination_size
         self._update_buttons()
 
     def _get_page_sounds(self):
@@ -833,10 +854,14 @@ class SoundboardView(View):
 
         page_sounds = self._get_page_sounds()
         if page_sounds:
+            # Get config for trigger truncation
+            cfg = self.cog.bot.config_manager.for_guild("Soundboard", self.guild_id)
+            truncate_at = cfg.sound_select_truncate_triggers
+
             options = []
             for key, sound in page_sounds:
-                triggers_text = ", ".join(sound.triggers[:3])
-                if len(sound.triggers) > 3:
+                triggers_text = ", ".join(sound.triggers[:truncate_at])
+                if len(sound.triggers) > truncate_at:
                     triggers_text += "..."
 
                 options.append(discord.SelectOption(
