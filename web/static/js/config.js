@@ -204,7 +204,7 @@ function renderSetting(key, setting) {
 }
 
 function renderGuildSetting(key, settingData, guildId) {
-    const { value, is_override, global_default } = settingData;
+    const { value, is_override, global_default, type, description, min, max, choices } = settingData;
 
     const overrideBadge = is_override
         ? '<span class="guild-override-badge">✏️</span>'
@@ -215,7 +215,7 @@ function renderGuildSetting(key, settingData, guildId) {
         : '';
 
     // Build tooltip
-    let tooltip = key.replace(/_/g, ' ');
+    let tooltip = description || key.replace(/_/g, ' ');
     tooltip += `\nCurrent: ${value}`;
     if (!is_override) {
         tooltip += '\nUsing global default';
@@ -223,12 +223,17 @@ function renderGuildSetting(key, settingData, guildId) {
         tooltip += `\nGlobal default: ${global_default}`;
         tooltip += '\n✏️ = Guild override';
     }
+    if (choices) tooltip += `\nChoices: ${choices.join(', ')}`;
+    if (min !== null && min !== undefined) tooltip += `\nMin: ${min}`;
+    if (max !== null && max !== undefined) tooltip += `\nMax: ${max}`;
 
-    // Create a pseudo-setting object for renderControl
+    // Create a full setting object with all metadata for renderControl
     const setting = {
-        type: typeof value === 'boolean' ? 'bool' :
-              typeof value === 'number' ? (Number.isInteger(value) ? 'int' : 'float') : 'str',
-        value: value
+        type: type,
+        value: value,
+        choices: choices,
+        min: min,
+        max: max
     };
 
     const control = renderControl(key, setting);
@@ -252,7 +257,7 @@ function renderGuildSetting(key, settingData, guildId) {
 function renderControl(key, setting) {
     const value = setting.value;
 
-    if (setting.type === 'bool') {
+    if (setting.type === 'boolean' || setting.type === 'bool') {
         return `<input type="checkbox" data-key="${escapeHtml(key)}" ${value ? 'checked' : ''}>`;
     }
 
@@ -268,15 +273,15 @@ function renderControl(key, setting) {
         `;
     }
 
-    if (setting.type === 'int' || setting.type === 'float') {
-        const step = setting.type === 'float' ? '0.1' : '1';
+    if (setting.type === 'number' || setting.type === 'int' || setting.type === 'float') {
+        const step = (setting.type === 'float' || (setting.type === 'number' && !Number.isInteger(value))) ? '0.1' : '1';
         return `
             <input type="number"
                    data-key="${escapeHtml(key)}"
                    value="${value}"
                    step="${step}"
-                   ${setting.min !== null ? `min="${setting.min}"` : ''}
-                   ${setting.max !== null ? `max="${setting.max}"` : ''}>
+                   ${setting.min !== null && setting.min !== undefined ? `min="${setting.min}"` : ''}
+                   ${setting.max !== null && setting.max !== undefined ? `max="${setting.max}"` : ''}>
         `;
     }
 
