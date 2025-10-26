@@ -92,7 +92,7 @@ class SoundboardConfig(ConfigBase):
     soundboard_pagination_size: int = config_field(
         default=10,
         description="Number of sounds shown per page in soundboard browser",
-        category="UI",
+        category="WebUI",
         guild_override=True,
         min_value=5,
         max_value=25
@@ -101,7 +101,7 @@ class SoundboardConfig(ConfigBase):
     sound_upload_modal_timeout: int = config_field(
         default=180,
         description="Seconds before sound upload modal times out",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=60,
@@ -111,7 +111,7 @@ class SoundboardConfig(ConfigBase):
     sound_edit_modal_timeout: int = config_field(
         default=300,
         description="Seconds before sound edit modal times out",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=60,
@@ -121,7 +121,7 @@ class SoundboardConfig(ConfigBase):
     sound_browser_timeout: int = config_field(
         default=300,
         description="Seconds before soundboard browser UI times out",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=60,
@@ -132,7 +132,7 @@ class SoundboardConfig(ConfigBase):
     sound_volume_min: int = config_field(
         default=0,
         description="Minimum volume percentage for sounds (0%)",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=0,
@@ -142,7 +142,7 @@ class SoundboardConfig(ConfigBase):
     sound_volume_max: int = config_field(
         default=200,
         description="Maximum volume percentage for sounds (200%)",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -152,7 +152,7 @@ class SoundboardConfig(ConfigBase):
     sound_title_max_length: int = config_field(
         default=100,
         description="Maximum characters for sound title",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=20,
@@ -162,7 +162,7 @@ class SoundboardConfig(ConfigBase):
     sound_description_max_length: int = config_field(
         default=500,
         description="Maximum characters for sound description in upload modal",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -172,7 +172,7 @@ class SoundboardConfig(ConfigBase):
     sound_description_edit_max_length: int = config_field(
         default=1000,
         description="Maximum characters for sound description when editing",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -182,7 +182,7 @@ class SoundboardConfig(ConfigBase):
     sound_triggers_max_length: int = config_field(
         default=500,
         description="Maximum characters for trigger words list",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -192,7 +192,7 @@ class SoundboardConfig(ConfigBase):
     sound_flags_max_length: int = config_field(
         default=100,
         description="Maximum characters for sound flags input",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=50,
@@ -202,7 +202,7 @@ class SoundboardConfig(ConfigBase):
     sound_volume_input_max_length: int = config_field(
         default=3,
         description="Maximum characters for volume input field (0-200)",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=2,
@@ -212,7 +212,7 @@ class SoundboardConfig(ConfigBase):
     sound_select_truncate_triggers: int = config_field(
         default=3,
         description="Number of triggers to show in sound selection dropdown before truncating",
-        category="UI",
+        category="WebUI",
         guild_override=False,
         admin_only=True,
         min_value=1,

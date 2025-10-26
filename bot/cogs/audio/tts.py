@@ -27,7 +27,7 @@ class TTSConfig(ConfigBase):
     tts_default_volume: float = config_field(
         default=1.5,
         description="Default TTS playback volume (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
-        category="TTS",
+        category="TextToSpeech/PyTTS",
         guild_override=True,
         min_value=0.0,
         max_value=2.0
@@ -36,7 +36,7 @@ class TTSConfig(ConfigBase):
     tts_default_rate: int = config_field(
         default=150,
         description="Default TTS speech rate in words per minute",
-        category="TTS",
+        category="TextToSpeech/PyTTS",
         guild_override=True,
         min_value=50,
         max_value=400
@@ -45,7 +45,7 @@ class TTSConfig(ConfigBase):
     tts_max_text_length: int = config_field(
         default=500,
         description="Maximum text length for TTS messages (prevents spam)",
-        category="TTS",
+        category="TextToSpeech/PyTTS",
         guild_override=True,
         admin_only=True,
         min_value=50,
@@ -134,10 +134,10 @@ class TtsCog(BaseCog):
         if user_id_str in self.user_preferences:
             return self.user_preferences[user_id_str]
 
-        # Get default rate from guild config if available
+        # Get default rate from unified config manager
         default_rate = 150
-        if guild_id and hasattr(self.bot, 'guild_config'):
-            default_rate = self.bot.guild_config.get_guild_config(guild_id, "tts_default_rate")
+        if guild_id and hasattr(self.bot, 'config_manager'):
+            default_rate = self.bot.config_manager.get("TTS", "tts_default_rate", guild_id)
 
         return {"name": None, "gender": None, "country": None, "rate": default_rate}
 
@@ -254,12 +254,12 @@ class TtsCog(BaseCog):
             logger.error("VoiceSpeechCog not found!")
             return await UserFeedback.error(ctx, "Voice system not available!")
 
-        # Get guild config for volume and max text length
+        # Get guild config for volume and max text length from unified config manager
         volume = 1.5  # default
         max_length = 500  # default
-        if hasattr(self.bot, 'guild_config'):
-            volume = self.bot.guild_config.get_guild_config(ctx.guild.id, "tts_default_volume")
-            max_length = self.bot.guild_config.get_guild_config(ctx.guild.id, "tts_max_text_length")
+        if hasattr(self.bot, 'config_manager'):
+            volume = self.bot.config_manager.get("TTS", "tts_default_volume", ctx.guild.id)
+            max_length = self.bot.config_manager.get("TTS", "tts_max_text_length", ctx.guild.id)
 
         chunks = self.split_text(text, max_length=max_length)
 

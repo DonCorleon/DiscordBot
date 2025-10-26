@@ -18,7 +18,7 @@ class EdgeTTSConfig(ConfigBase):
     edge_tts_default_volume: float = config_field(
         default=1.5,
         description="Default Edge TTS playback volume (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
-        category="TTS",
+        category="TextToSpeech/Edge",
         guild_override=True,
         min_value=0.0,
         max_value=2.0
@@ -27,7 +27,7 @@ class EdgeTTSConfig(ConfigBase):
     edge_tts_default_voice: str = config_field(
         default="en-US-AriaNeural",
         description="Default Edge TTS voice (e.g., en-US-AriaNeural, en-GB-RyanNeural)",
-        category="TTS",
+        category="TextToSpeech/Edge",
         guild_override=True,
         choices=[
             "en-US-AriaNeural",

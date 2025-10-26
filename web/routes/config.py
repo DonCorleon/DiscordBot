@@ -129,9 +129,22 @@ async def get_all_config():
                     "is_large_int": field_meta.is_large_int
                 }
 
+        # Count settings recursively in nested structure
+        def count_settings(obj):
+            count = 0
+            for key, value in obj.items():
+                if isinstance(value, dict):
+                    # Check if this is a setting (has 'key' field) or a category
+                    if 'key' in value:
+                        count += 1
+                    else:
+                        # It's a category, recurse
+                        count += count_settings(value)
+            return count
+
         return {
             "categories": categorized,
-            "total_settings": sum(len(settings) for settings in categorized.values())
+            "total_settings": count_settings(categorized)
         }
 
     except Exception as e:
