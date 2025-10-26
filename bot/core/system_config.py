@@ -117,6 +117,161 @@ class SystemConfig(ConfigBase):
         max_value=200
     )
 
+    # Monitoring Intervals and Thresholds
+    monitor_health_interval: int = config_field(
+        default=60,
+        description="Seconds between health monitoring checks (CPU/memory warnings)",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=30,
+        max_value=600
+    )
+
+    high_memory_threshold: int = config_field(
+        default=80,
+        description="Memory usage percentage threshold for warnings",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=50,
+        max_value=95
+    )
+
+    high_cpu_threshold: int = config_field(
+        default=80,
+        description="CPU usage percentage threshold for warnings",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=50,
+        max_value=95
+    )
+
+    large_queue_warning_size: int = config_field(
+        default=50,
+        description="Sound queue size threshold for warnings in health monitoring",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=10,
+        max_value=500
+    )
+
+    # Health Status Color Thresholds
+    health_color_warning_memory: int = config_field(
+        default=80,
+        description="Memory percentage threshold for red health status color",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=50,
+        max_value=95
+    )
+
+    health_color_warning_cpu: int = config_field(
+        default=80,
+        description="CPU percentage threshold for red health status color",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=50,
+        max_value=95
+    )
+
+    health_color_caution_memory: int = config_field(
+        default=60,
+        description="Memory percentage threshold for orange health status color",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=30,
+        max_value=80
+    )
+
+    health_color_caution_cpu: int = config_field(
+        default=60,
+        description="CPU percentage threshold for orange health status color",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=30,
+        max_value=80
+    )
+
+    # Log Display Settings
+    logs_chunk_char_limit: int = config_field(
+        default=1900,
+        description="Character limit per Discord embed for log chunks",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=500,
+        max_value=4000
+    )
+
+    log_message_truncate_length: int = config_field(
+        default=100,
+        description="Maximum characters to show per log message in logs command",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=50,
+        max_value=500
+    )
+
+    # Ping Status Thresholds
+    ping_excellent_threshold: int = config_field(
+        default=100,
+        description="Milliseconds threshold for 'Excellent' ping status",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=50,
+        max_value=200
+    )
+
+    ping_good_threshold: int = config_field(
+        default=200,
+        description="Milliseconds threshold for 'Good' ping status",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=100,
+        max_value=300
+    )
+
+    ping_fair_threshold: int = config_field(
+        default=300,
+        description="Milliseconds threshold for 'Fair' ping status",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=200,
+        max_value=500
+    )
+
+    # System Update Settings
+    update_git_output_truncate: int = config_field(
+        default=400,
+        description="Maximum characters to show from git pull output",
+        category="Admin/System",
+        guild_override=False,
+        admin_only=True,
+        min_value=100,
+        max_value=2000
+    )
+
+    update_shutdown_delay: int = config_field(
+        default=2,
+        description="Seconds to wait before shutting down after update",
+        category="Admin/System",
+        guild_override=False,
+        admin_only=True,
+        min_value=1,
+        max_value=10
+    )
+
     # Feature Flags
     enable_auto_disconnect: bool = config_field(
         default=True,

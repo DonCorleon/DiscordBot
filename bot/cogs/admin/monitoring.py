@@ -55,21 +55,24 @@ class MonitoringCog(BaseCog):
     async def monitor_health(self):
         """Monitor bot health and log warnings."""
         try:
+            # Get config thresholds
+            sys_cfg = self.bot.config_manager.for_guild("System")
+
             process = psutil.Process()
             memory_percent = process.memory_percent()
             cpu_percent = process.cpu_percent()
 
             # Log warnings if resources are high
-            if memory_percent > 80:
+            if memory_percent > sys_cfg.high_memory_threshold:
                 logger.warning(f"High memory usage: {memory_percent:.1f}%")
-            if cpu_percent > 80:
+            if cpu_percent > sys_cfg.high_cpu_threshold:
                 logger.warning(f"High CPU usage: {cpu_percent:.1f}%")
 
             # Check for stale connections
             voice_cog = self.bot.get_cog("VoiceSpeechCog")
             if voice_cog and hasattr(voice_cog, 'sound_queues'):
                 for guild_id, queue in voice_cog.sound_queues.items():
-                    if queue.qsize() > 50:
+                    if queue.qsize() > sys_cfg.large_queue_warning_size:
                         logger.warning(f"Large queue in guild {guild_id}: {queue.qsize()} items")
 
         except Exception as e:
@@ -170,9 +173,11 @@ class MonitoringCog(BaseCog):
 
     def _get_health_color(self, memory_percent: float, cpu_percent: float) -> discord.Color:
         """Determine embed color based on resource usage."""
-        if memory_percent > 80 or cpu_percent > 80:
+        sys_cfg = self.bot.config_manager.for_guild("System")
+
+        if memory_percent > sys_cfg.health_color_warning_memory or cpu_percent > sys_cfg.health_color_warning_cpu:
             return discord.Color.red()
-        elif memory_percent > 60 or cpu_percent > 60:
+        elif memory_percent > sys_cfg.health_color_caution_memory or cpu_percent > sys_cfg.health_color_caution_cpu:
             return discord.Color.orange()
         else:
             return discord.Color.green()
@@ -317,15 +322,16 @@ class MonitoringCog(BaseCog):
         }
 
         # Group logs into chunks to avoid message length limits
+        sys_cfg = self.bot.config_manager.for_guild("System")
         chunks = []
         current_chunk = []
         current_length = 0
 
         for entry in log_entries:
-            log_line = f"`{entry['timestamp']}` **[{entry['level']}]** {entry['message'][:100]}"
+            log_line = f"`{entry['timestamp']}` **[{entry['level']}]** {entry['message'][:sys_cfg.log_message_truncate_length]}"
             line_length = len(log_line)
 
-            if current_length + line_length > 1900:  # Discord limit ~2000 chars
+            if current_length + line_length > sys_cfg.logs_chunk_char_limit:
                 chunks.append(current_chunk)
                 current_chunk = [log_line]
                 current_length = line_length
@@ -433,16 +439,17 @@ class MonitoringCog(BaseCog):
     @commands.command(name="ping", help="Check bot latency")
     async def ping(self, ctx):
         """Simple ping command to check bot responsiveness."""
+        sys_cfg = self.bot.config_manager.for_guild("System")
         latency_ms = self.bot.latency * 1000
 
         # Determine color based on latency
-        if latency_ms < 100:
+        if latency_ms < sys_cfg.ping_excellent_threshold:
             color = discord.Color.green()
             status = "Excellent"
-        elif latency_ms < 200:
+        elif latency_ms < sys_cfg.ping_good_threshold:
             color = discord.Color.blue()
             status = "Good"
-        elif latency_ms < 300:
+        elif latency_ms < sys_cfg.ping_fair_threshold:
             color = discord.Color.orange()
             status = "Fair"
         else:
@@ -572,13 +579,14 @@ class MonitoringCog(BaseCog):
             else:
                 restart_info = "\n\n⚠️ **Manual restart required** - Bot will shut down now."
 
+            sys_cfg = self.bot.config_manager.for_guild("System")
             await status_msg.edit(embed=discord.Embed(
                 title="✅ Update Complete",
                 description=(
                     f"**Old commit:** `{old_commit}`\n"
                     f"**New commit:** `{new_commit}`\n"
                     f"**Branch:** `{current_branch}`\n"
-                    f"\n**Changes:**\n```{pull_output[:400]}```"
+                    f"\n**Changes:**\n```{pull_output[:sys_cfg.update_git_output_truncate]}```"
                     f"{restart_info}"
                 ),
                 color=discord.Color.green()
@@ -587,7 +595,7 @@ class MonitoringCog(BaseCog):
             logger.info(f"Bot updated from {old_commit} to {new_commit} by {ctx.author} (ID: {ctx.author.id})")
 
             # Give Discord time to send the message
-            await asyncio.sleep(2)
+            await asyncio.sleep(sys_cfg.update_shutdown_delay)
 
             # Shutdown (systemd will restart automatically)
             logger.info("Shutting down for update...")
