@@ -135,7 +135,8 @@ function displayConfiguration(categories) {
 }
 
 function renderCategories(categories, depth = 0) {
-    return Object.keys(categories).map(categoryName => {
+    // Sort category names alphabetically
+    return Object.keys(categories).sort().map(categoryName => {
         const categoryData = categories[categoryName];
 
         // Separate settings from subcategories
@@ -158,15 +159,18 @@ function renderCategories(categories, depth = 0) {
         const hasSettings = Object.keys(settings).length > 0;
         const hasSubcategories = Object.keys(subcategories).length > 0;
 
+        // Use category-group-header for depth 0 (main categories), category-header for subcategories
+        const headerClass = depth === 0 ? 'category-group-header' : 'category-header';
+
         if (hasSubcategories) {
             // Parent category with subcategories
             return `
                 <div class="category-group" style="margin-left: ${depth * 20}px;">
-                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
+                    <div class="${headerClass}">${escapeHtml(categoryName)}</div>
                     ${hasSettings ? `
                         <div class="category-section">
                             <div class="settings-grid">
-                                ${Object.keys(settings).map(key => {
+                                ${Object.keys(settings).sort().map(key => {
                                     return renderSetting(key, settings[key]);
                                 }).join('')}
                             </div>
@@ -178,12 +182,14 @@ function renderCategories(categories, depth = 0) {
         } else if (hasSettings) {
             // Leaf category with only settings
             return `
-                <div class="category-section" style="margin-left: ${depth * 20}px;">
-                    <div class="category-header">${escapeHtml(categoryName)}</div>
-                    <div class="settings-grid">
-                        ${Object.keys(settings).map(key => {
-                            return renderSetting(key, settings[key]);
-                        }).join('')}
+                <div class="category-group" style="margin-left: ${depth * 20}px;">
+                    <div class="${headerClass}">${escapeHtml(categoryName)}</div>
+                    <div class="category-section">
+                        <div class="settings-grid">
+                            ${Object.keys(settings).sort().map(key => {
+                                return renderSetting(key, settings[key]);
+                            }).join('')}
+                        </div>
                     </div>
                 </div>
             `;
@@ -201,7 +207,8 @@ function displayGuildConfiguration(categories, guildId) {
 }
 
 function renderGuildCategories(categories, guildId, depth = 0) {
-    return Object.keys(categories).map(categoryName => {
+    // Sort category names alphabetically
+    return Object.keys(categories).sort().map(categoryName => {
         const categoryData = categories[categoryName];
 
         // Separate settings from subcategories
@@ -224,15 +231,18 @@ function renderGuildCategories(categories, guildId, depth = 0) {
         const hasSettings = Object.keys(settings).length > 0;
         const hasSubcategories = Object.keys(subcategories).length > 0;
 
+        // Use category-group-header for depth 0 (main categories), category-header for subcategories
+        const headerClass = depth === 0 ? 'category-group-header' : 'category-header';
+
         if (hasSubcategories) {
             // Parent category with subcategories
             return `
                 <div class="category-group" style="margin-left: ${depth * 20}px;">
-                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
+                    <div class="${headerClass}">${escapeHtml(categoryName)}</div>
                     ${hasSettings ? `
                         <div class="category-section">
                             <div class="settings-grid">
-                                ${Object.keys(settings).map(key => {
+                                ${Object.keys(settings).sort().map(key => {
                                     return renderGuildSetting(key, settings[key], guildId);
                                 }).join('')}
                             </div>
@@ -244,12 +254,14 @@ function renderGuildCategories(categories, guildId, depth = 0) {
         } else if (hasSettings) {
             // Leaf category with only settings
             return `
-                <div class="category-section" style="margin-left: ${depth * 20}px;">
-                    <div class="category-header">${escapeHtml(categoryName)}</div>
-                    <div class="settings-grid">
-                        ${Object.keys(settings).map(key => {
-                            return renderGuildSetting(key, settings[key], guildId);
-                        }).join('')}
+                <div class="category-group" style="margin-left: ${depth * 20}px;">
+                    <div class="${headerClass}">${escapeHtml(categoryName)}</div>
+                    <div class="category-section">
+                        <div class="settings-grid">
+                            ${Object.keys(settings).sort().map(key => {
+                                return renderGuildSetting(key, settings[key], guildId);
+                            }).join('')}
+                        </div>
                     </div>
                 </div>
             `;
