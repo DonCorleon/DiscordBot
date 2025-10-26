@@ -99,12 +99,22 @@ class SystemConfig(ConfigBase):
 
     data_export_interval: int = config_field(
         default=10,
-        description="Seconds between data exports to disk",
+        description="Seconds between admin dashboard JSON exports (health, commands, errors, etc.)",
         category="Admin/Monitoring",
         guild_override=False,
         admin_only=True,
         min_value=5,
         max_value=300
+    )
+
+    logs_max_lines: int = config_field(
+        default=50,
+        description="Maximum log lines to display in Discord ~logs command (prevents spam)",
+        category="Admin/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=10,
+        max_value=200
     )
 
     # Feature Flags

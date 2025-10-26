@@ -291,9 +291,12 @@ class MonitoringCog(BaseCog):
         Usage: ~logs [level] [lines]
         Levels: all, info, warning, error, critical
         """
+        # Get max lines from config
+        sys_cfg = self.bot.config_manager.for_guild("System")
+        max_lines = sys_cfg.logs_max_lines
 
-        if lines > 50:
-            lines = 50  # Limit to prevent spam
+        if lines > max_lines:
+            lines = max_lines  # Limit to prevent spam
 
         if not self.data_collector:
             await UserFeedback.error(ctx, "Data collector not available.")

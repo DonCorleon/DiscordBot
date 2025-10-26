@@ -137,16 +137,17 @@
   {
     "var_name": "logs_max_lines",
     "files_where_used": [
-      "bot/cogs/admin/monitoring.py:469"
+      "bot/cogs/admin/monitoring.py:295-299",
+      "bot/core/system_config.py:110-118"
     ],
     "hardcoded_value": "50",
     "value_type": "int",
     "suggested_category": "Admin/Monitoring",
-    "new_existing": false,
-    "description": "Maximum number of log lines to return in logs command",
-    "cog_name": "Monitoring",
+    "new_existing": "existing",
+    "description": "Maximum log lines to display in Discord ~logs command (web interface has separate limits: 500 for /api/v1/logs/read, 100 for tail)",
+    "cog_name": "System",
     "per_guild": false,
-    "_notes": "? for the web interface?"
+    "_notes": ""
   },
   {
     "var_name": "logs_chunk_char_limit",
