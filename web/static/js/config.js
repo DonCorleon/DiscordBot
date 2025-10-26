@@ -138,33 +138,58 @@ function renderCategories(categories, depth = 0) {
     return Object.keys(categories).map(categoryName => {
         const categoryData = categories[categoryName];
 
-        // Check if this is a settings object (has setting keys) or a nested category
-        const isSettings = Object.keys(categoryData).some(key =>
-            categoryData[key] && typeof categoryData[key] === 'object' && categoryData[key].key
-        );
+        // Separate settings from subcategories
+        const settings = {};
+        const subcategories = {};
 
-        if (isSettings) {
-            // This is a leaf category with settings
+        for (const key in categoryData) {
+            const item = categoryData[key];
+            if (item && typeof item === 'object') {
+                // If it has a 'key' property, it's a setting
+                if (item.key) {
+                    settings[key] = item;
+                } else {
+                    // Otherwise it's a subcategory
+                    subcategories[key] = item;
+                }
+            }
+        }
+
+        const hasSettings = Object.keys(settings).length > 0;
+        const hasSubcategories = Object.keys(subcategories).length > 0;
+
+        if (hasSubcategories) {
+            // Parent category with subcategories
+            return `
+                <div class="category-group" style="margin-left: ${depth * 20}px;">
+                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
+                    ${hasSettings ? `
+                        <div class="category-section">
+                            <div class="settings-grid">
+                                ${Object.keys(settings).map(key => {
+                                    return renderSetting(key, settings[key]);
+                                }).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${renderCategories(subcategories, depth + 1)}
+                </div>
+            `;
+        } else if (hasSettings) {
+            // Leaf category with only settings
             return `
                 <div class="category-section" style="margin-left: ${depth * 20}px;">
                     <div class="category-header">${escapeHtml(categoryName)}</div>
                     <div class="settings-grid">
-                        ${Object.keys(categoryData).map(key => {
-                            const setting = categoryData[key];
-                            return renderSetting(key, setting);
+                        ${Object.keys(settings).map(key => {
+                            return renderSetting(key, settings[key]);
                         }).join('')}
                     </div>
                 </div>
             `;
-        } else {
-            // This is a parent category with subcategories
-            return `
-                <div class="category-group" style="margin-left: ${depth * 20}px;">
-                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
-                    ${renderCategories(categoryData, depth + 1)}
-                </div>
-            `;
         }
+
+        return '';
     }).join('');
 }
 
@@ -179,33 +204,58 @@ function renderGuildCategories(categories, guildId, depth = 0) {
     return Object.keys(categories).map(categoryName => {
         const categoryData = categories[categoryName];
 
-        // Check if this is a settings object (has setting keys) or a nested category
-        const isSettings = Object.keys(categoryData).some(key =>
-            categoryData[key] && typeof categoryData[key] === 'object' && categoryData[key].key
-        );
+        // Separate settings from subcategories
+        const settings = {};
+        const subcategories = {};
 
-        if (isSettings) {
-            // This is a leaf category with settings
+        for (const key in categoryData) {
+            const item = categoryData[key];
+            if (item && typeof item === 'object') {
+                // If it has a 'key' property, it's a setting
+                if (item.key) {
+                    settings[key] = item;
+                } else {
+                    // Otherwise it's a subcategory
+                    subcategories[key] = item;
+                }
+            }
+        }
+
+        const hasSettings = Object.keys(settings).length > 0;
+        const hasSubcategories = Object.keys(subcategories).length > 0;
+
+        if (hasSubcategories) {
+            // Parent category with subcategories
+            return `
+                <div class="category-group" style="margin-left: ${depth * 20}px;">
+                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
+                    ${hasSettings ? `
+                        <div class="category-section">
+                            <div class="settings-grid">
+                                ${Object.keys(settings).map(key => {
+                                    return renderGuildSetting(key, settings[key], guildId);
+                                }).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${renderGuildCategories(subcategories, guildId, depth + 1)}
+                </div>
+            `;
+        } else if (hasSettings) {
+            // Leaf category with only settings
             return `
                 <div class="category-section" style="margin-left: ${depth * 20}px;">
                     <div class="category-header">${escapeHtml(categoryName)}</div>
                     <div class="settings-grid">
-                        ${Object.keys(categoryData).map(key => {
-                            const setting = categoryData[key];
-                            return renderGuildSetting(key, setting, guildId);
+                        ${Object.keys(settings).map(key => {
+                            return renderGuildSetting(key, settings[key], guildId);
                         }).join('')}
                     </div>
                 </div>
             `;
-        } else {
-            // This is a parent category with subcategories
-            return `
-                <div class="category-group" style="margin-left: ${depth * 20}px;">
-                    <div class="category-group-header">${escapeHtml(categoryName)}</div>
-                    ${renderGuildCategories(categoryData, guildId, depth + 1)}
-                </div>
-            `;
         }
+
+        return '';
     }).join('');
 }
 
