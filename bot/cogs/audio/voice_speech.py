@@ -539,8 +539,8 @@ class VoiceSpeechCog(BaseCog):
     def _create_speech_listener(self, ctx):
         """Create a speech recognition listener with ducking support and error handling."""
         guild_id = ctx.guild.id
-        # Get the voice channel ID from the bot's voice client
-        voice_channel_id = ctx.guild.voice_client.channel.id if ctx.guild.voice_client else None
+        # Get the voice channel ID from the bot's voice client (as string for transcript session)
+        voice_channel_id = str(ctx.guild.voice_client.channel.id) if ctx.guild.voice_client else None
 
         def text_callback(user: discord.User, text: str):
             try:

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("discordbot.transcript_session")
 
 TRANSCRIPTS_DIR = Path("data/transcripts/sessions")
 
