@@ -12,6 +12,7 @@ from bot.base_cog import BaseCog, logger
 from bot.core.config_base import ConfigBase, config_field
 from bot.core.audio.sources import DuckedAudioSource
 from bot.core.errors import UserFeedback
+from bot.core.transcript_session import TranscriptSessionManager
 from bot.config import config
 
 
@@ -139,6 +140,10 @@ class VoiceSpeechCog(BaseCog):
         # Auto-disconnect timeout tasks
         self.disconnect_tasks = {}  # {guild_id: Task}
 
+        # Transcript session manager
+        self.transcript_manager = TranscriptSessionManager()
+        logger.info("Initialized TranscriptSessionManager")
+
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
                                     after: discord.VoiceState):
@@ -179,6 +184,16 @@ class VoiceSpeechCog(BaseCog):
                                 vc.listen(sink)
                                 self.active_sinks[guild_id] = sink
                                 logger.info(f"[{member.guild.name}] Auto-started listening in {after.channel.name}")
+
+                            # Start transcript session
+                            self.transcript_manager.start_session(
+                                channel_id=str(after.channel.id),
+                                guild_id=str(guild_id),
+                                guild_name=member.guild.name,
+                                channel_name=after.channel.name,
+                                first_user_id=str(member.id),
+                                first_username=member.display_name
+                            )
 
                             # Cancel any pending disconnect
                             if guild_id in self.disconnect_tasks:
@@ -242,10 +257,18 @@ class VoiceSpeechCog(BaseCog):
 
                         try:
                             if guild.voice_client:
+                                # Get channel ID before disconnecting
+                                channel_id = str(guild.voice_client.channel.id) if guild.voice_client.channel else None
+
                                 await guild.voice_client.disconnect()
                                 # Remove voice state (disconnected due to timeout)
                                 from bot.core.audio.voice_state import remove_voice_state
                                 remove_voice_state(guild_id)
+
+                                # End transcript session
+                                if channel_id:
+                                    self.transcript_manager.end_session(channel_id)
+
                                 logger.info(f"[{guild.name}] Disconnected after timeout")
                             else:
                                 logger.debug(f"[{guild.name}] Voice client already disconnected")
@@ -314,10 +337,15 @@ class VoiceSpeechCog(BaseCog):
             except:
                 pass
 
-        # Disconnect from voice
+        # End all transcript sessions and disconnect from voice
         for guild in self.bot.guilds:
             if guild.voice_client:
                 try:
+                    # End transcript session before disconnecting
+                    channel_id = str(guild.voice_client.channel.id) if guild.voice_client.channel else None
+                    if channel_id:
+                        self.transcript_manager.end_session(channel_id)
+
                     await guild.voice_client.disconnect()
                 except Exception as e:
                     logger.error(f"Error disconnecting from guild {guild.id}: {e}")
@@ -542,6 +570,15 @@ class VoiceSpeechCog(BaseCog):
                 data_collector = get_data_collector()
                 if data_collector:
                     data_collector.update_user_info(user)
+
+                # Add transcription to session
+                self.transcript_manager.add_transcript(
+                    channel_id=voice_channel_id,
+                    user_id=str(user.id),
+                    username=user.display_name,
+                    text=transcribed_text,
+                    confidence=1.0  # Vosk doesn't provide confidence in text mode
+                )
 
                 soundboard_cog = self.bot.get_cog("Soundboard")
                 if not soundboard_cog:
@@ -851,6 +888,20 @@ class VoiceSpeechCog(BaseCog):
             sink = self._create_speech_listener(ctx)
             vc.listen(sink)
             self.active_sinks[ctx.guild.id] = sink
+
+            # Start transcript session
+            members_in_channel = [m for m in target_channel.members if not m.bot]
+            if members_in_channel:
+                first_member = members_in_channel[0]
+                self.transcript_manager.start_session(
+                    channel_id=str(target_channel.id),
+                    guild_id=str(ctx.guild.id),
+                    guild_name=ctx.guild.name,
+                    channel_name=target_channel.name,
+                    first_user_id=str(first_member.id),
+                    first_username=first_member.display_name
+                )
+
             await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧\n*Auto-join enabled for this channel.*")
         except Exception as e:
             logger.error(f"Failed to join channel {target_channel.name}: {e}", exc_info=True)
@@ -878,6 +929,11 @@ class VoiceSpeechCog(BaseCog):
             except:
                 pass
             del self.current_sources[guild_id]
+
+        # End transcript session before disconnecting
+        channel_id = str(vc.channel.id) if vc.channel else None
+        if channel_id:
+            self.transcript_manager.end_session(channel_id)
 
         await vc.disconnect()
 

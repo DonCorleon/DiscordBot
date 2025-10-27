@@ -27,6 +27,7 @@ ENV/
 data/stats/
 data/admin/
 data/logs/
+data/transcripts/
 *.backup
 *.bak
 uv.lock
