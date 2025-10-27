@@ -337,7 +337,11 @@ class JSONEditor {
                 td.dataset.index = item._index;
 
                 const value = item[key];
-                td.textContent = this.formatCellValue(value);
+                const formattedValue = this.formatCellValue(value);
+                td.textContent = formattedValue;
+
+                // Add tooltip with full content
+                td.title = formattedValue;
 
                 // Make editable
                 td.addEventListener('click', () => this.editCell(td, item, key));
@@ -350,7 +354,9 @@ class JSONEditor {
             notesCell.classList.add('cell-editable', 'notes-cell');
             notesCell.dataset.key = '_notes';
             notesCell.dataset.index = item._index;
-            notesCell.textContent = item._notes || '';
+            const notesValue = item._notes || '';
+            notesCell.textContent = notesValue;
+            notesCell.title = notesValue; // Add tooltip
             notesCell.addEventListener('click', () => this.editCell(notesCell, item, '_notes'));
             tr.appendChild(notesCell);
 

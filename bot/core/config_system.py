@@ -15,6 +15,7 @@ Design decisions:
 import json
 import logging
 import ipaddress
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
@@ -58,6 +59,8 @@ class ConfigField:
         max_value: Maximum value (for numeric types)
         choices: List of valid choices (for enums)
         validator: Custom validation function (value -> (bool, error_msg))
+        is_large_int: Whether this is a large integer (e.g., Discord ID) that should be serialized as string for JS
+        env_only: Whether this field should ONLY be read from environment variables (never saved to JSON)
     """
     name: str
     type: Type
@@ -71,6 +74,8 @@ class ConfigField:
     max_value: Optional[Union[int, float]] = None
     choices: Optional[List[Any]] = None
     validator: Optional[Callable[[Any], Tuple[bool, str]]] = None
+    is_large_int: bool = False
+    env_only: bool = False
 
     def validate(self, value: Any) -> Tuple[bool, Optional[str]]:
         """
@@ -150,7 +155,10 @@ class CogConfigSchema:
                 requires_restart=metadata.get("requires_restart", False),
                 min_value=metadata.get("min_value"),
                 max_value=metadata.get("max_value"),
-                choices=metadata.get("choices")
+                choices=metadata.get("choices"),
+                validator=metadata.get("validator"),
+                is_large_int=metadata.get("is_large_int", False),
+                env_only=metadata.get("env_only", False)
             )
 
             schema.fields[dc_field.name] = config_field_obj
@@ -248,12 +256,47 @@ class ConfigManager:
 
         field_meta = schema.fields[key]
 
-        # Hierarchy: default -> global -> guild
+        # Hierarchy: default -> global override -> environment variable -> guild override
         value = field_meta.default
 
-        # Apply global override
+        # Apply global override (from JSON file)
         if cog_name in self.global_overrides and key in self.global_overrides[cog_name]:
             value = self.global_overrides[cog_name][key]
+
+        # Apply environment variable override (if exists)
+        # Special case mappings for legacy env var names
+        env_var_mappings = {
+            ("System", "token"): "DISCORD_TOKEN",
+            ("System", "bot_owner_id"): "BOT_OWNER",
+            ("System", "command_prefix"): "COMMAND_PREFIX",
+            ("System", "max_history"): "MAX_HISTORY",
+            ("System", "log_level"): "LOG_LEVEL",
+            ("System", "enable_web_dashboard"): "ENABLE_WEB_DASHBOARD",
+            ("System", "web_host"): "WEB_HOST",
+            ("System", "web_port"): "WEB_PORT",
+            ("Soundboard", "default_volume"): "DEFAULT_VOLUME",
+            ("Activity", "voice_tracking_enabled"): "VOICE_TRACKING_ENABLED",
+            ("Activity", "voice_points_per_minute"): "VOICE_POINTS_PER_MINUTE",
+            ("Activity", "voice_time_display_mode"): "VOICE_TIME_DISPLAY_MODE",
+            ("Activity", "voice_tracking_type"): "VOICE_TRACKING_TYPE",
+        }
+        env_var_name = env_var_mappings.get((cog_name, key), f"{cog_name.upper()}_{key.upper()}")
+        env_value = os.getenv(env_var_name)
+        if env_value is not None:
+            # Convert env string to appropriate type
+            try:
+                if field_meta.type == bool:
+                    value = env_value.lower() in ('true', '1', 'yes', 'on')
+                elif field_meta.type == int:
+                    value = int(env_value)
+                elif field_meta.type == float:
+                    value = float(env_value)
+                elif field_meta.type == list:
+                    value = [v.strip() for v in env_value.split(',') if v.strip()]
+                else:
+                    value = env_value
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Failed to parse env var {env_var_name}={env_value}: {e}")
 
         # Apply guild override (if applicable)
         if guild_id is not None and field_meta.guild_override:
@@ -289,6 +332,10 @@ class ConfigManager:
             return False, f"Unknown config key: {key}"
 
         field_meta = schema.fields[key]
+
+        # Reject changes to env-only fields
+        if field_meta.env_only:
+            return False, f"Field '{key}' can only be set via environment variables (.env file)"
 
         # Validate value
         is_valid, error = field_meta.validate(value)

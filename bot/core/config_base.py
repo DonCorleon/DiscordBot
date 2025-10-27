@@ -32,6 +32,8 @@ def config_field(
     max_value: Optional[Union[int, float]] = None,
     choices: Optional[List[Any]] = None,
     validator: Optional[Callable[[Any], Tuple[bool, str]]] = None,
+    is_large_int: bool = False,
+    env_only: bool = False,
 ) -> Any:
     """
     Helper function to define a config field with metadata.
@@ -50,6 +52,8 @@ def config_field(
         max_value: Maximum value (for numeric types)
         choices: List of valid choices (for enum-like fields)
         validator: Custom validation function (value -> (bool, error_msg))
+        is_large_int: Whether this is a large integer (e.g., Discord ID snowflake) that needs string serialization for JavaScript
+        env_only: Whether this field should ONLY be read from .env (never saved to JSON config files)
 
     Returns:
         A dataclass field with metadata attached
@@ -76,6 +80,8 @@ def config_field(
         "max_value": max_value,
         "choices": choices,
         "validator": validator,
+        "is_large_int": is_large_int,
+        "env_only": env_only,
     }
 
     return field(default=default, metadata=metadata)
