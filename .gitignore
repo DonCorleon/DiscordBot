@@ -31,6 +31,11 @@ data/logs/
 *.bak
 uv.lock
 
+# Config runtime files (user settings, not defaults)
+data/config/*.json
+data/config/*.backup
+data/config/guilds/
+
 # Session tracking
 docs/WHERE_WE_ARE_AT.md
 TODO.md
@@ -61,6 +66,7 @@ htmlcov/
 models/vosk/
 model/
 
-# Keep these
-!data/config/
+# Keep these directory structures
 !data/soundboard/.gitkeep
+!data/config/.gitkeep
+!data/config/README.md
