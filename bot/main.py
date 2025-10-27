@@ -152,6 +152,7 @@ async def rejoin_saved_voice_channels():
 
         rejoined_count = 0
         skipped_count = 0
+        skipped_details = []  # Track skipped channels with details
 
         for guild_id_str, state_data in voice_state.items():
             try:
@@ -163,12 +164,14 @@ async def rejoin_saved_voice_channels():
                 if not guild:
                     logger.warning(f"Guild {guild_id} not found, skipping rejoin")
                     skipped_count += 1
+                    skipped_details.append(f"Guild {guild_id} (not found)")
                     continue
 
                 channel = guild.get_channel(channel_id)
                 if not channel or not isinstance(channel, discord.VoiceChannel):
                     logger.warning(f"Voice channel {channel_id} not found in {guild.name}, skipping rejoin")
                     skipped_count += 1
+                    skipped_details.append(f"{guild.name}:#{channel_id} (channel not found)")
                     continue
 
                 # Check if there are non-bot users in the channel
@@ -176,12 +179,14 @@ async def rejoin_saved_voice_channels():
                 if not users_in_channel:
                     logger.info(f"No users in {channel.name} ({guild.name}), skipping rejoin")
                     skipped_count += 1
+                    skipped_details.append(f"{guild.name}:#{channel.name} (no users)")
                     continue
 
                 # Check if already connected
                 if guild.voice_client and guild.voice_client.is_connected():
                     logger.info(f"Already connected to voice in {guild.name}, skipping rejoin")
                     skipped_count += 1
+                    skipped_details.append(f"{guild.name}:#{channel.name} (already connected)")
                     continue
 
                 # Rejoin the channel
@@ -214,12 +219,26 @@ async def rejoin_saved_voice_channels():
             except Exception as e:
                 logger.error(f"Failed to rejoin voice channel in guild {guild_id_str}: {e}")
                 skipped_count += 1
+                # Try to get guild/channel names for error case
+                try:
+                    guild = bot.get_guild(int(guild_id_str))
+                    channel_id = int(state_data.get("channel_id"))
+                    if guild:
+                        channel = guild.get_channel(channel_id)
+                        if channel:
+                            skipped_details.append(f"{guild.name}:#{channel.name} (error: {str(e)[:50]})")
+                        else:
+                            skipped_details.append(f"{guild.name}:#{channel_id} (error)")
+                    else:
+                        skipped_details.append(f"Guild {guild_id_str} (error)")
+                except:
+                    skipped_details.append(f"Guild {guild_id_str} (error)")
                 continue
 
         if rejoined_count > 0:
             logger.info(f"🔊 Rejoined {rejoined_count} voice channel(s) from saved state")
         if skipped_count > 0:
-            logger.info(f"⏭️  Skipped {skipped_count} channel(s) (no users or not found)")
+            logger.info(f"⏭️  Skipped {skipped_count} channel(s): {', '.join(skipped_details)}")
 
     except Exception as e:
         logger.error(f"Error loading saved voice channels: {e}", exc_info=True)

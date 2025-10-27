@@ -1608,7 +1608,6 @@ class Soundboard(BaseCog):
                         tier_contributor=activity_cfg.activity_tier_contributor
                     )
                     from bot.core.stats.activity import render_bar_chart, get_voice_time_display
-                    from bot.config import config
 
                     # Find max score for bar chart
                     max_score = 0
@@ -1621,17 +1620,17 @@ class Soundboard(BaseCog):
 
                     # Get voice time based on configured tracking type
                     voice_minutes = 0
-                    if config.voice_tracking_type == "total":
+                    if activity_cfg.voice_tracking_type == "total":
                         voice_minutes = user_activity_stat.activity_stats._voice_total_minutes
-                    elif config.voice_tracking_type == "unmuted":
+                    elif activity_cfg.voice_tracking_type == "unmuted":
                         voice_minutes = user_activity_stat.activity_stats._voice_unmuted_minutes
-                    elif config.voice_tracking_type == "speaking":
+                    elif activity_cfg.voice_tracking_type == "speaking":
                         voice_minutes = user_activity_stat.activity_stats._voice_speaking_minutes
 
                     voice_display = get_voice_time_display(
                         voice_minutes,
-                        display_mode=config.voice_time_display_mode,
-                        tracking_type=config.voice_tracking_type
+                        display_mode=activity_cfg.voice_time_display_mode,
+                        tracking_type=activity_cfg.voice_tracking_type
                     )
 
                     activity_value = (
@@ -1824,7 +1823,6 @@ class Soundboard(BaseCog):
                     else:
                         # Show ambiguous data
                         from bot.core.stats.activity import get_voice_time_display
-                        from bot.config import config
 
                         # Get activity config for tier thresholds and bar chart length
                         activity_cfg = self.bot.config_manager.for_guild("Activity", guild_id_str)
@@ -1843,18 +1841,18 @@ class Soundboard(BaseCog):
                         user_stat = activity_stats.guilds[guild_id_str].users.get(str(user_id))
                         if user_stat:
                             voice_minutes = 0
-                            if config.voice_tracking_type == "total":
+                            if activity_cfg.voice_tracking_type == "total":
                                 voice_minutes = user_stat.activity_stats._voice_total_minutes
-                            elif config.voice_tracking_type == "unmuted":
+                            elif activity_cfg.voice_tracking_type == "unmuted":
                                 voice_minutes = user_stat.activity_stats._voice_unmuted_minutes
-                            elif config.voice_tracking_type == "speaking":
+                            elif activity_cfg.voice_tracking_type == "speaking":
                                 voice_minutes = user_stat.activity_stats._voice_speaking_minutes
 
                             if voice_minutes > 0:
                                 voice_display = get_voice_time_display(
                                     voice_minutes,
-                                    display_mode=config.voice_time_display_mode,
-                                    tracking_type=config.voice_tracking_type
+                                    display_mode=activity_cfg.voice_time_display_mode,
+                                    tracking_type=activity_cfg.voice_tracking_type
                                 )
                                 if voice_display:
                                     value_text += f"\n{voice_display}"

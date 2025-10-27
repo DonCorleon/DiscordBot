@@ -152,7 +152,8 @@ class VoiceSpeechCog(BaseCog):
         guild_id = member.guild.id
 
         # Handle auto-join when someone joins an enabled channel
-        if config.auto_join_enabled and not member.bot:
+        voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
+        if voice_cfg.auto_join_enabled and not member.bot:
             # User joined a channel
             if before.channel is None and after.channel is not None:
                 # Check if this channel has auto-join enabled
@@ -224,8 +225,11 @@ class VoiceSpeechCog(BaseCog):
                 async def disconnect_after_timeout():
                     try:
                         guild = member.guild
-                        await asyncio.sleep(config.auto_join_timeout)
-                        logger.info(f"[{guild.name}] Timeout reached, disconnecting from {bot_channel.name}")
+                        # Get timeout from ConfigManager
+                        voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
+                        timeout = voice_cfg.auto_join_timeout
+                        await asyncio.sleep(timeout)
+                        logger.info(f"[{guild.name}] Timeout reached ({timeout}s), disconnecting from {bot_channel.name}")
 
                         # Cancel queue processor
                         if guild_id in self.queue_tasks:
@@ -283,7 +287,9 @@ class VoiceSpeechCog(BaseCog):
                         logger.debug(f"[{guild.name}] Disconnect timeout cancelled")
 
                 self.disconnect_tasks[guild_id] = self.bot.loop.create_task(disconnect_after_timeout())
-                logger.info(f"[{member.guild.name}] All users left, starting {config.auto_join_timeout}s disconnect timer")
+                # Get timeout for logging
+                voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
+                logger.info(f"[{member.guild.name}] All users left, starting {voice_cfg.auto_join_timeout}s disconnect timer")
 
             elif len(members_in_channel) > 0:
                 # Someone is back, cancel disconnect if scheduled
@@ -395,14 +401,13 @@ class VoiceSpeechCog(BaseCog):
                     self.bot.loop.call_soon_threadsafe(event.set)
 
                 # Calculate effective volume (read from config dynamically for hot-reload support)
-                from bot.config import config
-                effective_volume = volume * config.default_volume
+                soundboard_cfg = self.bot.config_manager.for_guild("Soundboard", guild_id)
+                effective_volume = volume * soundboard_cfg.default_volume
 
-                # Get ducking config (use global config as default)
-                from bot.config import config as bot_config
-                config = self.ducking_config.get(
+                # Get ducking config (use ConfigManager as default)
+                ducking_config = self.ducking_config.get(
                     guild_id,
-                    {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
+                    {"enabled": soundboard_cfg.ducking_enabled, "level": soundboard_cfg.ducking_level}
                 )
 
                 # Get audio engine config from SystemConfig
@@ -413,7 +418,7 @@ class VoiceSpeechCog(BaseCog):
                     source = DuckedAudioSource(
                         soundfile,
                         volume=effective_volume,
-                        ducking_level=config["level"],
+                        ducking_level=ducking_config["level"],
                         duck_transition_ms=sys_cfg.audio_duck_transition_ms,
                         sample_rate=sys_cfg.audio_sample_rate,
                         channels=sys_cfg.audio_channels,
@@ -429,7 +434,7 @@ class VoiceSpeechCog(BaseCog):
                 self.current_sources[guild_id] = source
 
                 # If users are currently speaking, start ducked
-                if guild_id in self.speaking_users and self.speaking_users[guild_id] and config["enabled"]:
+                if guild_id in self.speaking_users and self.speaking_users[guild_id] and ducking_config["enabled"]:
                     source.duck()
                     logger.debug(f"[Guild {guild_id}] Starting playback ducked (users speaking)")
 
@@ -689,11 +694,11 @@ class VoiceSpeechCog(BaseCog):
         # Add user to speaking set
         self.speaking_users[guild_id].add(user_id)
 
-        # Check if ducking is enabled (use global config as default)
-        from bot.config import config as bot_config
+        # Check if ducking is enabled (use ConfigManager as default)
+        soundboard_cfg = self.bot.config_manager.for_guild("Soundboard", guild_id)
         ducking_cfg = self.ducking_config.get(
             guild_id,
-            {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
+            {"enabled": soundboard_cfg.ducking_enabled, "level": soundboard_cfg.ducking_level}
         )
         if not ducking_cfg["enabled"]:
             return
@@ -711,11 +716,11 @@ class VoiceSpeechCog(BaseCog):
         # Remove user from speaking set
         self.speaking_users[guild_id].discard(user_id)
 
-        # Check if ducking is enabled (use global config as default)
-        from bot.config import config as bot_config
+        # Check if ducking is enabled (use ConfigManager as default)
+        soundboard_cfg = self.bot.config_manager.for_guild("Soundboard", guild_id)
         ducking_cfg = self.ducking_config.get(
             guild_id,
-            {"enabled": bot_config.ducking_enabled, "level": bot_config.ducking_level}
+            {"enabled": soundboard_cfg.ducking_enabled, "level": soundboard_cfg.ducking_level}
         )
         if not ducking_cfg["enabled"]:
             return
@@ -744,13 +749,13 @@ class VoiceSpeechCog(BaseCog):
         """
         guild_id = ctx.guild.id
 
-        # Get current config (use global config as default)
-        from bot.config import config as bot_config
+        # Get current config (use ConfigManager as default)
+        soundboard_cfg = self.bot.config_manager.for_guild("Soundboard", guild_id)
         if guild_id not in self.ducking_config:
-            # Initialize with global config values
+            # Initialize with ConfigManager values
             self.ducking_config[guild_id] = {
-                "enabled": bot_config.ducking_enabled,
-                "level": bot_config.ducking_level
+                "enabled": soundboard_cfg.ducking_enabled,
+                "level": soundboard_cfg.ducking_level
             }
 
         ducking_cfg = self.ducking_config[guild_id]
@@ -762,8 +767,8 @@ class VoiceSpeechCog(BaseCog):
 
             # Check if using global default or guild override
             using_global = (guild_id not in self.ducking_config or
-                          (ducking_cfg["enabled"] == bot_config.ducking_enabled and
-                           ducking_cfg["level"] == bot_config.ducking_level))
+                          (ducking_cfg["enabled"] == soundboard_cfg.ducking_enabled and
+                           ducking_cfg["level"] == soundboard_cfg.ducking_level))
             source = "(using global config)" if using_global else "(guild override)"
 
             embed = discord.Embed(
@@ -775,7 +780,7 @@ class VoiceSpeechCog(BaseCog):
             embed.add_field(
                 name="ℹ️ Info",
                 value="Ducking automatically reduces audio volume when users speak.\n"
-                      f"Global default: {'Enabled' if bot_config.ducking_enabled else 'Disabled'} @ {int(bot_config.ducking_level * 100)}%",
+                      f"Global default: {'Enabled' if soundboard_cfg.ducking_enabled else 'Disabled'} @ {int(soundboard_cfg.ducking_level * 100)}%",
                 inline=False
             )
             embed.set_footer(text="Use ~ducking on/off or ~ducking level <0-100>")
@@ -787,7 +792,7 @@ class VoiceSpeechCog(BaseCog):
             if guild_id in self.ducking_config:
                 del self.ducking_config[guild_id]
             await UserFeedback.success(ctx,
-                f"Reset to global default: {'Enabled' if bot_config.ducking_enabled else 'Disabled'} @ {int(bot_config.ducking_level * 100)}%")
+                f"Reset to global default: {'Enabled' if soundboard_cfg.ducking_enabled else 'Disabled'} @ {int(soundboard_cfg.ducking_level * 100)}%")
             return
 
         # Handle on/off
@@ -828,7 +833,6 @@ class VoiceSpeechCog(BaseCog):
     @commands.command(help="Join a voice channel (optional: channel name or ID)")
     async def join(self, ctx, *, channel_input: str = None):
         from bot.core.audio.auto_join import add_auto_join_channel
-        from bot.config import config
 
         # If already connected
         if ctx.voice_client:
@@ -880,7 +884,8 @@ class VoiceSpeechCog(BaseCog):
             save_voice_state(ctx.guild.id, target_channel.id)
 
             # Enable auto-join for this channel
-            if config.auto_join_enabled:
+            voice_cfg = self.bot.config_manager.for_guild("Voice", ctx.guild.id)
+            if voice_cfg.auto_join_enabled:
                 add_auto_join_channel(ctx.guild.id, target_channel.id)
                 logger.info(f"Auto-join enabled for {target_channel.name} in guild {ctx.guild.id}")
 
