@@ -8,6 +8,11 @@
     <div class="transcripts-controls card">
         <div class="control-row">
             <div class="control-group">
+                <button id="live-btn" class="btn btn-toggle active">▶️ Live</button>
+                <button id="history-btn" class="btn btn-toggle">📜 History</button>
+            </div>
+
+            <div class="control-group">
                 <label for="guild-select">Guild:</label>
                 <select id="guild-select" class="control-select">
                     <option value="">All Guilds</option>
@@ -21,21 +26,20 @@
                 </select>
             </div>
 
-            <div class="control-group search-group">
+            <div class="control-group search-group live-only">
                 <label for="transcript-search">Search:</label>
                 <input type="text" id="transcript-search" class="control-input" placeholder="Search transcriptions...">
             </div>
 
-            <div class="control-group">
+            <div class="control-group live-only">
                 <label>
                     <input type="checkbox" id="auto-scroll-checkbox" checked>
                     Auto-scroll
                 </label>
             </div>
 
-            <div class="control-group">
+            <div class="control-group live-only">
                 <button id="clear-filters-btn" class="btn btn-secondary">Clear Filters</button>
-                <button id="live-btn" class="btn btn-toggle">▶️ Live</button>
             </div>
         </div>
 

@@ -981,3 +981,164 @@ canvas {
         gap: 0.75rem;
     }
 }
+
+/* Disable card hover effect on transcripts page */
+.transcripts-controls.card:hover,
+.transcripts-viewer.card:hover {
+    transform: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+/* Mode-specific visibility */
+.live-only {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+}
+
+body.history-mode .live-only {
+    visibility: hidden;
+    opacity: 0;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+/* Historical Sessions Styles */
+.session-entry {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background: #2d2d2d;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.session-entry:hover {
+    background: #3a3a3a;
+    border-color: #5865F2;
+}
+
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.session-time {
+    color: #e0e0e0;
+    font-size: 0.95rem;
+}
+
+.session-duration {
+    color: #b0b0b0;
+    font-size: 0.85rem;
+}
+
+.session-info {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.session-guild {
+    color: #5865F2;
+    font-weight: 500;
+}
+
+.session-channel {
+    color: #b0b0b0;
+}
+
+.session-stats {
+    color: #888;
+    font-size: 0.85rem;
+}
+
+.session-back-btn {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    margin-bottom: 1rem;
+    background: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    color: #5865F2;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9rem;
+}
+
+.session-back-btn:hover {
+    background: #4a4a4a;
+    border-color: #5865F2;
+}
+
+.session-details {
+    background: #2d2d2d;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.session-details h3 {
+    color: #5865F2;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.session-meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: 0.9rem;
+    color: #b0b0b0;
+}
+
+.session-meta span {
+    display: flex;
+    align-items: center;
+}
+
+.confidence-low {
+    color: #f04747;
+    font-size: 0.85rem;
+    margin-left: 0.5rem;
+}
+
+.transcript-content {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Button toggle styles */
+.btn-toggle {
+    background: #3a3a3a;
+    color: #b0b0b0;
+    border: 1px solid #4a4a4a;
+    transition: all 0.2s ease;
+}
+
+.btn-toggle:hover {
+    background: #4a4a4a;
+    color: #e0e0e0;
+}
+
+.btn-toggle.active {
+    background: #5865F2;
+    color: white;
+    border-color: #5865F2;
+    font-weight: bold;
+    box-shadow: 0 0 10px rgba(88, 101, 242, 0.5);
+}
+
+.btn-toggle.active:hover {
+    background: #4752C4;
+    border-color: #4752C4;
+}

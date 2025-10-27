@@ -5,11 +5,13 @@
 let currentGuild = '';
 let currentChannel = '';
 let currentSearch = '';
-let liveMode = false;
+let viewMode = 'live'; // 'live' or 'history'
 let autoScroll = true;
 let allGuilds = [];
 let allChannels = [];
 let transcripts = [];
+let historicalSessions = [];
+let currentSession = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
@@ -80,7 +82,12 @@ function setupEventListeners() {
 
     // Live mode toggle
     document.getElementById('live-btn').addEventListener('click', () => {
-        toggleLiveMode();
+        switchToLiveMode();
+    });
+
+    // History mode toggle
+    document.getElementById('history-btn').addEventListener('click', () => {
+        switchToHistoryMode();
     });
 
     // Auto-scroll checkbox
@@ -107,7 +114,11 @@ function setupWebSocket() {
 
 async function loadGuilds() {
     try {
-        const response = await fetch('/api/v1/transcripts/guilds');
+        const endpoint = viewMode === 'live'
+            ? '/api/v1/transcripts/guilds'
+            : '/api/v1/transcripts/history/guilds';
+
+        const response = await fetch(endpoint);
         const data = await response.json();
 
         allGuilds = data.guilds || [];
@@ -134,7 +145,11 @@ async function loadChannels() {
     if (!currentGuild) {
         // When no guild is selected, show all channels across all guilds in "Guild:Channel" format
         try {
-            const response = await fetch('/api/v1/transcripts/all-channels');
+            const endpoint = viewMode === 'live'
+                ? '/api/v1/transcripts/all-channels'
+                : '/api/v1/transcripts/history/channels';
+
+            const response = await fetch(endpoint);
             const data = await response.json();
 
             allChannels = data.channels || [];
@@ -154,7 +169,11 @@ async function loadChannels() {
     }
 
     try {
-        const response = await fetch(`/api/v1/transcripts/channels?guild_id=${currentGuild}`);
+        const endpoint = viewMode === 'live'
+            ? `/api/v1/transcripts/channels?guild_id=${currentGuild}`
+            : `/api/v1/transcripts/history/channels?guild_id=${currentGuild}`;
+
+        const response = await fetch(endpoint);
         const data = await response.json();
 
         allChannels = data.channels || [];
@@ -172,6 +191,14 @@ async function loadChannels() {
 }
 
 async function loadTranscripts() {
+    if (viewMode === 'live') {
+        await loadLiveTranscripts();
+    } else {
+        await loadHistoricalSessions();
+    }
+}
+
+async function loadLiveTranscripts() {
     try {
         const params = new URLSearchParams({
             limit: '100'
@@ -201,6 +228,31 @@ async function loadTranscripts() {
     } catch (error) {
         console.error('Error loading transcripts:', error);
         showError('Failed to load transcripts');
+    }
+}
+
+async function loadHistoricalSessions() {
+    try {
+        const params = new URLSearchParams();
+
+        if (currentGuild) {
+            params.append('guild_id', currentGuild);
+        }
+
+        if (currentChannel) {
+            params.append('channel_id', currentChannel);
+        }
+
+        const response = await fetch(`/api/v1/transcripts/history/sessions?${params}`);
+        const data = await response.json();
+
+        historicalSessions = data.sessions || [];
+        displayHistoricalSessions(historicalSessions);
+        updateHistoryStats(data);
+
+    } catch (error) {
+        console.error('Error loading historical sessions:', error);
+        showError('Failed to load historical sessions');
     }
 }
 
@@ -350,17 +402,164 @@ function updateStats(data) {
     document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
 }
 
-function toggleLiveMode() {
-    liveMode = !liveMode;
-    const btn = document.getElementById('live-btn');
+function switchToLiveMode() {
+    viewMode = 'live';
+    currentSession = null;
 
-    if (liveMode) {
-        btn.classList.add('active');
-        btn.textContent = '⏸️ Pause';
-    } else {
-        btn.classList.remove('active');
-        btn.textContent = '▶️ Live';
+    // Update button states
+    document.getElementById('live-btn').classList.add('active');
+    document.getElementById('history-btn').classList.remove('active');
+
+    // Remove history mode class to show live-only elements
+    document.body.classList.remove('history-mode');
+
+    // Reload guilds, channels, and data
+    loadGuilds();
+    loadChannels();
+    loadTranscripts();
+}
+
+function switchToHistoryMode() {
+    viewMode = 'history';
+
+    // Update button states
+    document.getElementById('live-btn').classList.remove('active');
+    document.getElementById('history-btn').classList.add('active');
+
+    // Add history mode class to hide live-only elements
+    document.body.classList.add('history-mode');
+
+    // Reload guilds, channels, and data
+    loadGuilds();
+    loadChannels();
+    loadTranscripts();
+}
+
+function displayHistoricalSessions(sessions) {
+    const container = document.getElementById('transcripts-content');
+
+    if (!sessions || sessions.length === 0) {
+        container.innerHTML = '<div class="transcripts-empty">No historical sessions match the current filters</div>';
+        return;
     }
+
+    container.innerHTML = sessions.map(session => {
+        const startTime = new Date(session.start_time).toLocaleString();
+        const endTime = session.end_time ? new Date(session.end_time).toLocaleString() : 'In Progress';
+        const duration = session.duration_seconds
+            ? formatDuration(session.duration_seconds)
+            : 'N/A';
+
+        return `
+            <div class="session-entry" data-session-id="${session.session_id}" onclick="loadSessionTranscript('${session.session_id}')">
+                <div class="session-header">
+                    <span class="session-time">${startTime}</span>
+                    <span class="session-duration">Duration: ${duration}</span>
+                </div>
+                <div class="session-info">
+                    <span class="session-guild">${escapeHtml(session.guild_name)}</span>
+                    <span class="session-channel">#${escapeHtml(session.channel_name)}</span>
+                    <span class="session-stats">${session.total_messages} messages • ${session.unique_speakers} speakers</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+async function loadSessionTranscript(sessionId) {
+    try {
+        const response = await fetch(`/api/v1/transcripts/history/session/${sessionId}`);
+        const data = await response.json();
+
+        if (!data.success || !data.session) {
+            showError('Failed to load session transcript');
+            return;
+        }
+
+        currentSession = data.session;
+        displaySessionTranscript(currentSession);
+
+    } catch (error) {
+        console.error('Error loading session transcript:', error);
+        showError('Failed to load session transcript');
+    }
+}
+
+function displaySessionTranscript(session) {
+    const container = document.getElementById('transcripts-content');
+
+    if (!session.transcript || session.transcript.length === 0) {
+        container.innerHTML = `
+            <div class="session-back-btn" onclick="loadHistoricalSessions()">← Back to Sessions</div>
+            <div class="transcripts-empty">No transcript entries in this session</div>
+        `;
+        return;
+    }
+
+    // Build transcript HTML
+    const transcriptHtml = session.transcript.map(entry => {
+        const timestamp = new Date(entry.timestamp).toLocaleString();
+        const confidenceBadge = entry.confidence < 0.8
+            ? ` <span class="confidence-low">(${Math.round(entry.confidence * 100)}%)</span>`
+            : '';
+
+        return `
+            <div class="transcript-entry">
+                <span class="transcript-timestamp">${timestamp}</span>
+                <span class="transcript-user">${escapeHtml(entry.username)}</span>
+                <span class="transcript-text">${escapeHtml(entry.text)}</span>${confidenceBadge}
+            </div>
+        `;
+    }).join('');
+
+    // Session header info
+    const startTime = new Date(session.start_time).toLocaleString();
+    const endTime = session.end_time ? new Date(session.end_time).toLocaleString() : 'In Progress';
+    const duration = session.stats?.duration_seconds
+        ? formatDuration(session.stats.duration_seconds)
+        : 'N/A';
+
+    container.innerHTML = `
+        <div class="session-back-btn" onclick="loadHistoricalSessions()">← Back to Sessions</div>
+        <div class="session-details">
+            <h3>${escapeHtml(session.guild_name)} - #${escapeHtml(session.channel_name)}</h3>
+            <div class="session-meta">
+                <span>Started: ${startTime}</span>
+                <span>Ended: ${endTime}</span>
+                <span>Duration: ${duration}</span>
+                <span>${session.stats?.total_messages || 0} messages</span>
+                <span>${session.stats?.unique_speakers || 0} speakers</span>
+            </div>
+        </div>
+        <div class="transcript-content">
+            ${transcriptHtml}
+        </div>
+    `;
+
+    // Scroll to top
+    container.scrollTop = 0;
+}
+
+function formatDuration(seconds) {
+    if (!seconds || seconds < 0) return 'N/A';
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${secs}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${secs}s`;
+    } else {
+        return `${secs}s`;
+    }
+}
+
+function updateHistoryStats(data) {
+    document.getElementById('total-transcripts').textContent = (data.count || 0).toLocaleString();
+    document.getElementById('filtered-transcripts').textContent = (data.count || 0).toLocaleString();
+    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
 }
 
 function showError(message) {

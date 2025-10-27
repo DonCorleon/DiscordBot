@@ -1,53 +1,185 @@
 # Current Work Session
 
-**Last Updated**: 2025-10-26
-**Session Status**: ✅ Pygame Dashboard Removed, UI Controls Added, IP Validation Complete
+**Last Updated**: 2025-10-27
+**Session Status**: ✅ Transcript Session System Complete
 
 ---
 
 ## 📍 Current Focus
 
-**Status**: ✅ Config Migration Phase 1 - First 3 Tasks COMPLETE + Environment Variables + SystemConfig Organization
+**Status**: ✅ Incremental Transcript Recording System with Bot Action Tracking
 
-**Latest Work**: Completed environment variable support (.env integration), large integer handling (Discord IDs), env_only security fields, and separated SystemConfig into dedicated file.
+**Latest Work**: Completed incremental transcript session recording with:
+- Chronological participant join/leave event tracking
+- Bot action logging (TTS, sounds, commands)
+- Username context for all bot actions
+- Distinction between speech-triggered sounds ([TRIGGER]) vs manual commands ([SOUND])
+- Nested folder structure by guild_id/channel_id
+- Configurable flush intervals via ConfigManager
+- Atomic file writes to prevent corruption
 
-### Recent Accomplishments
+### Recent Accomplishments (2025-10-27 Session)
 
-1. **JSON File Editor** (Commit: e30b050) ✅
-   - Full-featured web UI at `/json-editor`
-   - Table-based editing with inline cell modification
-   - Advanced features: sortable/resizable columns, search/filter, bulk operations
-   - Custom field addition with type selection
-   - Notes column for annotations
-   - Auto-saves last opened file
-   - Automatic backups before saving
+1. **Transcript Session System** (Branch: transcription_fun) ✅
+   - Incremental file writing with background flush task
+   - Nested directory structure: `{transcript_dir}/{guild_id}/{channel_id}/`
+   - Chronological participant event tracking (join/leave with timestamps)
+   - Bot action logging (TTS, sounds, leave command)
+   - Username context: `[username] content` format
+   - Distinction between speech triggers and manual commands
+   - ConfigManager integration (transcript_enabled, transcript_flush_interval, transcript_dir)
+   - Atomic file writes (temp file + rename pattern)
+   - No duplicate entries (join events, TTS temp files)
 
-2. **Config Inventory** ✅
-   - Created `docs/config_inventory.json` with 79 config variables
-   - Comprehensive scan of codebase for hardcoded values
-   - Ready for user review and config migration planning
+2. **ConfigManager Migration** ✅
+   - Migrated auto_join_timeout from old bot.config to ConfigManager
+   - Audited and converted 21 config usages across voice_speech.py and soundboard.py
+   - All cogs now use unified ConfigManager for settings
 
-3. **Unified ConfigManager Migration** ✅
-   - Migrated from dual config system to unified ConfigManager
-   - All cogs updated to use new system
-   - Old config managers deleted
-   - Web API fully integrated
+3. **Bug Fixes** ✅
+   - Fixed logger configuration (transcript_session.py now uses "discordbot.*" namespace)
+   - Fixed channel ID type mismatches (always use strings for consistency)
+   - Fixed auto-disconnect timer not cancelling on rejoin
+   - Fixed duplicate join events on auto-join
+   - Fixed TTS appearing twice in transcripts (temp file detection)
 
 ---
 
-## 🔨 Recent Commits
+## 🔨 Recent Commits (transcription_fun branch)
 
-**Latest Commit**: `e30b050` - feat: add comprehensive JSON file editor to web dashboard
+**Latest Commit**: `91f5d7e` - feat: distinguish speech-triggered sounds from manual commands in transcripts
 
-**Files Added**:
-- `web/routes/json_editor.py` - FastAPI endpoints for JSON file operations
-- `web/templates/json_editor.html` - Frontend UI with embedded CSS
-- `web/static/js/json_editor.js` - Client-side functionality
-- `docs/config_inventory.json` - Config variable inventory (79 entries)
+**Recent Commits**:
+1. `91f5d7e` - Distinguish [TRIGGER] vs [SOUND] in transcripts
+2. `eaad3b0` - Add username context to TTS and sound transcripts
+3. `dfe9313` - Update Activity tracker to use ConfigManager
+4. `d739ba8` - Apply system config settings from ConfigManager on startup
+5. `d8cc123` - Implement global config update endpoint
+6. `b264a2c` - Add SystemConfig schema to monitoring cog
 
-**Files Modified**:
-- `web/app.py` - Registered json_editor router
-- `web/templates/base.html` - Added JSON Editor nav link
+**Key Files Modified**:
+- `bot/cogs/audio/voice_speech.py` - Main voice handling, transcript integration
+- `bot/cogs/audio/tts.py` - TTS transcript logging
+- `bot/cogs/audio/soundboard.py` - ConfigManager migration
+- `bot/core/transcript_session.py` - Complete refactor for incremental writes
+- `bot/main.py` - Voice channel rejoin skip tracking details
+
+---
+
+## 📋 Transcript Session System Details
+
+### Core Architecture
+
+**TranscriptSessionManager** (`bot/core/transcript_session.py`):
+- Accepts bot instance for ConfigManager access
+- Background flush task runs every N seconds (configurable)
+- Immediate file creation on session start
+- Incremental updates marked with `_dirty` flag
+- Atomic writes using temp files to prevent corruption
+
+**Data Structure**:
+```python
+@dataclass
+class Participant:
+    user_id: str
+    username: str
+
+@dataclass
+class ParticipantEvent:
+    timestamp: str
+    user_id: str
+    username: str
+    event_type: str  # "join" or "leave"
+
+@dataclass
+class TranscriptEntry:
+    timestamp: str
+    user_id: str
+    username: str
+    text: str
+    confidence: float
+
+@dataclass
+class TranscriptSession:
+    session_id: str
+    guild_id: str
+    guild_name: str
+    channel_id: str
+    channel_name: str
+    start_time: str
+    end_time: Optional[str]
+    participants: List[Participant]  # Summary
+    participant_events: List[ParticipantEvent]  # Chronological
+    transcript: List[TranscriptEntry]
+    file_path: Optional[str]
+```
+
+### File Organization
+
+**Directory Structure**:
+```
+data/transcripts/sessions/
+  {guild_id}/
+    {channel_id}/
+      20251027_120530_{session_id}.json
+      20251027_130210_{session_id}.json
+```
+
+**Example Transcript Entry**:
+```json
+{
+  "timestamp": "2025-10-27T12:05:03.832418",
+  "user_id": "696940351977422878",
+  "username": "The_KnobFather",
+  "text": "shit",
+  "confidence": 1.0
+},
+{
+  "timestamp": "2025-10-27T12:05:03.945597",
+  "user_id": "1421388225112444998",
+  "username": "Rancher_SaS_Bot [TRIGGER]",
+  "text": "[The_KnobFather] shit",
+  "confidence": 1.0
+}
+```
+
+### Bot Action Types
+
+- **[TTS]**: Text-to-speech command (`~say`)
+  - Format: `[username] text_content`
+  - Example: `[The_KnobFather] testing testing one two three`
+
+- **[TRIGGER]**: Speech-triggered sound
+  - Format: `[username] trigger_word`
+  - Example: `[The_KnobFather] shit`
+
+- **[SOUND]**: Manual play command (`~play`)
+  - Format: `[username] sound_name_or_trigger`
+  - Example: `[The_KnobFather] wet fart`
+
+- **[COMMAND]**: Bot commands (e.g., leave)
+  - Format: Action description
+  - Example: `Left voice channel (requested by The_KnobFather)`
+
+### Configuration
+
+**Voice Config Fields**:
+- `transcript_enabled` (bool, default: True)
+- `transcript_flush_interval` (int, 5-300 seconds, default: 30)
+- `transcript_dir` (str, default: "data/transcripts/sessions")
+
+### Integration Points
+
+**Voice Speech Cog** (`bot/cogs/audio/voice_speech.py`):
+- Session start on first user join (line 217)
+- Participant tracking via on_voice_state_update (lines 231-262)
+- Auto-disconnect timer cancellation (lines 269-274)
+- Speech recognition transcript logging (line 696)
+- Sound playback transcript logging (lines 504-517)
+- Session end on bot disconnect/leave (line 1003)
+
+**TTS Cog** (`bot/cogs/audio/tts.py`):
+- TTS transcript logging (lines 276-284)
 
 ---
 
@@ -148,7 +280,39 @@ Default (in code) → Global Override → Guild Override
 
 ---
 
-## 🎯 Completed Tasks (This Session)
+## 🎯 Completed Tasks (2025-10-27 Transcript Session)
+
+### ✅ Incremental Transcript System Implementation
+- Created incremental file writing system with background flush task
+- Implemented nested directory structure by guild_id/channel_id (IDs not names)
+- Added chronological participant event tracking (join/leave with timestamps)
+- Integrated ConfigManager for transcript settings (enabled, flush interval, directory)
+- Implemented atomic file writes (temp file + rename pattern)
+- Fixed logger configuration to use "discordbot.*" namespace
+
+### ✅ Bot Action Tracking
+- Added transcript logging for TTS commands with username context
+- Added transcript logging for sound playback (both speech-triggered and manual)
+- Added transcript logging for leave command
+- Distinguished [TRIGGER] for speech-triggered vs [SOUND] for manual commands
+- Shows trigger words/phrases instead of filenames
+- Format: `[username] content` for all bot actions
+
+### ✅ Bug Fixes
+- Fixed auto-disconnect timer not cancelling when users rejoin
+- Fixed channel ID type mismatches (string vs int)
+- Fixed duplicate join events on auto-join (check last event before adding)
+- Fixed TTS appearing twice in transcripts (detect temp files starting with "tmp")
+- Fixed voice channel rejoin skip messages to show guild:channel details
+
+### ✅ ConfigManager Migration
+- Migrated auto_join_timeout from old bot.config to ConfigManager
+- Audited and converted 21 config usages in voice_speech.py and soundboard.py
+- All voice and soundboard settings now use unified ConfigManager
+
+---
+
+## 🎯 Completed Tasks (Previous Sessions - Config Migration Phase 1)
 
 ### ✅ Task 1: Remove Obsolete Pygame Dashboard
 - Deleted `bot/ui/dashboard_full.py` and `dashboard_minimal.py`
@@ -206,7 +370,14 @@ Default (in code) → Global Override → Guild Override
   - Voice Settings (keepalive_interval)
 - MonitoringCog now imports SystemConfig instead of defining it
 
-## 🎯 Next Steps (Remaining Config Migration Tasks)
+## 🎯 Next Steps
+
+### Pending: WebUI Historical Transcripts Viewer
+- **Goal**: Add section to web dashboard to view historical transcript sessions
+- **Status**: Awaiting user requirements (user said "when we get to it, ask for more details")
+- **Branch**: transcription_fun
+
+### Future: Remaining Config Migration Tasks (on hold)
 
 ### Task 4: Rename Voice Time Variables
 - **Goal**: Rename `voice_time_range_*` to `voice_time_level_*` for clarity
@@ -280,18 +451,20 @@ Default (in code) → Global Override → Guild Override
 ```
 Read .claude/CURRENT_WORK.md to see current status.
 
-Current branch: config-migration-phase1
+Current branch: transcription_fun
 
-Recent work:
-- Built JSON file editor for web dashboard ✅
-- Created config_inventory.json with 79 variables ✅
-- Unified ConfigManager migration complete ✅
+Recent work (2025-10-27):
+- Implemented incremental transcript session recording system ✅
+- Added chronological participant tracking (join/leave events) ✅
+- Integrated bot action logging (TTS, sounds, commands) ✅
+- Distinguished [TRIGGER] vs [SOUND] in transcripts ✅
+- Fixed auto-disconnect timer and duplicate entry issues ✅
 
-Next: User to review config inventory and plan next migration steps
+Next: Pending WebUI historical transcripts viewer (awaiting user requirements)
 ```
 
 ---
 
-**Document Version**: 4.0 (JSON Editor Complete)
-**Last Updated By**: Claude
-**Next Review**: After user reviews config inventory
+**Document Version**: 5.0 (Transcript Session System Complete)
+**Last Updated By**: Claude (2025-10-27)
+**Next Review**: When starting WebUI transcripts viewer work
