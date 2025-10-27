@@ -203,3 +203,109 @@ The cog will be loaded automatically on bot startup.
 - **Command Prefix:** Default is `~`, configurable via `.env`
 - **Logs Location:** `logs/` directory with timestamp rotation
 - **Admin Data:** Exported to `admin_data/` directory for dashboard
+
+---
+
+## Project Rules & Conventions
+
+### Session Management
+- **ALWAYS** update `.claude/CURRENT_WORK.md` after completing significant work
+  - Document what was accomplished
+  - Update commit references
+  - Mark completed tasks
+  - Add new pending tasks if discovered
+- Keep session state current for continuity across conversations
+
+### Git Workflow & Commits
+- **DO NOT commit** unless explicitly told to do so
+- **DO NOT push** unless explicitly told to do so
+- **NO** auto-generated footers in commit messages (e.g., "Generated with Claude Code", "Co-Authored-By: Claude")
+- Use conventional commits format:
+  - `feat:` - New features
+  - `fix:` - Bug fixes
+  - `refactor:` - Code restructuring without behavior change
+  - `docs:` - Documentation changes
+  - `test:` - Adding or updating tests
+  - `chore:` - Maintenance tasks
+- Be concise but descriptive in commit messages
+- Always stage specific files, never use `git add .`
+- Keep commits focused (one logical change per commit)
+
+### Code Style & Organization
+- **Max line length:** 120 characters
+- **File size limit:** Keep files under 500 lines when possible
+  - If file exceeds 500 lines, consider splitting into focused modules
+  - Group related code in packages (not single large files)
+- **Type hints:** Required for function parameters and return values
+- **Docstrings:** Required for all public methods and classes
+  - Include Args, Returns, Raises sections for complex functions
+  - Add usage examples for non-obvious functionality
+- **Prefer explicit over implicit** code patterns
+- **No emojis** in code or comments unless explicitly requested by user
+
+### Configuration System
+- **ALL** config must use unified ConfigManager (no old `bot.config`)
+- New config fields require schema registration in cog's `__init__`
+- Document config fields with clear descriptions and categories
+- Use `config_field()` with appropriate metadata (guild_override, admin_only, etc.)
+- Test config changes via web UI before committing
+
+### Testing Requirements
+- Write unit tests for new features (aim for 70%+ coverage on critical paths)
+- Run `pytest tests/` before committing changes
+- Add integration tests for complex workflows
+- Mock Discord.py components when testing cogs
+- Test error cases, not just happy paths
+
+### Code Organization Principles
+- **Single Responsibility:** Each module should do one thing well
+- **Separation of Concerns:**
+  - Cogs = Discord command layer
+  - Core = Business logic (reusable)
+  - Models = Data structures
+  - Repositories = Data access
+- **No business logic in web routes** - use service layer
+- **No direct file I/O in cogs** - use repositories
+- Keep UI components (Discord Views/Modals) in separate files
+
+### Documentation Requirements
+- Update `README.md` when adding major features
+- Document breaking changes in commit messages
+- Keep `docs/CLAUDE.md` updated with architectural changes
+- Add architecture decision records (ADRs) for significant choices
+- Update `.claude/CURRENT_WORK.md` at end of each work session
+
+### Error Handling
+- Use custom exceptions from `bot/core/errors.py`
+- Provide helpful error messages to users via `UserFeedback` class
+- Log errors with context (guild_id, user_id, etc.)
+- Handle Discord API rate limits gracefully
+- Never let exceptions crash the bot
+
+### Performance Considerations
+- Use `asyncio.Queue` for background processing
+- Avoid blocking I/O in async functions (use `aiofiles` for file operations)
+- Cache frequently accessed data (soundboard, config)
+- Use `functools.lru_cache` for expensive pure functions
+- Profile before optimizing (measure, don't guess)
+
+### Security Guidelines
+- Never log sensitive data (tokens, user passwords)
+- Validate all user input (file uploads, text commands)
+- Use admin-only checks for destructive operations
+- Sanitize paths to prevent directory traversal
+- Rate limit user-facing operations
+
+### Debugging Guidelines
+- Use structured logging with clear context
+- Add debug logs at important decision points
+- Use appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Include relevant IDs (guild_id, user_id, channel_id) in logs
+- Test error paths explicitly
+
+### When in Doubt
+- Ask the user for clarification instead of guessing
+- Check existing code patterns before inventing new ones
+- Review `docs/SUGGESTIONS_28-10.md` for architectural guidance
+- Consult `docs/CLAUDE.md` (this file) for project conventions
+- Look at recent commits to understand current development direction
