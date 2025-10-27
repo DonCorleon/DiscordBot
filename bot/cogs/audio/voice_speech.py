@@ -88,6 +88,30 @@ class VoiceConfig(ConfigBase):
         max_value=38400
     )
 
+    # Transcript Session Settings
+    transcript_enabled: bool = config_field(
+        default=True,
+        description="Enable transcript session recording",
+        category="Transcription",
+        guild_override=True
+    )
+
+    transcript_flush_interval: int = config_field(
+        default=30,
+        description="Seconds between transcript file updates (lower = more writes, less data loss risk)",
+        category="Transcription",
+        guild_override=False,
+        min_value=5,
+        max_value=300
+    )
+
+    transcript_dir: str = config_field(
+        default="data/transcripts/sessions",
+        description="Directory to store transcript session files",
+        category="Transcription",
+        guild_override=False
+    )
+
 
 # Monkey patch for discord-ext-voice-recv bug
 def _patched_remove_ssrc(self, *, user_id: int):
@@ -140,8 +164,8 @@ class VoiceSpeechCog(BaseCog):
         # Auto-disconnect timeout tasks
         self.disconnect_tasks = {}  # {guild_id: Task}
 
-        # Transcript session manager
-        self.transcript_manager = TranscriptSessionManager()
+        # Transcript session manager (pass bot for ConfigManager access)
+        self.transcript_manager = TranscriptSessionManager(bot)
         logger.info("Initialized TranscriptSessionManager")
 
     @commands.Cog.listener()
@@ -204,19 +228,53 @@ class VoiceSpeechCog(BaseCog):
                         except Exception as e:
                             logger.error(f"Failed to auto-join {after.channel.name}: {e}")
 
-        # Handle disconnect when channel becomes empty
-        if before.channel is not None:
-            if not member.guild.voice_client:
-                return
-
+        # Track participant join/leave events for transcript sessions (all users, not just auto-join)
+        if not member.bot and member.guild.voice_client:
             bot_channel = member.guild.voice_client.channel
+            voice_channel_id = str(bot_channel.id)
 
-            if before.channel.id != bot_channel.id:
-                return
+            # User joined the channel where bot is
+            if before.channel != bot_channel and after.channel == bot_channel:
+                # Check if this user was already added in start_session (avoid duplicate)
+                session = self.transcript_manager.get_active_session(voice_channel_id)
+                should_add = True
 
+                if session and session.participant_events:
+                    # Check if the last event was a join for this same user (within 1 second)
+                    last_event = session.participant_events[-1]
+                    if (last_event.event_type == "join" and
+                        last_event.user_id == str(member.id)):
+                        # This is a duplicate from start_session, skip it
+                        should_add = False
+
+                if should_add:
+                    self.transcript_manager.add_participant(
+                        channel_id=voice_channel_id,
+                        user_id=str(member.id),
+                        username=member.display_name
+                    )
+
+            # User left the channel where bot is
+            elif before.channel == bot_channel and after.channel != bot_channel:
+                self.transcript_manager.remove_participant(
+                    channel_id=voice_channel_id,
+                    user_id=str(member.id)
+                )
+
+        # Handle disconnect when channel becomes empty or cancel timer when someone rejoins
+        if member.guild.voice_client:
+            bot_channel = member.guild.voice_client.channel
             members_in_channel = [m for m in bot_channel.members if not m.bot]
 
-            if len(members_in_channel) == 0:
+            # User joined the bot's channel - cancel any pending disconnect
+            if after.channel == bot_channel and len(members_in_channel) > 0:
+                if guild_id in self.disconnect_tasks:
+                    self.disconnect_tasks[guild_id].cancel()
+                    del self.disconnect_tasks[guild_id]
+                    logger.info(f"[{member.guild.name}] User rejoined, cancelled disconnect timer")
+
+            # User left the bot's channel - check if channel is now empty
+            if before.channel == bot_channel and len(members_in_channel) == 0:
                 # Cancel any existing disconnect task
                 if guild_id in self.disconnect_tasks:
                     self.disconnect_tasks[guild_id].cancel()
@@ -291,15 +349,11 @@ class VoiceSpeechCog(BaseCog):
                 voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
                 logger.info(f"[{member.guild.name}] All users left, starting {voice_cfg.auto_join_timeout}s disconnect timer")
 
-            elif len(members_in_channel) > 0:
-                # Someone is back, cancel disconnect if scheduled
-                if guild_id in self.disconnect_tasks:
-                    self.disconnect_tasks[guild_id].cancel()
-                    del self.disconnect_tasks[guild_id]
-                    logger.debug(f"[{member.guild.name}] User rejoined, cancelled disconnect timer")
-
     async def cog_unload(self):
         logger.info("Unloading VoiceSpeechCog...")
+
+        # Stop transcript flush task
+        self.transcript_manager.stop_flush_task()
 
         # Stop keepalive
         if self._keepalive_task and not self._keepalive_task.done():
@@ -369,7 +423,7 @@ class VoiceSpeechCog(BaseCog):
 
         try:
             while True:
-                soundfile, sound_key, volume, vc, user_id, trigger_word, channel_id, username = await queue.get()
+                soundfile, sound_key, volume, vc, user_id, trigger_word, channel_id, username, from_speech = await queue.get()
 
                 if not vc or not vc.is_connected():
                     logger.warning(f"[Guild {guild_id}] Voice client disconnected, skipping {soundfile}")
@@ -442,6 +496,26 @@ class VoiceSpeechCog(BaseCog):
                 vc.play(source, after=after_callback)
                 logger.info(f"[Guild {guild_id}] ▶️ Playing '{soundfile}' (volume: {effective_volume:.2f})")
 
+                # Add to transcript (skip TTS temp files - they're already logged as [TTS])
+                if vc.channel:
+                    # Check if this is a TTS temp file (starts with "tmp" and ends with .wav/.mp3)
+                    is_tts_temp = os.path.basename(soundfile).startswith("tmp") and soundfile.endswith((".wav", ".mp3"))
+
+                    if not is_tts_temp:
+                        # Use trigger word if available, otherwise sound name
+                        sound_content = trigger_word if trigger_word else (sound_key if sound_key else os.path.basename(soundfile))
+                        # Include who triggered the sound
+                        content = f"[{username}] {sound_content}"
+                        # Use "TRIGGER" for speech-triggered sounds, "SOUND" for manual commands
+                        message_type = "TRIGGER" if from_speech else "SOUND"
+                        self.transcript_manager.add_bot_message(
+                            channel_id=str(vc.channel.id),
+                            bot_id=str(self.bot.user.id),
+                            bot_name=self.bot.user.name,
+                            message_type=message_type,
+                            content=content
+                        )
+
                 # Update soundboard play stats
                 soundboard_cog = self.bot.get_cog("Soundboard")
                 if soundboard_cog and sound_key:
@@ -488,13 +562,18 @@ class VoiceSpeechCog(BaseCog):
             logger.critical(f"[Guild {guild_id}] Unexpected error: {e}", exc_info=True)
 
     async def queue_sound(self, guild_id: int, soundfile: str, user: discord.User, sound_key: str = None,
-                          volume: float = 1.0, trigger_word: str = None, channel_id: int = None):
-        """Queue a sound for playback."""
+                          volume: float = 1.0, trigger_word: str = None, channel_id: int = None,
+                          from_speech: bool = False):
+        """Queue a sound for playback.
+
+        Args:
+            from_speech: True if triggered by speech recognition, False if from manual command
+        """
         if guild_id not in self.sound_queues:
             self.sound_queues[guild_id] = asyncio.Queue()
             self.queue_tasks[guild_id] = asyncio.create_task(self._process_sound_queue(guild_id))
 
-        await self.sound_queues[guild_id].put((soundfile, sound_key, volume, user.guild.voice_client, user.id, trigger_word, channel_id, user.display_name))
+        await self.sound_queues[guild_id].put((soundfile, sound_key, volume, user.guild.voice_client, user.id, trigger_word, channel_id, user.display_name, from_speech))
 
         queue_size = self.sound_queues[guild_id].qsize()
         logger.debug(
@@ -606,8 +685,8 @@ class VoiceSpeechCog(BaseCog):
                                     "sound": os.path.basename(soundfile),
                                     "volume": volume
                                 })
-                                # Queue sound for THIS guild only
-                                await self.queue_sound(guild_id, soundfile, user, sound_key, volume, trigger_word, voice_channel_id)
+                                # Queue sound for THIS guild only (speech-triggered)
+                                await self.queue_sound(guild_id, soundfile, user, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
 
                         # Log transcription with guild_id and triggers after adding them
                         logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
@@ -935,9 +1014,16 @@ class VoiceSpeechCog(BaseCog):
                 pass
             del self.current_sources[guild_id]
 
-        # End transcript session before disconnecting
+        # Add bot leave message to transcript before ending session
         channel_id = str(vc.channel.id) if vc.channel else None
         if channel_id:
+            self.transcript_manager.add_bot_message(
+                channel_id=channel_id,
+                bot_id=str(self.bot.user.id),
+                bot_name=self.bot.user.name,
+                message_type="COMMAND",
+                content=f"Left voice channel (requested by {ctx.author.display_name})"
+            )
             self.transcript_manager.end_session(channel_id)
 
         await vc.disconnect()
