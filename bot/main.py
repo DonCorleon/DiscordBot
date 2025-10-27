@@ -210,6 +210,19 @@ async def rejoin_saved_voice_channels():
                     sink = voice_cog._create_speech_listener(ctx)
                     vc.listen(sink)
                     voice_cog.active_sinks[guild_id] = sink
+
+                    # Start transcript session
+                    if users_in_channel:
+                        first_member = users_in_channel[0]
+                        voice_cog.transcript_manager.start_session(
+                            channel_id=str(channel.id),
+                            guild_id=str(guild_id),
+                            guild_name=guild.name,
+                            channel_name=channel.name,
+                            first_user_id=str(first_member.id),
+                            first_username=first_member.display_name
+                        )
+
                     logger.info(f"✅ Rejoined and started listening in {channel.name} ({guild.name})")
                 else:
                     logger.warning(f"Rejoined {channel.name} but VoiceSpeech cog not available")
