@@ -231,18 +231,6 @@ The cog will be loaded automatically on bot startup.
 - Always stage specific files, never use `git add .`
 - Keep commits focused (one logical change per commit)
 
-### Code Style & Organization
-- **Max line length:** 120 characters
-- **File size limit:** Keep files under 500 lines when possible
-  - If file exceeds 500 lines, consider splitting into focused modules
-  - Group related code in packages (not single large files)
-- **Type hints:** Required for function parameters and return values
-- **Docstrings:** Required for all public methods and classes
-  - Include Args, Returns, Raises sections for complex functions
-  - Add usage examples for non-obvious functionality
-- **Prefer explicit over implicit** code patterns
-- **No emojis** in code or comments unless explicitly requested by user
-
 ### Configuration System
 - **ALL** config must use unified ConfigManager (no old `bot.config`)
 - New config fields require schema registration in cog's `__init__`
