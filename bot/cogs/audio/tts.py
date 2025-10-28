@@ -273,6 +273,16 @@ class TtsCog(BaseCog):
                 # CRITICAL FIX: Pass ctx.guild.id to queue_sound for guild isolation
                 await voice_cog.queue_sound(ctx.guild.id, filepath, ctx.author, None, 1.0)
 
+                # Add to transcript
+                if ctx.voice_client and ctx.voice_client.channel:
+                    voice_cog.transcript_manager.add_bot_message(
+                        channel_id=str(ctx.voice_client.channel.id),
+                        bot_id=str(self.bot.user.id),
+                        bot_name=self.bot.user.name,
+                        message_type="TTS",
+                        content=f"[{ctx.author.display_name}] {chunk}"
+                    )
+
                 logger.info(
                     f"[Guild {ctx.guild.id}:{ctx.guild.name}] Queued TTS chunk {i + 1}/{len(chunks)}: '{chunk[:50]}...'")
             except Exception as e:

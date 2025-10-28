@@ -7,6 +7,7 @@ recording all transcriptions for later AI analysis.
 
 import json
 import uuid
+import asyncio
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from pathlib import Path
@@ -15,16 +16,21 @@ import logging
 
 logger = logging.getLogger("discordbot.transcript_session")
 
-TRANSCRIPTS_DIR = Path("data/transcripts/sessions")
-
 
 @dataclass
 class Participant:
-    """Voice channel participant information."""
+    """Voice channel participant information (summary - just who was present)."""
     user_id: str
     username: str
-    join_time: str
-    leave_time: Optional[str] = None
+
+
+@dataclass
+class ParticipantEvent:
+    """Single participant join/leave event."""
+    timestamp: str
+    user_id: str
+    username: str
+    event_type: str  # "join" or "leave"
 
 
 @dataclass
@@ -48,7 +54,10 @@ class TranscriptSession:
     start_time: str
     end_time: Optional[str] = None
     participants: List[Participant] = field(default_factory=list)
+    participant_events: List[ParticipantEvent] = field(default_factory=list)
     transcript: List[TranscriptEntry] = field(default_factory=list)
+    file_path: Optional[str] = None  # Track where file is saved
+    _dirty: bool = field(default=False, repr=False)  # Has unflushed changes
 
     @property
     def stats(self) -> Dict:
@@ -73,21 +82,142 @@ class TranscriptSession:
     def to_dict(self) -> Dict:
         """Convert session to dictionary for JSON serialization."""
         data = asdict(self)
+        # Remove internal fields
+        data.pop('_dirty', None)
+        # Add computed stats
         data['stats'] = self.stats
         return data
 
 
 class TranscriptSessionManager:
-    """Manages voice channel transcript sessions."""
+    """Manages voice channel transcript sessions with incremental file writing."""
 
-    def __init__(self):
-        """Initialize the session manager."""
+    def __init__(self, bot):
+        """Initialize the session manager.
+
+        Args:
+            bot: Discord bot instance (for accessing ConfigManager)
+        """
+        self.bot = bot
         self.active_sessions: Dict[str, TranscriptSession] = {}  # {channel_id: session}
+        self._flush_task: Optional[asyncio.Task] = None
 
-        # Ensure transcripts directory exists
-        TRANSCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
+        # Get transcript directory from config (will use Voice config)
+        # Note: We'll read this dynamically in methods to support hot-reload
 
         logger.info("TranscriptSessionManager initialized")
+
+    def _get_transcripts_dir(self) -> Path:
+        """Get transcripts directory from config."""
+        try:
+            voice_cfg = self.bot.config_manager.for_guild("Voice", "System")
+            return Path(voice_cfg.transcript_dir)
+        except:
+            # Fallback to default if config not available
+            return Path("data/transcripts/sessions")
+
+    def _get_flush_interval(self) -> int:
+        """Get flush interval from config."""
+        try:
+            voice_cfg = self.bot.config_manager.for_guild("Voice", "System")
+            return voice_cfg.transcript_flush_interval
+        except:
+            return 30  # Default fallback
+
+    def start_flush_task(self):
+        """Start background task to periodically flush active sessions."""
+        if self._flush_task is None or self._flush_task.done():
+            self._flush_task = asyncio.create_task(self._flush_loop())
+            logger.info("Started transcript flush task")
+
+    def stop_flush_task(self):
+        """Stop the background flush task."""
+        if self._flush_task and not self._flush_task.done():
+            self._flush_task.cancel()
+            logger.info("Stopped transcript flush task")
+
+    async def _flush_loop(self):
+        """Background loop that periodically flushes dirty sessions."""
+        try:
+            while True:
+                interval = self._get_flush_interval()
+                await asyncio.sleep(interval)
+
+                # Flush all dirty sessions
+                flushed_count = 0
+                for channel_id, session in self.active_sessions.items():
+                    if session._dirty:
+                        self._update_session_file(session)
+                        session._dirty = False
+                        flushed_count += 1
+
+                if flushed_count > 0:
+                    logger.debug(f"Flushed {flushed_count} transcript session(s)")
+
+        except asyncio.CancelledError:
+            logger.info("Transcript flush loop cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"Error in transcript flush loop: {e}", exc_info=True)
+
+    def _create_session_file(self, session: TranscriptSession):
+        """
+        Create initial session file immediately when session starts.
+        Uses nested directory structure: {transcripts_dir}/{guild_id}/{channel_id}/
+
+        Args:
+            session: TranscriptSession to create file for
+        """
+        try:
+            # Create nested directory structure: guild_id/channel_id/
+            base_dir = self._get_transcripts_dir()
+            session_dir = base_dir / session.guild_id / session.channel_id
+            session_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create filename with timestamp and session ID
+            start_dt = datetime.fromisoformat(session.start_time)
+            filename = f"{start_dt.strftime('%Y%m%d_%H%M%S')}_{session.session_id}.json"
+            filepath = session_dir / filename
+
+            # Store filepath in session
+            session.file_path = str(filepath)
+
+            # Write initial session data
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
+
+            logger.info(f"Created transcript session file: {filepath}")
+
+        except Exception as e:
+            logger.error(f"Failed to create transcript session file for {session.session_id}: {e}", exc_info=True)
+
+    def _update_session_file(self, session: TranscriptSession):
+        """
+        Update existing session file with new data (incremental write).
+        Uses atomic write (write to temp file, then rename).
+
+        Args:
+            session: TranscriptSession to update
+        """
+        if not session.file_path:
+            logger.warning(f"Cannot update session {session.session_id}: no file_path set")
+            return
+
+        try:
+            filepath = Path(session.file_path)
+            temp_filepath = filepath.with_suffix('.tmp')
+
+            # Write to temp file
+            with open(temp_filepath, 'w', encoding='utf-8') as f:
+                json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
+
+            # Atomic replace
+            temp_filepath.replace(filepath)
+
+            logger.debug(f"Updated transcript session file: {filepath}")
+
+        except Exception as e:
+            logger.error(f"Failed to update transcript session file for {session.session_id}: {e}", exc_info=True)
 
     def start_session(
         self,
@@ -122,8 +252,15 @@ class TranscriptSessionManager:
 
         first_participant = Participant(
             user_id=first_user_id,
+            username=first_username
+        )
+
+        # Create first participant join event
+        first_join_event = ParticipantEvent(
+            timestamp=now,
+            user_id=first_user_id,
             username=first_username,
-            join_time=now
+            event_type="join"
         )
 
         session = TranscriptSession(
@@ -133,10 +270,17 @@ class TranscriptSessionManager:
             channel_id=channel_id,
             channel_name=channel_name,
             start_time=now,
-            participants=[first_participant]
+            participants=[first_participant],
+            participant_events=[first_join_event]
         )
 
         self.active_sessions[channel_id] = session
+
+        # Create session file immediately
+        self._create_session_file(session)
+
+        # Start flush task if not already running
+        self.start_flush_task()
 
         logger.info(
             f"Started transcript session {session_id} for channel '{channel_name}' "
@@ -152,7 +296,7 @@ class TranscriptSessionManager:
         username: str
     ):
         """
-        Add a participant to the active session.
+        Add a participant join event to the active session.
 
         Args:
             channel_id: Voice channel ID
@@ -164,20 +308,29 @@ class TranscriptSessionManager:
             return
 
         session = self.active_sessions[channel_id]
+        now = datetime.utcnow().isoformat()
 
-        # Check if participant already exists
-        for p in session.participants:
-            if p.user_id == user_id:
-                return  # Already in session
-
-        participant = Participant(
+        # Add join event to chronological log
+        join_event = ParticipantEvent(
+            timestamp=now,
             user_id=user_id,
             username=username,
-            join_time=datetime.utcnow().isoformat()
+            event_type="join"
         )
+        session.participant_events.append(join_event)
 
-        session.participants.append(participant)
-        logger.debug(f"Added participant {username} to session {session.session_id}")
+        # Check if participant already exists in summary list
+        participant_exists = any(p.user_id == user_id for p in session.participants)
+        if not participant_exists:
+            participant = Participant(
+                user_id=user_id,
+                username=username
+            )
+            session.participants.append(participant)
+
+        # Mark session as dirty for next flush
+        session._dirty = True
+        logger.debug(f"Added participant join event: {username} to session {session.session_id}")
 
     def remove_participant(
         self,
@@ -185,7 +338,7 @@ class TranscriptSessionManager:
         user_id: str
     ):
         """
-        Mark a participant as left.
+        Add a participant leave event to the active session.
 
         Args:
             channel_id: Voice channel ID
@@ -195,12 +348,27 @@ class TranscriptSessionManager:
             return
 
         session = self.active_sessions[channel_id]
+        now = datetime.utcnow().isoformat()
 
-        for participant in session.participants:
-            if participant.user_id == user_id and participant.leave_time is None:
-                participant.leave_time = datetime.utcnow().isoformat()
-                logger.debug(f"Marked participant {participant.username} as left")
+        # Find username from participants list
+        username = "Unknown"
+        for p in session.participants:
+            if p.user_id == user_id:
+                username = p.username
                 break
+
+        # Add leave event to chronological log
+        leave_event = ParticipantEvent(
+            timestamp=now,
+            user_id=user_id,
+            username=username,
+            event_type="leave"
+        )
+        session.participant_events.append(leave_event)
+
+        # Mark session as dirty for next flush
+        session._dirty = True
+        logger.debug(f"Added participant leave event: {username} from session {session.session_id}")
 
     def add_transcript(
         self,
@@ -235,7 +403,37 @@ class TranscriptSessionManager:
         )
 
         session.transcript.append(entry)
+
+        # Mark session as dirty for next flush
+        session._dirty = True
+
         logger.debug(f"Added transcript to session {session.session_id}: {username}: {text[:50]}")
+
+    def add_bot_message(
+        self,
+        channel_id: str,
+        bot_id: str,
+        bot_name: str,
+        message_type: str,
+        content: str
+    ):
+        """
+        Add a bot action/message to the transcript.
+
+        Args:
+            channel_id: Voice channel ID
+            bot_id: Bot user ID
+            bot_name: Bot username
+            message_type: Type of message (e.g., "TTS", "SOUND", "COMMAND")
+            content: Message content
+        """
+        self.add_transcript(
+            channel_id=channel_id,
+            user_id=bot_id,
+            username=f"{bot_name} [{message_type}]",
+            text=content,
+            confidence=1.0
+        )
 
     def end_session(self, channel_id: str) -> Optional[str]:
         """
@@ -254,8 +452,8 @@ class TranscriptSessionManager:
         session = self.active_sessions[channel_id]
         session.end_time = datetime.utcnow().isoformat()
 
-        # Save to file
-        self._save_session(session)
+        # Final flush to ensure all data written
+        self._update_session_file(session)
 
         # Remove from active sessions
         del self.active_sessions[channel_id]
@@ -280,27 +478,6 @@ class TranscriptSessionManager:
         """
         return self.active_sessions.get(channel_id)
 
-    def _save_session(self, session: TranscriptSession):
-        """
-        Save session to JSON file.
-
-        Args:
-            session: TranscriptSession to save
-        """
-        try:
-            # Create filename with timestamp and session ID
-            start_dt = datetime.fromisoformat(session.start_time)
-            filename = f"{start_dt.strftime('%Y%m%d_%H%M%S')}_{session.session_id}.json"
-            filepath = TRANSCRIPTS_DIR / filename
-
-            # Save to file
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(session.to_dict(), f, indent=2, ensure_ascii=False)
-
-            logger.info(f"Saved transcript session to {filepath}")
-
-        except Exception as e:
-            logger.error(f"Failed to save transcript session {session.session_id}: {e}", exc_info=True)
 
     def load_session(self, session_id: str) -> Optional[TranscriptSession]:
         """
