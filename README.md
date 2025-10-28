@@ -1,15 +1,17 @@
 # Discord Bot
 
-A feature-rich Discord bot with voice recognition, TTS, soundboard, comprehensive user statistics, and voice time tracking.
+A production-grade Discord bot with voice recognition, TTS, soundboard, comprehensive user statistics, voice time tracking, and web-based admin dashboard.
 
 ## Features
 
 - **Voice & Audio**
   - Text-to-Speech (TTS) using Edge TTS and local pyttsx3
-  - Voice recognition with transcription logging
-  - Audio playback with queue management and ducking
+  - Voice recognition with real-time transcription (Vosk)
+  - Session-based transcript recording with historical viewer
+  - Audio playback with per-guild queue management and ducking
   - Customizable soundboard with trigger word detection
   - 20+ voice options with per-user preferences
+  - Auto-join and auto-disconnect functionality
 
 - **User Statistics & Tracking**
   - Activity tracking (messages, reactions, replies)
@@ -20,18 +22,23 @@ A feature-rich Discord bot with voice recognition, TTS, soundboard, comprehensiv
   - Weekly recap summaries
   - Point-based scoring system with ambiguous display
 
-- **Admin Dashboard**
-  - Real-time bot monitoring with Pygame interface
+- **Web Admin Dashboard**
+  - Modern FastAPI-based web interface
+  - Real-time bot monitoring with WebSocket updates
+  - Live voice transcription display
+  - Historical transcript viewer (browse past voice sessions)
+  - Interactive JSON editor for configuration files
+  - Unified configuration system with per-guild overrides
   - Health metrics and connection tracking
   - Command usage statistics
   - Error logging and reporting
-  - Live voice transcription display
   - Admin user management system
   - Exact stats viewing mode (admin only)
 
 - **Modular Cog System**
+  - Domain-organized architecture (bot/cogs/, bot/core/, bot/ui/)
   - Hot-reload functionality for cogs
-  - Centralized error handling
+  - Centralized error handling via BaseCog
   - Command execution tracking
   - Easy extensibility
 
@@ -50,14 +57,24 @@ cd DiscordBot
 
 2. Install dependencies:
 ```bash
-pip install -r requirements.txt
+uv sync                # Using uv package manager (recommended)
+# OR
+pip install -e .       # Using pip with pyproject.toml
 ```
 
 3. Create a `.env` file in the root directory:
 ```env
 DISCORD_TOKEN=your_discord_token_here
 COMMAND_PREFIX=~
-ENABLE_ADMIN_DASHBOARD=true
+BOT_OWNER_ID=your_discord_user_id
+LOG_LEVEL=INFO
+
+# Web Dashboard
+ENABLE_WEB_DASHBOARD=true
+WEB_HOST=127.0.0.1
+WEB_PORT=8000
+
+# Voice Settings
 VOICE_TRACKING_ENABLED=true
 VOICE_POINTS_PER_MINUTE=0.0
 VOICE_TIME_DISPLAY_MODE=ranges
@@ -65,41 +82,54 @@ VOICE_TIME_DISPLAY_MODE=ranges
 
 4. Run the bot:
 ```bash
-python main.py
+python bot/main.py
 ```
 
 ## Configuration
 
-Edit `.env` file or set environment variables:
+The bot uses a unified ConfigManager system with support for:
+- Environment variables (`.env` file)
+- Global configuration overrides (`data/config/base_config.json`)
+- Per-guild configuration overrides (`data/config/guilds/{guild_id}.json`)
+- Web-based configuration UI at `http://localhost:8000/config`
 
-### Core Settings
+### Essential Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DISCORD_TOKEN` | Yes | - | Your Discord bot token |
+| `BOT_OWNER_ID` | Yes | - | Your Discord user ID (for admin access) |
+| `COMMAND_PREFIX` | No | `~` | Bot command prefix |
+| `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
+
+### Web Dashboard Settings
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DISCORD_TOKEN` | Required | Your Discord bot token |
-| `COMMAND_PREFIX` | `~` | Bot command prefix |
-| `ENABLE_ADMIN_DASHBOARD` | `true` | Enable/disable Pygame dashboard |
-| `LOG_LEVEL` | `INFO` | Logging level |
+| `ENABLE_WEB_DASHBOARD` | `true` | Enable/disable web dashboard |
+| `WEB_HOST` | `127.0.0.1` | Dashboard host address |
+| `WEB_PORT` | `8000` | Dashboard port |
+| `WEB_RELOAD` | `false` | Enable hot reload (development only) |
 
-### Audio Settings
+### Voice & Audio Settings
+
+Most audio settings can be configured via the web UI at runtime. Key environment variables:
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEFAULT_VOLUME` | `0.5` | Default audio volume (0.0-1.0) |
 | `DUCKING_ENABLED` | `true` | Enable audio ducking when users speak |
 | `DUCKING_LEVEL` | `0.5` | Volume reduction when ducked (0.0-1.0) |
-
-### Voice Time Tracking
-| Variable | Default | Description |
-|----------|---------|-------------|
 | `VOICE_TRACKING_ENABLED` | `true` | Track voice channel time |
-| `VOICE_POINTS_PER_MINUTE` | `0.0` | Points awarded per minute in voice |
 | `VOICE_TIME_DISPLAY_MODE` | `ranges` | Display mode: ranges, descriptions, points_only |
-| `VOICE_TRACKING_TYPE` | `total` | Type to track: total, unmuted, speaking |
 
-### Admin System
+### Transcript Settings
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WEEKLY_RECAP_ENABLED` | `false` | Enable weekly recap posting |
-| `WEEKLY_RECAP_CHANNEL_ID` | None | Channel ID for weekly recaps |
+| `TRANSCRIPT_ENABLED` | `true` | Enable session transcript recording |
+| `TRANSCRIPT_FLUSH_INTERVAL` | `30` | Seconds between transcript saves (5-300) |
+| `TRANSCRIPT_DIR` | `data/transcripts/sessions` | Transcript storage directory |
 
 ## Commands
 
@@ -144,88 +174,155 @@ Edit `.env` file or set environment variables:
 - `~weeklyrecap` - Generate weekly stats summary (admin only)
 - `~admincontrol <add|remove|list> [@user]` - Manage bot admins (owner only)
 
-## Admin Dashboard
+## Web Admin Dashboard
 
-Run the admin dashboard (requires `ENABLE_ADMIN_DASHBOARD=true`):
+Access the web dashboard at `http://localhost:8000` (requires `ENABLE_WEB_DASHBOARD=true` in `.env`).
 
-```bash
-python admin_interface_full.py
-```
+**Dashboard Pages:**
 
-**Dashboard Features:**
-- Real-time health monitoring
-- Active connections display
+- **Home** (`/`) - Bot status overview and health metrics
+- **Configuration** (`/config`) - Interactive config editor with per-guild overrides
+- **Transcripts** (`/transcripts`) - Live and historical voice session transcripts
+- **JSON Editor** (`/json-editor`) - Edit configuration files with table interface
+- **Monitoring** - Real-time WebSocket updates for bot metrics
+
+**Key Features:**
+- Real-time health monitoring via WebSocket
+- Live voice transcription display
+- Historical transcript viewer with session browsing
+- Interactive configuration management
 - Command usage statistics
 - Error tracking with severity levels
-- Live voice transcription feed
-- Soundboard management
-
-**Controls:**
-- Left Click: Navigate views
-- Mouse Wheel: Scroll
-- R: Refresh data
-- ESC: Exit
+- Per-guild configuration overrides
+- JSON file backup system
 
 ## Project Structure
 
 ```
 DiscordBot/
-├── main.py                      # Bot entry point
-├── config.py                    # Configuration management
-├── base_cog.py                  # Base cog with error handling
+├── bot/                              # Main bot package (domain-organized)
+│   ├── main.py                       # Bot entry point
+│   ├── config.py                     # Legacy config (deprecated)
+│   ├── base_cog.py                   # Base cog with error handling
+│   │
+│   ├── cogs/                         # Discord command modules (UI layer)
+│   │   ├── admin/
+│   │   │   └── monitoring.py         # Bot monitoring commands
+│   │   ├── activity/
+│   │   │   └── tracker.py            # Activity & voice time tracking
+│   │   ├── audio/
+│   │   │   ├── soundboard.py         # Soundboard commands
+│   │   │   ├── voice_speech.py       # Voice recognition
+│   │   │   ├── tts.py                # Text-to-speech
+│   │   │   └── edge_tts.py           # Edge TTS integration
+│   │   ├── errors.py                 # Error handling cog
+│   │   └── utility/
+│   │       ├── base_commands.py      # General commands
+│   │       └── test.py               # Test commands
+│   │
+│   ├── core/                         # Business logic (reusable)
+│   │   ├── config_system.py          # Unified ConfigManager
+│   │   ├── system_config.py          # System-level config schema
+│   │   ├── errors.py                 # Custom exceptions
+│   │   ├── transcript_session.py     # Transcript recording manager
+│   │   ├── admin/
+│   │   │   ├── manager.py            # Admin user management
+│   │   │   └── data_collector.py     # Metrics collection
+│   │   ├── audio/
+│   │   │   ├── sources.py            # Discord audio source
+│   │   │   ├── player.py             # PyAudio player
+│   │   │   └── auto_join.py          # Auto-join logic
+│   │   └── stats/
+│   │       ├── activity.py           # Activity statistics
+│   │       └── user_triggers.py      # User trigger statistics
+│   │
+│   └── ui/                           # UI components
+│       └── (Discord views/modals)
 │
-├── cogs/                        # Bot command modules
-│   ├── activity_tracker.py      # Activity & voice time tracking
-│   ├── soundboard.py            # Soundboard + stats/leaderboards
-│   ├── voicespeech.py           # Voice recognition
-│   ├── tts.py                   # Text-to-speech
-│   ├── monitoring.py            # Bot monitoring
-│   └── base_commands.py         # General commands
+├── web/                              # FastAPI web dashboard
+│   ├── app.py                        # FastAPI app entry point
+│   ├── routes/                       # API endpoints
+│   │   ├── index.py                  # Home page
+│   │   ├── config.py                 # Config management API
+│   │   ├── transcripts.py            # Transcript API
+│   │   ├── json_editor.py            # JSON editor API
+│   │   └── websocket.py              # WebSocket endpoints
+│   ├── templates/                    # Jinja2 HTML templates
+│   └── static/                       # CSS, JS, assets
+│       ├── css/
+│       └── js/
 │
-├── utils/                       # Utility modules
-│   ├── activity_stats.py        # Activity statistics data layer
-│   ├── user_stats.py            # User trigger statistics
-│   ├── admin_manager.py         # Admin user management
-│   ├── admin_data_collector.py  # Metrics collection
-│   ├── error_handler.py         # Error handling utilities
-│   ├── discord_audio_source.py  # Audio source implementation
-│   └── pyaudio_player.py        # Audio player
+├── data/                             # Runtime data files
+│   ├── config/                       # Configuration files
+│   │   ├── base_config.json          # Global overrides
+│   │   ├── soundboard.json           # Sound definitions
+│   │   └── guilds/                   # Per-guild config overrides
+│   ├── soundboard/                   # Audio files (MP3, OGG)
+│   ├── transcripts/                  # Voice session transcripts
+│   │   └── sessions/
+│   │       └── {guild_id}/
+│   │           └── {channel_id}/
+│   ├── activity_stats.json           # Activity statistics (runtime)
+│   ├── user_stats.json               # User trigger stats (runtime)
+│   └── tts_preferences.json          # TTS user preferences
 │
-├── admin_interface_full.py      # Full admin dashboard
-├── admin_interface_minimal.py   # Minimal dashboard
+├── logs/                             # Rotating log files
+├── admin_data/                       # Dashboard data exports
+├── model/                            # Vosk speech recognition model
+├── docs/                             # Project documentation
+│   ├── CLAUDE.md                     # AI assistant guidance
+│   ├── SUGGESTIONS_28-10.md          # Refactoring roadmap
+│   └── backups/                      # Config file backups
 │
-├── soundboard/                  # Audio files (MP3, OGG)
-├── model/                       # Vosk speech model
-├── logs/                        # Bot logs
-├── admin_data/                  # Dashboard data exports
-│
-├── soundboard.json              # Sound definitions
-├── activity_stats.json          # Activity statistics (runtime)
-├── user_stats.json              # User trigger stats (runtime)
-└── tts_preferences.json         # TTS user preferences
+├── .env                              # Environment variables
+├── pyproject.toml                    # Python dependencies (uv)
+└── README.md                         # This file
 ```
 
 ## Development
 
 **Adding New Cogs:**
-1. Create a new Python file in `cogs/` directory
+1. Create a new Python file in `bot/cogs/` directory (organized by domain: audio, activity, admin, utility)
 2. Inherit from `BaseCog` for automatic error handling
 3. Use `@track_command` decorator for command tracking
-4. Add `async def setup(bot)` function
+4. Register any config fields in `__init__` using `config_manager.register_schema()`
+5. Add `async def setup(bot)` function
 
 **Example:**
 ```python
-from base_cog import BaseCog
+from bot.base_cog import BaseCog
 from discord.ext import commands
+from bot.core.config_system import ConfigSchema, config_field
 
 class MyCog(BaseCog):
+    def __init__(self, bot):
+        super().__init__(bot)
+        # Register config schema
+        self.config_manager.register_schema("MyCog", ConfigSchema(
+            my_setting=config_field(
+                default="default_value",
+                description="Description of my setting",
+                guild_override=True
+            )
+        ))
+
+    @track_command
     @commands.command(name="mycommand")
     async def my_command(self, ctx):
-        await ctx.send("Hello!")
+        # Get config (with guild override support)
+        cfg = self.config_manager.for_guild("MyCog", ctx.guild.id)
+        await ctx.send(f"Setting value: {cfg.my_setting}")
 
 async def setup(bot):
     await bot.add_cog(MyCog(bot))
 ```
+
+**Configuration System:**
+- All config should use `ConfigManager` (accessible via `self.config_manager` in cogs)
+- Register config schemas in cog `__init__` method
+- Use `config_field()` to define config metadata (defaults, descriptions, guild overrides, etc.)
+- Test config changes via web UI at `http://localhost:8000/config`
+- See `bot/core/config_system.py` for full API details
 
 ## Key Features Explained
 
