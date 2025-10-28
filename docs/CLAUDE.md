@@ -231,6 +231,14 @@ The cog will be loaded automatically on bot startup.
 - Always stage specific files, never use `git add .`
 - Keep commits focused (one logical change per commit)
 
+### Branch Management
+- **Create feature branches** for each feature, migration, or fix (e.g., `feat-transcript-viewer`, `config-migration-phase1`)
+- **Always clean up branches after merging to master:**
+  1. Delete local branch: `git branch -d branch-name`
+  2. Delete remote branch: `git push master --delete branch-name`
+- Use `git branch --merged` to see which branches are safe to delete
+- Keep branch list clean - only active work should have branches
+
 ### Configuration System
 - **ALL** config must use unified ConfigManager (no old `bot.config`)
 - New config fields require schema registration in cog's `__init__`
