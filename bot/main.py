@@ -10,6 +10,25 @@ from dotenv import load_dotenv
 # Load .env file FIRST (before any config imports)
 load_dotenv()
 
+# Configure Vosk library log level based on LOG_LEVEL environment variable
+try:
+    import vosk
+    # Map Python log levels to Vosk log levels
+    # Vosk: -1=suppress, 0=fatal, 1=error, 2=warning, 3=info, 4=debug
+    # Python: CRITICAL=50, ERROR=40, WARNING=30, INFO=20, DEBUG=10
+    log_level_name = os.getenv("LOG_LEVEL", "INFO").upper()
+    vosk_log_mapping = {
+        "CRITICAL": 0,  # Fatal errors only
+        "ERROR": 1,     # Errors
+        "WARNING": 2,   # Warnings
+        "INFO": -1,     # Suppress (INFO is too verbose for Vosk)
+        "DEBUG": 3      # Show Vosk info when debugging
+    }
+    vosk_level = vosk_log_mapping.get(log_level_name, -1)
+    vosk.SetLogLevel(vosk_level)
+except ImportError:
+    pass  # Vosk not installed, skip
+
 from bot.config import config
 from bot.core.admin.data_collector import initialize_data_collector
 
@@ -72,6 +91,22 @@ def update_log_level(level_name: str):
         if name.startswith("discord"):
             if isinstance(log, logging.Logger):
                 log.setLevel(level)
+
+    # Also update Vosk log level to match
+    try:
+        import vosk
+        vosk_log_mapping = {
+            "CRITICAL": 0,  # Fatal errors only
+            "ERROR": 1,     # Errors
+            "WARNING": 2,   # Warnings
+            "INFO": -1,     # Suppress (INFO is too verbose for Vosk)
+            "DEBUG": 3      # Show Vosk info when debugging
+        }
+        vosk_level = vosk_log_mapping.get(level_name.upper(), -1)
+        vosk.SetLogLevel(vosk_level)
+    except (ImportError, AttributeError):
+        pass  # Vosk not available
+
     logger.info(f"Updated log level to {level_name.upper()}")
 
 
@@ -129,10 +164,11 @@ intents.members = True
 bot = commands.Bot(command_prefix=config.command_prefix, intents=intents, help_command=None)
 bot.start_time = datetime.now(UTC)
 
-# Initialize data collector with config settings
+# Initialize data collector with defaults (will be configured by ConfigManager later)
+# Note: max_history and enable_export come from SystemConfig after ConfigManager loads
 data_collector = initialize_data_collector(
     bot,
-    max_history=config.max_history,
+    max_history=1000,  # Default, will use SystemConfig.max_history after cogs load
     enable_export=True  # Always enable export for web dashboard and debugging
 )
 
@@ -293,6 +329,15 @@ async def on_ready():
         # Update log level from config
         update_log_level(sys_cfg.log_level)
 
+        # Update data collector settings from config
+        if data_collector.export_dir:
+            data_collector.export_dir = Path(sys_cfg.admin_data_dir)
+            data_collector.export_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"📊 Data export directory: {data_collector.export_dir}")
+
+        # Update max_history from config
+        data_collector.max_history = sys_cfg.max_history
+
         # Log feature flags
         if sys_cfg.enable_web_dashboard:
             logger.info(f"🌐 Web dashboard enabled on {sys_cfg.web_host}:{sys_cfg.web_port}")
@@ -305,8 +350,8 @@ async def on_ready():
     except Exception as e:
         logger.warning(f"Could not apply system config settings: {e}")
 
-    # Connect web dashboard to data collector if enabled
-    if config.enable_web_dashboard:
+    # Connect web dashboard to data collector if enabled (use ConfigManager setting)
+    if sys_cfg.enable_web_dashboard:
         try:
             from web.websocket_manager import manager
             from web.app import set_bot_instance
@@ -325,6 +370,12 @@ async def on_ready():
             logger.info("🌐 Web dashboard connected to data collector")
         except Exception as e:
             logger.error(f"Failed to connect web dashboard: {e}", exc_info=True)
+
+    # Start web server in background if enabled (after ConfigManager is ready)
+    if sys_cfg.enable_web_dashboard:
+        import asyncio
+        asyncio.create_task(start_web_server())
+        logger.info("🌐 Web server task created - starting in background...")
 
     # Rejoin voice channels from saved state if users are present
     await rejoin_saved_voice_channels()
@@ -352,15 +403,22 @@ async def on_connect():
 # -----------------------
 
 async def start_web_server():
-    """Start the web dashboard server."""
-    if config.enable_web_dashboard:
+    """Start the web dashboard server using ConfigManager settings."""
+    # Get system config from bot's ConfigManager (bot is global)
+    if not hasattr(bot, 'config_manager'):
+        logger.error("ConfigManager not initialized - cannot start web server")
+        return
+
+    sys_cfg = bot.config_manager.for_guild("System")
+
+    if sys_cfg.enable_web_dashboard:
         try:
             from web.app import run_server
-            logger.info(f"🌐 Starting web dashboard on {config.web_host}:{config.web_port}")
+            logger.info(f"🌐 Starting web dashboard on {sys_cfg.web_host}:{sys_cfg.web_port}")
             await run_server(
-                host=config.web_host,
-                port=config.web_port,
-                reload=config.web_reload
+                host=sys_cfg.web_host,
+                port=sys_cfg.web_port,
+                reload=sys_cfg.web_reload
             )
         except Exception as e:
             logger.error(f"Failed to start web server: {e}", exc_info=True)
@@ -369,12 +427,7 @@ async def start_web_server():
 async def main():
     """Main async entry point."""
     try:
-        # Start web server in background if enabled
-        if config.enable_web_dashboard:
-            import asyncio
-            asyncio.create_task(start_web_server())
-            logger.info("🌐 Web server starting in background...")
-
+        # Note: Web server will be started in setup_hook() after ConfigManager is initialized
         # Start bot
         async with bot:
             await bot.start(config.token)

@@ -82,12 +82,12 @@ class AdminDataCollector:
         self.commands_this_minute = 0
         self.last_minute_reset = datetime.now()
 
-        # Data export path
+        # Data export path (default used until ConfigManager updates it in main.py on_ready)
         self.export_dir = None
         if self.enable_export:
-            self.export_dir = Path(config.admin_data_dir)
+            self.export_dir = Path("data/admin")  # Default, updated from SystemConfig.admin_data_dir
             self.export_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Data export enabled - {config.admin_data_dir} directory created")
+            logger.info(f"Data export enabled - {self.export_dir} directory created")
         else:
             logger.info("Data export disabled - running in headless mode")
 
