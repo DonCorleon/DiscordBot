@@ -232,7 +232,8 @@ The cog will be loaded automatically on bot startup.
 - Keep commits focused (one logical change per commit)
 
 ### Branch Management
-- **Create feature branches** for each feature, migration, or fix (e.g., `feat-transcript-viewer`, `config-migration-phase1`)
+- **DO NOT create branches** unless explicitly told to do so by the user
+- When directed to create a branch, use descriptive names (e.g., `feat-transcript-viewer`, `config-migration-phase1`)
 - **Always clean up branches after merging to master:**
   1. Delete local branch: `git branch -d branch-name`
   2. Delete remote branch: `git push master --delete branch-name`
