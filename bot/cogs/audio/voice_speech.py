@@ -183,11 +183,17 @@ class VoiceSpeechCog(BaseCog):
         global _voice_cog_instance
         _voice_cog_instance = self
 
-        # Register config schema
+        # Register config schemas
         from bot.core.config_system import CogConfigSchema
-        schema = CogConfigSchema.from_dataclass("Voice", VoiceConfig)
-        bot.config_manager.register_schema("Voice", schema)
+        from bot.core.audio.speech_engines.config import SpeechConfig
+
+        voice_schema = CogConfigSchema.from_dataclass("Voice", VoiceConfig)
+        bot.config_manager.register_schema("Voice", voice_schema)
         logger.info("Registered Voice config schema")
+
+        speech_schema = CogConfigSchema.from_dataclass("Speech", SpeechConfig)
+        bot.config_manager.register_schema("Speech", speech_schema)
+        logger.info("Registered Speech config schema")
 
         self.active_sinks = {}
         self._keepalive_task = None
@@ -243,9 +249,13 @@ class VoiceSpeechCog(BaseCog):
                                         self.voice_client = voice_client
 
                                 ctx = AutoJoinContext(member.guild, vc)
-                                sink = self._create_speech_listener(ctx)
-                                vc.listen(sink)
-                                self.active_sinks[guild_id] = sink
+                                engine = self._create_speech_listener(ctx)
+                                await engine.start_listening(vc)
+                                # Store both engine and sink
+                                self.active_sinks[guild_id] = {
+                                    'engine': engine,
+                                    'sink': engine.get_sink()
+                                }
                                 logger.info(f"[{member.guild.name}] Auto-started listening in {after.channel.name}")
 
                             # Start transcript session
@@ -341,6 +351,11 @@ class VoiceSpeechCog(BaseCog):
                         # Stop listening
                         if guild_id in self.active_sinks:
                             try:
+                                sink_data = self.active_sinks[guild_id]
+                                if isinstance(sink_data, dict):
+                                    engine = sink_data.get('engine')
+                                    if engine:
+                                        await engine.stop_listening()
                                 if guild.voice_client:
                                     guild.voice_client.stop_listening()
                             except Exception as e:
@@ -651,8 +666,8 @@ class VoiceSpeechCog(BaseCog):
                     except Exception as e:
                         logger.error(f"[Guild {guild_id}] Keepalive error: {e}", exc_info=True)
                 # Read from config dynamically for hot-reload support
-                from bot.config import config
-                await asyncio.sleep(config.keepalive_interval)
+                sys_cfg = self.bot.config_manager.for_guild("System")
+                await asyncio.sleep(sys_cfg.keepalive_interval)
         except asyncio.CancelledError:
             logger.info("Keepalive loop cancelled")
             raise
@@ -683,9 +698,12 @@ class VoiceSpeechCog(BaseCog):
 
                 # Restart the listener
                 ctx = RestartContext(guild, vc)
-                new_sink = self._create_speech_listener(ctx)
-                vc.listen(new_sink)
-                self.active_sinks[guild_id] = new_sink
+                new_engine = self._create_speech_listener(ctx)
+                await new_engine.start_listening(vc)
+                self.active_sinks[guild_id] = {
+                    'engine': new_engine,
+                    'sink': new_engine.get_sink()
+                }
 
                 logger.info(f"[{guild.name}] ✅ Speech listener restarted successfully")
 
@@ -698,10 +716,15 @@ class VoiceSpeechCog(BaseCog):
         # Get the voice channel ID from the bot's voice client (as string for transcript session)
         voice_channel_id = str(ctx.guild.voice_client.channel.id) if ctx.guild.voice_client else None
 
-        def text_callback(user: discord.User, text: str):
+        def text_callback(member: discord.Member, text: str):
+            """
+            Callback for speech engines.
+            Args:
+                member: Discord member who spoke
+                text: Transcribed text (plain string, already parsed)
+            """
             try:
-                result = json.loads(text)
-                transcribed_text = result.get("text", "").strip()
+                transcribed_text = text.strip()
                 if not transcribed_text:
                     return
 
@@ -714,31 +737,31 @@ class VoiceSpeechCog(BaseCog):
                     "guild": guild_name,
                     "channel_id": voice_channel_id,
                     "channel": channel_name,
-                    "user_id": str(user.id),
-                    "user": user.display_name,
-                    "user_avatar_url": user.display_avatar.url if user.display_avatar else None,
+                    "user_id": str(member.id),
+                    "user": member.display_name,
+                    "user_avatar_url": member.display_avatar.url if member.display_avatar else None,
                     "text": transcribed_text,
                     "triggers": []
                 }
 
                 # Detailed colored console output (debug level)
                 logger.debug(
-                    f"\033[92m[{guild_name}] [{user.id}] [{user.display_name}] : {transcribed_text}\033[0m"
+                    f"\033[92m[{guild_name}] [{member.id}] [{member.display_name}] : {transcribed_text}\033[0m"
                 )
 
                 # Update user info in data collector
                 from bot.core.admin.data_collector import get_data_collector
                 data_collector = get_data_collector()
                 if data_collector:
-                    data_collector.update_user_info(user)
+                    data_collector.update_user_info(member)
 
                 # Add transcription to session
                 self.transcript_manager.add_transcript(
                     channel_id=voice_channel_id,
-                    user_id=str(user.id),
-                    username=user.display_name,
+                    user_id=str(member.id),
+                    username=member.display_name,
                     text=transcribed_text,
-                    confidence=1.0  # Vosk doesn't provide confidence in text mode
+                    confidence=1.0  # Speech engines don't provide confidence
                 )
 
                 soundboard_cog = self.bot.get_cog("Soundboard")
@@ -746,14 +769,14 @@ class VoiceSpeechCog(BaseCog):
                     # Full JSON for debug
                     logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
                     # Minimal info log
-                    logger.info(f"[TRANSCRIPTION] {user.display_name}: {transcribed_text}")
+                    logger.info(f"[TRANSCRIPTION] {member.display_name}: {transcribed_text}")
                     # Record transcription to data collector for web dashboard
                     if data_collector:
                         data_collector.record_transcription(transcription_data)
                     return
 
                 # Check for soundboard triggers
-                files = soundboard_cog.get_soundfiles_for_text(guild_id, user.id, transcribed_text)
+                files = soundboard_cog.get_soundfiles_for_text(guild_id, member.id, transcribed_text)
                 if files:
                     async def queue_all():
                         for soundfile, sound_key, volume, trigger_word in files:
@@ -765,14 +788,14 @@ class VoiceSpeechCog(BaseCog):
                                     "volume": volume
                                 })
                                 # Queue sound for THIS guild only (speech-triggered)
-                                await self.queue_sound(guild_id, soundfile, user, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
+                                await self.queue_sound(guild_id, soundfile, member, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
 
                         # Full JSON for debug (includes trigger details)
                         logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
 
                         # Minimal info log with triggers
                         trigger_words = ", ".join([t["word"] for t in transcription_data["triggers"]])
-                        logger.info(f"[TRANSCRIPTION] {user.display_name}: {transcribed_text} → triggers: {trigger_words}")
+                        logger.info(f"[TRANSCRIPTION] {member.display_name}: {transcribed_text} → triggers: {trigger_words}")
 
                         # Record transcription to data collector for web dashboard
                         if data_collector:
@@ -783,7 +806,7 @@ class VoiceSpeechCog(BaseCog):
                     # Full JSON for debug (no triggers)
                     logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
                     # Minimal info log (no triggers)
-                    logger.info(f"[TRANSCRIPTION] {user.display_name}: {transcribed_text}")
+                    logger.info(f"[TRANSCRIPTION] {member.display_name}: {transcribed_text}")
                     # Record transcription to data collector for web dashboard
                     if data_collector:
                         data_collector.record_transcription(transcription_data)
@@ -791,64 +814,29 @@ class VoiceSpeechCog(BaseCog):
             except Exception as e:
                 logger.error(f"Error in text_callback: {e}", exc_info=True)
 
-        # Get voice config for speech recognition settings
-        voice_cfg = self.bot.config_manager.for_guild("Voice")
+        # Ducking callback for speech engines
+        def ducking_callback(guild_id: int, member: discord.Member, is_speaking: bool):
+            """Handle speaking events for audio ducking."""
+            if is_speaking:
+                self._handle_user_speaking_start(guild_id, member.id)
+            else:
+                self._handle_user_speaking_stop(guild_id, member.id)
 
-        class SRListener(dsr.SpeechRecognitionSink):
-            def __init__(self, parent_cog, phrase_time_limit, error_log_threshold):
-                super().__init__(default_recognizer="vosk", phrase_time_limit=phrase_time_limit, text_cb=text_callback)
-                self.parent_cog = parent_cog
-                self.error_count = 0
-                self.max_errors = error_log_threshold
-                self.error_log_interval = error_log_threshold  # Log every Nth error
+        # Get speech config to determine which engine to use
+        from bot.core.audio.speech_engines import create_speech_engine
+        speech_cfg = self.bot.config_manager.for_guild("Speech")
 
-            def write(self, user, data):
-                """Override write to add error handling for corrupted audio data."""
-                try:
-                    super().write(user, data)
-                    # Reset error count on successful write
-                    self.error_count = 0
-                except Exception as e:
-                    self.error_count += 1
+        logger.info(f"[Guild {guild_id}] Creating speech engine: {speech_cfg.engine}")
 
-                    # Log first error and every Nth error to avoid spam
-                    if self.error_count == 1 or self.error_count % self.error_log_interval == 0:
-                        logger.warning(
-                            f"[Guild {guild_id}] Audio write error (count: {self.error_count}): {type(e).__name__}"
-                        )
-
-                    # If too many consecutive errors, log warning
-                    if self.error_count >= self.max_errors:
-                        logger.error(
-                            f"[Guild {guild_id}] Excessive audio errors ({self.error_count}). "
-                            "Voice connection may be unstable."
-                        )
-                        # Reset counter to avoid spam
-                        self.error_count = 0
-
-            @voice_recv.AudioSink.listener()
-            def on_voice_member_speaking_start(self, member: discord.Member):
-                try:
-                    logger.debug(f"🎤 {member.display_name} started speaking")
-                    # Trigger ducking
-                    self.parent_cog._handle_user_speaking_start(guild_id, member.id)
-                except Exception as e:
-                    logger.error(f"Error in speaking_start: {e}", exc_info=True)
-
-            @voice_recv.AudioSink.listener()
-            def on_voice_member_speaking_stop(self, member: discord.Member):
-                try:
-                    logger.debug(f"🔇 {member.display_name} stopped speaking")
-                    # Stop ducking
-                    self.parent_cog._handle_user_speaking_stop(guild_id, member.id)
-                except Exception as e:
-                    logger.error(f"Error in speaking_stop: {e}", exc_info=True)
-
-        return SRListener(
-            self,
-            phrase_time_limit=voice_cfg.voice_speech_phrase_time_limit,
-            error_log_threshold=voice_cfg.voice_speech_error_log_threshold
+        # Create speech engine (Vosk or Whisper based on config)
+        engine = create_speech_engine(
+            self.bot,
+            text_callback,
+            engine_type=speech_cfg.engine,
+            ducking_callback=ducking_callback
         )
+
+        return engine
 
     def _handle_user_speaking_start(self, guild_id: int, user_id: int):
         """Handle when a user starts speaking - duck the audio."""
@@ -1051,9 +1039,12 @@ class VoiceSpeechCog(BaseCog):
                 logger.info(f"Auto-join enabled for {target_channel.name} in guild {ctx.guild.id}")
 
             # Auto-start listening (always)
-            sink = self._create_speech_listener(ctx)
-            vc.listen(sink)
-            self.active_sinks[ctx.guild.id] = sink
+            engine = self._create_speech_listener(ctx)
+            await engine.start_listening(vc)
+            self.active_sinks[ctx.guild.id] = {
+                'engine': engine,
+                'sink': engine.get_sink()
+            }
 
             # Start transcript session
             session_id = None
@@ -1217,9 +1208,12 @@ class VoiceSpeechCog(BaseCog):
         else:
             vc = ctx.voice_client
 
-        sink = self._create_speech_listener(ctx)
-        vc.listen(sink)
-        self.active_sinks[ctx.guild.id] = sink
+        engine = self._create_speech_listener(ctx)
+        await engine.start_listening(vc)
+        self.active_sinks[ctx.guild.id] = {
+            'engine': engine,
+            'sink': engine.get_sink()
+        }
         await UserFeedback.success(ctx, "Listening...")
 
     @commands.command(help="Stop listening")
@@ -1227,6 +1221,14 @@ class VoiceSpeechCog(BaseCog):
         vc = ctx.voice_client
         if not vc or ctx.guild.id not in self.active_sinks:
             return await UserFeedback.warning(ctx, "Not currently listening.")
+
+        # Stop the speech engine
+        sink_data = self.active_sinks.get(ctx.guild.id)
+        if sink_data and isinstance(sink_data, dict):
+            engine = sink_data.get('engine')
+            if engine:
+                await engine.stop_listening()
+
         vc.stop_listening()
         self.active_sinks.pop(ctx.guild.id, None)
         await UserFeedback.success(ctx, "Stopped listening.")

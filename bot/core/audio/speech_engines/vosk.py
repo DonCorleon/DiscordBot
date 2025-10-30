@@ -1,23 +1,229 @@
 """
 Vosk speech recognition engine.
 
-Fast, local speech recognition using voice_recv library's built-in Vosk integration.
+Fast, local speech recognition using Vosk library directly.
 Best for low-latency real-time applications.
+
+Implementation based on direct AudioSink usage for full control.
 """
 
+import asyncio
 import json
 import discord
 from discord.ext import voice_recv
-from discord.ext.voice_recv.extras import speechrecognition as dsr
+import numpy as np
+import time
 from typing import Optional
+from collections import deque, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from .base import SpeechEngine, logger
+
+try:
+    from vosk import Model, KaldiRecognizer
+    VOSK_AVAILABLE = True
+except ImportError:
+    VOSK_AVAILABLE = False
+    logger.warning("Vosk not installed. Install with: pip install vosk")
+
+
+class VoskSink(voice_recv.AudioSink):
+    """
+    Custom AudioSink for Vosk speech recognition.
+
+    Processes audio chunks and transcribes using Vosk's KaldiRecognizer.
+    Based on proven pattern from user's working implementation.
+    """
+
+    CHUNK_TIME = 4  # Process audio every 4 seconds
+    OVERLAP_TIME = 0.5  # Keep 0.5s overlap between chunks
+    SAMPLE_RATE = 48000  # Discord's sample rate
+    CHANNELS = 2  # Stereo
+    SAMPLE_WIDTH = 2  # 16-bit audio
+
+    def __init__(
+        self,
+        vc: discord.VoiceClient,
+        callback,
+        vosk_model,
+        executor: ThreadPoolExecutor,
+        ducking_callback=None
+    ):
+        """
+        Initialize Vosk sink.
+
+        Args:
+            vc: Voice client
+            callback: Function called with (member, text) when speech is recognized
+            vosk_model: Loaded Vosk Model instance
+            executor: ThreadPoolExecutor for blocking Vosk calls
+            ducking_callback: Optional callback for ducking events
+        """
+        super().__init__()
+        self.vc = vc
+        self.callback = callback
+        self.vosk_model = vosk_model
+        self.executor = executor
+        self.ducking_callback = ducking_callback
+
+        # Per-user state
+        self.buffers = {}  # {user_id: deque([audio_chunks])}
+        self.recognizers = {}  # {user_id: KaldiRecognizer}
+        self.last_chunk_time = {}  # {user_id: timestamp}
+        self.user_locks = defaultdict(asyncio.Lock)
+
+        logger.info(f"[Guild {vc.guild.id}] VoskSink initialized")
+
+    def write(self, user: discord.User, data: voice_recv.VoiceData):
+        """
+        Called for every audio packet from Discord.
+
+        Buffers audio per user and processes chunks periodically.
+        """
+        try:
+            if not data.pcm:
+                return
+
+            async def process_user_audio():
+                async with self.user_locks[user.id]:
+                    # Initialize user state
+                    if user.id not in self.buffers:
+                        self.buffers[user.id] = deque()
+                        self.last_chunk_time[user.id] = time.time()
+                        self.recognizers[user.id] = KaldiRecognizer(
+                            self.vosk_model,
+                            self.SAMPLE_RATE
+                        )
+
+                    # Add audio to buffer
+                    self.buffers[user.id].append(data.pcm)
+
+                    # Check if it's time to process this chunk
+                    if time.time() - self.last_chunk_time[user.id] >= self.CHUNK_TIME:
+                        # Concatenate all buffered audio
+                        pcm_data = b''.join(self.buffers[user.id])
+
+                        # Keep overlap for next chunk (prevents missing words)
+                        bytes_per_second = self.SAMPLE_RATE * self.CHANNELS * self.SAMPLE_WIDTH
+                        overlap_bytes = int(bytes_per_second * self.OVERLAP_TIME)
+                        self.buffers[user.id] = deque([pcm_data[-overlap_bytes:]])
+                        self.last_chunk_time[user.id] = time.time()
+
+                        # Get member object
+                        member = self.vc.guild.get_member(user.id)
+                        if not member:
+                            return
+
+                        # Process in thread pool (blocking Vosk call)
+                        recognizer = self.recognizers.get(user.id)
+                        self.vc.loop.run_in_executor(
+                            self.executor,
+                            self.transcribe_user,
+                            pcm_data,
+                            member,
+                            recognizer
+                        )
+
+            asyncio.run_coroutine_threadsafe(process_user_audio(), self.vc.loop)
+
+        except Exception as e:
+            logger.error(f"VoskSink write error: {e}", exc_info=True)
+
+    def transcribe_user(self, pcm_data: bytes, member: discord.Member, recognizer: KaldiRecognizer):
+        """
+        Transcribe audio using Vosk (runs in thread pool).
+
+        Args:
+            pcm_data: Raw PCM audio bytes (stereo)
+            member: Discord member who spoke
+            recognizer: KaldiRecognizer instance for this user
+        """
+        try:
+            # Convert stereo to mono
+            audio_array = np.frombuffer(pcm_data, dtype=np.int16)
+            if len(audio_array) % 2 != 0:
+                audio_array = audio_array[:-1]
+            audio_array = audio_array.reshape(-1, 2)
+            mono_audio = audio_array.mean(axis=1).astype(np.int16)
+        except Exception as e:
+            logger.error(f"Audio processing error for {member.display_name}: {e}", exc_info=True)
+            return
+
+        try:
+            # Feed to Vosk
+            recognizer.AcceptWaveform(mono_audio.tobytes())
+            vosk_result = json.loads(recognizer.Result())
+            vosk_text = vosk_result.get("text", "").strip()
+        except Exception as e:
+            logger.error(f"Vosk transcription error for {member.display_name}: {e}", exc_info=True)
+            return
+
+        if vosk_text:
+            logger.debug(f"[Guild {self.vc.guild.id}] Vosk transcribed {member.display_name}: {vosk_text}")
+            # Invoke callback
+            try:
+                self.callback(member, vosk_text)
+            except Exception as e:
+                logger.error(f"Error in Vosk callback: {e}", exc_info=True)
+
+    @voice_recv.AudioSink.listener()
+    def on_voice_member_speaking_start(self, member: discord.Member):
+        """Handle member starting to speak."""
+        if member.bot:
+            return
+        logger.debug(f"[Guild {self.vc.guild.id}] 🎤 {member.display_name} started speaking")
+
+        # Notify ducking callback
+        if self.ducking_callback:
+            try:
+                self.ducking_callback(self.vc.guild.id, member, is_speaking=True)
+            except Exception as e:
+                logger.error(f"Error in ducking callback (start): {e}", exc_info=True)
+
+    @voice_recv.AudioSink.listener()
+    def on_voice_member_speaking_stop(self, member: discord.Member):
+        """Handle member stopping speaking."""
+        if member.bot:
+            return
+        logger.debug(f"[Guild {self.vc.guild.id}] 🔇 {member.display_name} stopped speaking")
+
+        # Process any remaining audio
+        if member.id in self.buffers and self.buffers[member.id]:
+            pcm_data = b''.join(self.buffers[member.id])
+            self.buffers[member.id].clear()
+            recognizer = self.recognizers.get(member.id)
+            if pcm_data and recognizer:
+                self.vc.loop.run_in_executor(
+                    self.executor,
+                    self.transcribe_user,
+                    pcm_data,
+                    member,
+                    recognizer
+                )
+
+        # Notify ducking callback
+        if self.ducking_callback:
+            try:
+                self.ducking_callback(self.vc.guild.id, member, is_speaking=False)
+            except Exception as e:
+                logger.error(f"Error in ducking callback (stop): {e}", exc_info=True)
+
+    def cleanup(self):
+        """Cleanup resources."""
+        self.buffers.clear()
+        self.recognizers.clear()
+        self.last_chunk_time.clear()
+        logger.debug(f"[Guild {self.vc.guild.id}] VoskSink cleaned up")
+
+    def wants_opus(self) -> bool:
+        """We want PCM audio, not Opus."""
+        return False
 
 
 class VoskEngine(SpeechEngine):
     """
     Vosk-based speech recognition engine.
 
-    Uses voice_recv's SpeechRecognitionSink with Vosk backend.
+    Uses Vosk library directly with custom AudioSink for full control.
     Provides fast, local speech recognition with minimal latency.
     """
 
@@ -25,8 +231,7 @@ class VoskEngine(SpeechEngine):
         self,
         bot,
         callback,
-        phrase_time_limit: int = 10,
-        error_log_threshold: int = 10,
+        model_path: str = "data/speechrecognition/vosk",
         ducking_callback=None
     ):
         """
@@ -35,141 +240,67 @@ class VoskEngine(SpeechEngine):
         Args:
             bot: Discord bot instance
             callback: Function called with (member, transcribed_text)
-            phrase_time_limit: Max seconds of speech to process
-            error_log_threshold: Number of errors before logging warning
-            ducking_callback: Optional (guild_id, member, is_speaking) callback for audio ducking
+            model_path: Path to Vosk model directory
+            ducking_callback: Optional callback for audio ducking events
         """
         super().__init__(bot, callback)
-        self.phrase_time_limit = phrase_time_limit
-        self.error_log_threshold = error_log_threshold
+
+        if not VOSK_AVAILABLE:
+            raise ImportError("Vosk not available. Install with: pip install vosk")
+
+        self.model_path = model_path
         self.ducking_callback = ducking_callback
         self.sink = None
-        self.guild_id = None
+        self.model = None
+        self.executor = ThreadPoolExecutor(max_workers=4)
+
+        logger.info(f"VoskEngine initialized (model={model_path})")
 
     async def start_listening(self, voice_client):
         """Start Vosk speech recognition."""
-        self.guild_id = voice_client.guild.id
+        if not VOSK_AVAILABLE:
+            raise ImportError("Vosk not available")
 
-        def text_callback(user: discord.User, text: str):
-            """Process Vosk JSON output and extract transcribed text."""
+        # Load model on first use (lazy loading)
+        if self.model is None:
+            logger.info(f"Loading Vosk model from '{self.model_path}'...")
             try:
-                result = json.loads(text)
-                transcribed_text = result.get("text", "").strip()
-
-                if not transcribed_text:
-                    return
-
-                # Get member object for more context
-                member = voice_client.guild.get_member(user.id)
-                if not member:
-                    return
-
-                # Invoke parent callback with clean text
-                self._invoke_callback(member, transcribed_text)
-
-            except json.JSONDecodeError as e:
-                logger.warning(f"[Guild {self.guild_id}] Failed to parse Vosk JSON: {e}")
+                self.model = Model(self.model_path)
+                logger.info(f"Vosk model loaded successfully")
             except Exception as e:
-                logger.error(f"[Guild {self.guild_id}] Error in Vosk text_callback: {e}", exc_info=True)
+                logger.error(f"Failed to load Vosk model: {e}", exc_info=True)
+                raise
 
-        # Create custom sink with error handling and ducking support
+        # Create VoskSink
         self.sink = VoskSink(
-            self.guild_id,
-            text_callback,
-            self.phrase_time_limit,
-            self.error_log_threshold,
-            self.ducking_callback
+            voice_client,
+            self.callback,
+            self.model,
+            self.executor,
+            ducking_callback=self.ducking_callback
         )
 
         # Attach to voice client
         voice_client.listen(self.sink)
         self._is_listening = True
 
-        logger.info(f"[Guild {self.guild_id}] Started Vosk speech recognition")
+        logger.info(f"[Guild {voice_client.guild.id}] Started Vosk speech recognition")
         return self.sink
 
     async def stop_listening(self):
-        """Stop Vosk speech recognition."""
+        """Stop Vosk speech recognition and cleanup resources."""
         if self.sink:
-            # voice_recv handles cleanup automatically when voice client disconnects
+            self.sink.cleanup()
             self.sink = None
-        self._is_listening = False
-        logger.info(f"[Guild {self.guild_id}] Stopped Vosk speech recognition")
 
-    def get_sink(self) -> Optional[dsr.SpeechRecognitionSink]:
+        self._is_listening = False
+        logger.info("Stopped Vosk speech recognition")
+
+    def get_sink(self) -> Optional[voice_recv.AudioSink]:
         """Get the Vosk sink instance."""
         return self.sink
 
-
-class VoskSink(dsr.SpeechRecognitionSink):
-    """
-    Custom Vosk sink with error handling and ducking support.
-
-    Extends voice_recv's SpeechRecognitionSink to add:
-    - Graceful error handling for corrupted audio
-    - Audio ducking integration via callbacks
-    - Error count tracking to prevent log spam
-    """
-
-    def __init__(
-        self,
-        guild_id: int,
-        text_callback,
-        phrase_time_limit: int,
-        error_log_threshold: int,
-        ducking_callback=None
-    ):
-        super().__init__(
-            default_recognizer="vosk",
-            phrase_time_limit=phrase_time_limit,
-            text_cb=text_callback
-        )
-        self.guild_id = guild_id
-        self.ducking_callback = ducking_callback
-        self.error_count = 0
-        self.max_errors = error_log_threshold
-        self.error_log_interval = error_log_threshold
-
-    def write(self, user, data):
-        """Override write to add error handling for corrupted audio data."""
-        try:
-            super().write(user, data)
-            # Reset error count on successful write
-            self.error_count = 0
-        except Exception as e:
-            self.error_count += 1
-
-            # Log first error and every Nth error to avoid spam
-            if self.error_count == 1 or self.error_count % self.error_log_interval == 0:
-                logger.warning(
-                    f"[Guild {self.guild_id}] Audio write error (count: {self.error_count}): {type(e).__name__}"
-                )
-
-            # If too many consecutive errors, log warning
-            if self.error_count >= self.max_errors:
-                logger.error(
-                    f"[Guild {self.guild_id}] Excessive audio errors ({self.error_count}). "
-                    "Voice connection may be unstable."
-                )
-                # Reset counter to avoid spam
-                self.error_count = 0
-
-    @voice_recv.AudioSink.listener()
-    def on_voice_member_speaking_start(self, member: discord.Member):
-        """Handle member starting to speak - notify ducking callback."""
-        try:
-            logger.debug(f"[Guild {self.guild_id}] 🎤 {member.display_name} started speaking")
-            if self.ducking_callback:
-                self.ducking_callback(self.guild_id, member, is_speaking=True)
-        except Exception as e:
-            logger.error(f"[Guild {self.guild_id}] Error in speaking_start: {e}", exc_info=True)
-
-    @voice_recv.AudioSink.listener()
-    def on_voice_member_speaking_stop(self, member: discord.Member):
-        """Handle member stopping speaking - notify ducking callback."""
-        try:
-            logger.debug(f"[Guild {self.guild_id}] 🔇 {member.display_name} stopped speaking")
-            if self.ducking_callback:
-                self.ducking_callback(self.guild_id, member, is_speaking=False)
-        except Exception as e:
-            logger.error(f"[Guild {self.guild_id}] Error in speaking_stop: {e}", exc_info=True)
+    def __del__(self):
+        """Cleanup executor on engine destruction."""
+        if hasattr(self, 'executor'):
+            self.executor.shutdown(wait=False)

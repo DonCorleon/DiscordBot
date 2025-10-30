@@ -243,9 +243,12 @@ async def rejoin_saved_voice_channels():
                             self.voice_client = voice_client
 
                     ctx = AutoRejoinContext(guild, vc)
-                    sink = voice_cog._create_speech_listener(ctx)
-                    vc.listen(sink)
-                    voice_cog.active_sinks[guild_id] = sink
+                    engine = voice_cog._create_speech_listener(ctx)
+                    await engine.start_listening(vc)
+                    voice_cog.active_sinks[guild_id] = {
+                        'engine': engine,
+                        'sink': engine.get_sink()
+                    }
 
                     # Resume or start transcript session
                     if users_in_channel:

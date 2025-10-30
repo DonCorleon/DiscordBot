@@ -22,30 +22,18 @@ class SpeechConfig(ConfigBase):
     )
 
     # Vosk Settings
-    vosk_phrase_time_limit: int = config_field(
-        default=10,
-        description="Maximum seconds of speech to process (Vosk)",
+    vosk_model_path: str = config_field(
+        default="data/speechrecognition/vosk",
+        description="Path to Vosk model directory",
         category="Speech Recognition/Vosk",
         guild_override=False,
-        admin_only=True,
-        min_value=1,
-        max_value=60
+        admin_only=True
     )
 
-    vosk_error_log_threshold: int = config_field(
-        default=10,
-        description="Number of audio errors before logging warning (Vosk)",
-        category="Speech Recognition/Vosk",
-        guild_override=False,
-        admin_only=True,
-        min_value=1,
-        max_value=100
-    )
-
-    # Whisper Settings (future)
+    # Whisper Settings
     whisper_model: str = config_field(
         default="tiny.en",
-        description="Whisper model size (NOT IMPLEMENTED)",
+        description="Whisper model size (requires openai-whisper, scipy)",
         category="Speech Recognition/Whisper",
         guild_override=False,
         admin_only=True,
@@ -54,7 +42,7 @@ class SpeechConfig(ConfigBase):
 
     whisper_buffer_duration: float = config_field(
         default=3.0,
-        description="Audio buffer duration in seconds (Whisper, NOT IMPLEMENTED)",
+        description="Audio buffer duration in seconds (Whisper)",
         category="Speech Recognition/Whisper",
         guild_override=False,
         admin_only=True,
@@ -64,7 +52,7 @@ class SpeechConfig(ConfigBase):
 
     whisper_debounce_seconds: float = config_field(
         default=1.0,
-        description="Min seconds between transcriptions (Whisper, NOT IMPLEMENTED)",
+        description="Min seconds between transcriptions (Whisper)",
         category="Speech Recognition/Whisper",
         guild_override=False,
         admin_only=True,

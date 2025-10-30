@@ -41,18 +41,15 @@ def create_speech_engine(
         # Get Vosk config from bot's ConfigManager
         try:
             speech_cfg = bot.config_manager.for_guild("Speech")
-            phrase_time_limit = speech_cfg.vosk_phrase_time_limit
-            error_log_threshold = speech_cfg.vosk_error_log_threshold
+            model_path = speech_cfg.vosk_model_path
         except Exception:
             # Fallback to defaults if config not available
-            phrase_time_limit = 10
-            error_log_threshold = 10
+            model_path = "data/speechrecognition/vosk"
 
         return VoskEngine(
             bot,
             callback,
-            phrase_time_limit=phrase_time_limit,
-            error_log_threshold=error_log_threshold,
+            model_path=model_path,
             ducking_callback=ducking_callback
         )
 
@@ -74,7 +71,8 @@ def create_speech_engine(
             callback,
             model_size=model_size,
             buffer_duration=buffer_duration,
-            debounce_seconds=debounce_seconds
+            debounce_seconds=debounce_seconds,
+            ducking_callback=ducking_callback
         )
 
     else:
