@@ -721,8 +721,8 @@ class VoiceSpeechCog(BaseCog):
                     "triggers": []
                 }
 
-                # Colored console output
-                logger.info(
+                # Detailed colored console output (debug level)
+                logger.debug(
                     f"\033[92m[{guild_name}] [{user.id}] [{user.display_name}] : {transcribed_text}\033[0m"
                 )
 
@@ -743,8 +743,10 @@ class VoiceSpeechCog(BaseCog):
 
                 soundboard_cog = self.bot.get_cog("Soundboard")
                 if not soundboard_cog:
-                    # Log transcription even if no soundboard triggers
-                    logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                    # Full JSON for debug
+                    logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
+                    # Minimal info log
+                    logger.info(f"[TRANSCRIPTION] {user.display_name}: {transcribed_text}")
                     # Record transcription to data collector for web dashboard
                     if data_collector:
                         data_collector.record_transcription(transcription_data)
@@ -765,16 +767,23 @@ class VoiceSpeechCog(BaseCog):
                                 # Queue sound for THIS guild only (speech-triggered)
                                 await self.queue_sound(guild_id, soundfile, user, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
 
-                        # Log transcription with guild_id and triggers after adding them
-                        logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                        # Full JSON for debug (includes trigger details)
+                        logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
+
+                        # Minimal info log with triggers
+                        trigger_words = ", ".join([t["word"] for t in transcription_data["triggers"]])
+                        logger.info(f"[TRANSCRIPTION] {user.display_name}: {transcribed_text} → triggers: {trigger_words}")
+
                         # Record transcription to data collector for web dashboard
                         if data_collector:
                             data_collector.record_transcription(transcription_data)
 
                     asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
                 else:
-                    # Log transcription with no triggers
-                    logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                    # Full JSON for debug (no triggers)
+                    logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
+                    # Minimal info log (no triggers)
+                    logger.info(f"[TRANSCRIPTION] {user.display_name}: {transcribed_text}")
                     # Record transcription to data collector for web dashboard
                     if data_collector:
                         data_collector.record_transcription(transcription_data)

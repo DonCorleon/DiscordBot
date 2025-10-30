@@ -1178,7 +1178,7 @@ class Soundboard(BaseCog):
                         f"[{guild_id}] Randomly selected '{chosen_entry.title}' from {len(candidates)} sounds for trigger '{word_lower}'")
 
         if matched_files:
-            logger.info(f"[{guild_id}] Found {len(matched_files)} sound(s) for: '{text}'")
+            logger.debug(f"[{guild_id}] Found {len(matched_files)} sound(s) for: '{text}'")
 
         return matched_files
 
