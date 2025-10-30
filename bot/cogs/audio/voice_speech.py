@@ -135,11 +135,53 @@ except Exception as e:
     logger.warning(f"Could not apply voice_recv patch: {e}")
 
 
+# Store reference to cog for PacketRouter error handling
+_voice_cog_instance = None
+
+
+def _patched_packet_router_run(original_run):
+    """Wrap PacketRouter.run to catch OpusError and trigger restart."""
+    def wrapper(self):
+        try:
+            original_run(self)
+        except Exception as e:
+            logger.error(f"PacketRouter crashed: {e}", exc_info=True)
+
+            # Try to restart the listener automatically
+            if _voice_cog_instance:
+                try:
+                    # Find which guild this router belongs to
+                    import asyncio
+                    asyncio.run_coroutine_threadsafe(
+                        _voice_cog_instance._restart_dead_listeners(),
+                        _voice_cog_instance.bot.loop
+                    )
+                except Exception as restart_error:
+                    logger.error(f"Failed to trigger listener restart: {restart_error}", exc_info=True)
+    return wrapper
+
+
+# Apply PacketRouter patch
+try:
+    from discord.ext.voice_recv.router import PacketRouter
+
+    if not hasattr(PacketRouter.run, '_patched'):
+        PacketRouter.run = _patched_packet_router_run(PacketRouter.run)
+        PacketRouter.run._patched = True
+        logger.info("Applied PacketRouter error recovery patch")
+except Exception as e:
+    logger.warning(f"Could not apply PacketRouter patch: {e}")
+
+
 class VoiceSpeechCog(BaseCog):
 
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
+
+        # Set global instance for PacketRouter error handling
+        global _voice_cog_instance
+        _voice_cog_instance = self
 
         # Register config schema
         from bot.core.config_system import CogConfigSchema
@@ -188,10 +230,6 @@ class VoiceSpeechCog(BaseCog):
                             vc = await after.channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
                             logger.info(f"[{member.guild.name}] Auto-joined {after.channel.name} (triggered by {member.name})")
 
-                            # Save voice state for persistence
-                            from bot.core.audio.voice_state import save_voice_state
-                            save_voice_state(guild_id, after.channel.id)
-
                             # Start keepalive if needed
                             if not self._keepalive_task:
                                 self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
@@ -211,7 +249,7 @@ class VoiceSpeechCog(BaseCog):
                                 logger.info(f"[{member.guild.name}] Auto-started listening in {after.channel.name}")
 
                             # Start transcript session
-                            self.transcript_manager.start_session(
+                            session_id = self.transcript_manager.start_session(
                                 channel_id=str(after.channel.id),
                                 guild_id=str(guild_id),
                                 guild_name=member.guild.name,
@@ -219,6 +257,10 @@ class VoiceSpeechCog(BaseCog):
                                 first_user_id=str(member.id),
                                 first_username=member.display_name
                             )
+
+                            # Save voice state for persistence (with session_id)
+                            from bot.core.audio.voice_state import save_voice_state
+                            save_voice_state(guild_id, after.channel.id, session_id)
 
                             # Cancel any pending disconnect
                             if guild_id in self.disconnect_tasks:
@@ -615,6 +657,41 @@ class VoiceSpeechCog(BaseCog):
             logger.info("Keepalive loop cancelled")
             raise
 
+    async def _restart_dead_listeners(self):
+        """Restart all speech listeners after PacketRouter crash."""
+        logger.warning("PacketRouter crashed globally, restarting all speech listeners...")
+
+        for guild_id, sink in list(self.active_sinks.items()):
+            try:
+                guild = self.bot.get_guild(guild_id)
+                if not guild or not guild.voice_client:
+                    continue
+
+                vc = guild.voice_client
+
+                # Stop the old sink
+                try:
+                    vc.stop_listening()
+                except Exception as e:
+                    logger.error(f"[{guild.name}] Error stopping dead listener: {e}")
+
+                # Create a minimal context for restart
+                class RestartContext:
+                    def __init__(self, guild, voice_client):
+                        self.guild = guild
+                        self.voice_client = voice_client
+
+                # Restart the listener
+                ctx = RestartContext(guild, vc)
+                new_sink = self._create_speech_listener(ctx)
+                vc.listen(new_sink)
+                self.active_sinks[guild_id] = new_sink
+
+                logger.info(f"[{guild.name}] ✅ Speech listener restarted successfully")
+
+            except Exception as e:
+                logger.error(f"[Guild {guild_id}] Failed to restart listener: {e}", exc_info=True)
+
     def _create_speech_listener(self, ctx):
         """Create a speech recognition listener with ducking support and error handling."""
         guild_id = ctx.guild.id
@@ -958,10 +1035,6 @@ class VoiceSpeechCog(BaseCog):
             if not self._keepalive_task:
                 self._keepalive_task = self.bot.loop.create_task(self._keepalive_loop())
 
-            # Save voice state for persistence across restarts
-            from bot.core.audio.voice_state import save_voice_state
-            save_voice_state(ctx.guild.id, target_channel.id)
-
             # Enable auto-join for this channel
             voice_cfg = self.bot.config_manager.for_guild("Voice", ctx.guild.id)
             if voice_cfg.auto_join_enabled:
@@ -974,10 +1047,11 @@ class VoiceSpeechCog(BaseCog):
             self.active_sinks[ctx.guild.id] = sink
 
             # Start transcript session
+            session_id = None
             members_in_channel = [m for m in target_channel.members if not m.bot]
             if members_in_channel:
                 first_member = members_in_channel[0]
-                self.transcript_manager.start_session(
+                session_id = self.transcript_manager.start_session(
                     channel_id=str(target_channel.id),
                     guild_id=str(ctx.guild.id),
                     guild_name=ctx.guild.name,
@@ -985,6 +1059,10 @@ class VoiceSpeechCog(BaseCog):
                     first_user_id=str(first_member.id),
                     first_username=first_member.display_name
                 )
+
+            # Save voice state for persistence across restarts (with session_id)
+            from bot.core.audio.voice_state import save_voice_state
+            save_voice_state(ctx.guild.id, target_channel.id, session_id)
 
             await UserFeedback.success(ctx, f"Joined `{target_channel.name}` and started listening! 🎧\n*Auto-join enabled for this channel.*")
         except Exception as e:
