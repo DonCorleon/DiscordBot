@@ -215,6 +215,7 @@ The cog will be loaded automatically on bot startup.
   - Mark completed tasks
   - Add new pending tasks if discovered
 - Keep session state current for continuity across conversations
+- **File Reading Efficiency:** If asked to read any file that was already read in the current session, simply respond "I've already read [filename] in this session" instead of re-reading it
 
 ### Git Workflow & Commits
 - **DO NOT commit** unless explicitly told to do so
@@ -234,6 +235,10 @@ The cog will be loaded automatically on bot startup.
 ### Branch Management
 - **DO NOT create branches** unless explicitly told to do so by the user
 - When directed to create a branch, use descriptive names (e.g., `feat-transcript-viewer`, `config-migration-phase1`)
+- **Git remote name:** This repository uses `master` as the remote name (not `origin`)
+  - Push: `git push master branch-name`
+  - Pull: `git pull master branch-name`
+  - Check remotes: `git remote -v` will show `master` instead of `origin`
 - **Always clean up branches after merging to master:**
   1. Delete local branch: `git branch -d branch-name`
   2. Delete remote branch: `git push master --delete branch-name`
