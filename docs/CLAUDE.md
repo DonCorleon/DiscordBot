@@ -208,14 +208,32 @@ The cog will be loaded automatically on bot startup.
 
 ## Project Rules & Conventions
 
+### Tool Usage Permissions
+- Claude has permission to use Read, Write, Edit, Bash (for compilation/testing), Glob, and Grep tools without asking
+- **Always ask before git operations:** commits, pushes, branch creation/deletion, merges, rebases, etc.
+- Always confirm before: deleting files, running destructive operations
+
+### Efficient Tool Usage
+- **Use Task agents proactively** for exploration tasks ("understand how X works", "find all uses of Y")
+  - Launch Explore agent for codebase searches instead of multiple Glob/Grep calls
+  - Use general-purpose agent for multi-step research tasks
+  - Agents run in separate contexts and save tokens in main conversation
+- **Batch compilation:** Use `python -m compileall bot/` to test all Python files at once instead of individual file compilation
+- **Parallel operations:** When tasks are independent, use multiple tool calls in a single message
+
 ### Session Management
-- **ALWAYS** update `.claude/CURRENT_WORK.md` after completing significant work
-  - Document what was accomplished
-  - Update commit references
-  - Mark completed tasks
+- **CRITICAL: Always update `.claude/CURRENT_WORK.md` after completing significant work**
+  - Windows updates can force restart and lose session history
+  - Document what was accomplished, current branch, and next steps
+  - Update commit references and mark completed tasks
   - Add new pending tasks if discovered
-- Keep session state current for continuity across conversations
+  - This file is ESSENTIAL for session continuity - treat it as high priority
 - **File Reading Efficiency:** If asked to read any file that was already read in the current session, simply respond "I've already read [filename] in this session" instead of re-reading it
+
+### Communication Style
+- Provide concise, clear explanations - not verbose
+- User will ask for clarification if needed
+- Focus on actionable information over detailed theory
 
 ### Git Workflow & Commits
 - **DO NOT commit** unless explicitly told to do so
