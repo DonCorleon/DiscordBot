@@ -148,6 +148,18 @@ class VoskSink(voice_recv.AudioSink):
             logger.error(f"Audio processing error for {member.display_name}: {e}", exc_info=True)
             return
 
+        # VAD: Check if audio contains speech using RMS energy threshold
+        # Calculate RMS (Root Mean Square) energy
+        rms = np.sqrt(np.mean(mono_audio.astype(np.float32) ** 2))
+
+        # Threshold for silence detection (typical speech is > 500 RMS)
+        # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
+        SILENCE_THRESHOLD = 300
+
+        if rms < SILENCE_THRESHOLD:
+            logger.debug(f"[Guild {self.vc.guild.id}] Vosk: Skipping silence for {member.display_name} (RMS: {rms:.1f})")
+            return
+
         try:
             # Feed to Vosk
             recognizer.AcceptWaveform(mono_audio.tobytes())
@@ -158,7 +170,7 @@ class VoskSink(voice_recv.AudioSink):
             return
 
         if vosk_text:
-            logger.debug(f"[Guild {self.vc.guild.id}] Vosk transcribed {member.display_name}: {vosk_text}")
+            logger.info(f"[Guild {self.vc.guild.id}] Vosk transcribed {member.display_name}: {vosk_text}")
             # Invoke callback
             try:
                 self.callback(member, vosk_text)

@@ -190,6 +190,19 @@ class WhisperSink(voice_recv.BasicSink):
             return
         self.last_transcription[user_name] = now
 
+        # VAD: Check if audio contains speech using RMS energy threshold
+        # Calculate RMS (Root Mean Square) energy of the float32 audio
+        rms = np.sqrt(np.mean(audio_array ** 2))
+
+        # Threshold for silence detection (normalized float32 audio: ~0.01-0.1 for speech)
+        # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
+        SILENCE_THRESHOLD = 0.01
+
+        if rms < SILENCE_THRESHOLD:
+            logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Skipping silence for {user_name} (RMS: {rms:.4f})")
+            self.buffers[user_name] = []  # Clear buffer
+            return
+
         # Resample 96kHz → 16kHz for Whisper
         try:
             target_len = int(len(audio_array) * TARGET_SR / SAMPLE_RATE)
