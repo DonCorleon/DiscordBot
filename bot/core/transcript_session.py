@@ -219,6 +219,121 @@ class TranscriptSessionManager:
         except Exception as e:
             logger.error(f"Failed to update transcript session file for {session.session_id}: {e}", exc_info=True)
 
+    def resume_or_start_session(
+        self,
+        channel_id: str,
+        guild_id: str,
+        guild_name: str,
+        channel_name: str,
+        first_user_id: str,
+        first_username: str,
+        existing_session_id: str = None
+    ) -> str:
+        """
+        Resume an existing session or start a new one.
+
+        Args:
+            channel_id: Voice channel ID
+            guild_id: Guild ID
+            guild_name: Guild name
+            channel_name: Voice channel name
+            first_user_id: ID of first user who joined
+            first_username: Username of first user
+            existing_session_id: Optional session ID to resume (from voice state)
+
+        Returns:
+            session_id: UUID of the resumed or created session
+        """
+        # Check if session already active in memory
+        if channel_id in self.active_sessions:
+            logger.info(f"Session already active in memory for channel {channel_id}")
+            return self.active_sessions[channel_id].session_id
+
+        # Try to resume existing session from disk
+        if existing_session_id:
+            try:
+                session = self._load_session_from_disk(existing_session_id)
+                if session:
+                    # Add session to active sessions
+                    self.active_sessions[channel_id] = session
+
+                    # Add a resume event
+                    now = datetime.utcnow().isoformat()
+                    resume_event = ParticipantEvent(
+                        timestamp=now,
+                        user_id=first_user_id,
+                        username=first_username,
+                        event_type="bot_resumed"
+                    )
+                    session.participant_events.append(resume_event)
+                    session._dirty = True
+
+                    # Start flush task if not already running
+                    self.start_flush_task()
+
+                    logger.info(f"Resumed transcript session {session.session_id} for channel '{channel_name}'")
+                    return session.session_id
+            except Exception as e:
+                logger.error(f"Failed to resume session {existing_session_id}: {e}", exc_info=True)
+                # Fall through to create new session
+
+        # Create new session if resume failed or no existing session
+        return self.start_session(
+            channel_id=channel_id,
+            guild_id=guild_id,
+            guild_name=guild_name,
+            channel_name=channel_name,
+            first_user_id=first_user_id,
+            first_username=first_username
+        )
+
+    def _load_session_from_disk(self, session_id: str) -> Optional[TranscriptSession]:
+        """
+        Load a session from disk by session ID.
+
+        Args:
+            session_id: Session UUID
+
+        Returns:
+            TranscriptSession or None if not found
+        """
+        try:
+            base_dir = self._get_transcripts_dir()
+
+            # Search recursively for file containing this session ID
+            for filepath in base_dir.glob(f"**/*_{session_id}.json"):
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                # Convert lists back to dataclass instances
+                participants = [Participant(**p) for p in data.get('participants', [])]
+                participant_events = [ParticipantEvent(**pe) for pe in data.get('participant_events', [])]
+                transcript = [TranscriptEntry(**t) for t in data.get('transcript', [])]
+
+                session = TranscriptSession(
+                    session_id=data['session_id'],
+                    guild_id=data['guild_id'],
+                    guild_name=data['guild_name'],
+                    channel_id=data['channel_id'],
+                    channel_name=data['channel_name'],
+                    start_time=data['start_time'],
+                    end_time=data.get('end_time'),
+                    participants=participants,
+                    participant_events=participant_events,
+                    transcript=transcript,
+                    file_path=str(filepath)
+                )
+
+                logger.info(f"Loaded session {session_id} from disk: {filepath}")
+                return session
+
+            logger.warning(f"Session file not found for {session_id}")
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to load session {session_id} from disk: {e}", exc_info=True)
+            return None
+
     def start_session(
         self,
         channel_id: str,

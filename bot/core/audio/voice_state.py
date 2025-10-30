@@ -12,13 +12,14 @@ from bot.base_cog import logger
 VOICE_STATE_FILE = "data/config/voice_state.json"
 
 
-def save_voice_state(guild_id: int, channel_id: int, file_path: str = VOICE_STATE_FILE):
+def save_voice_state(guild_id: int, channel_id: int, session_id: str = None, file_path: str = VOICE_STATE_FILE):
     """
     Save the bot's current voice channel state.
 
     Args:
         guild_id: Discord guild ID
         channel_id: Discord voice channel ID
+        session_id: Optional transcript session ID (for resume on restart)
         file_path: Path to state file
     """
     try:
@@ -29,7 +30,8 @@ def save_voice_state(guild_id: int, channel_id: int, file_path: str = VOICE_STAT
         guild_id_str = str(guild_id)
         state[guild_id_str] = {
             "channel_id": str(channel_id),
-            "last_joined": datetime.now().isoformat()
+            "last_joined": datetime.now().isoformat(),
+            "session_id": session_id  # Store session ID for resume
         }
 
         # Ensure directory exists
@@ -90,22 +92,22 @@ def load_voice_state(file_path: str = VOICE_STATE_FILE) -> Dict[str, Dict[str, s
         return {}
 
 
-def get_voice_state(guild_id: int, file_path: str = VOICE_STATE_FILE) -> Optional[str]:
+def get_voice_state(guild_id: int, file_path: str = VOICE_STATE_FILE) -> Optional[Dict[str, str]]:
     """
-    Get the saved voice channel ID for a guild.
+    Get the saved voice state for a guild.
 
     Args:
         guild_id: Discord guild ID
         file_path: Path to state file
 
     Returns:
-        Channel ID string if found, None otherwise
+        Dict with {"channel_id": str, "last_joined": str, "session_id": str} if found, None otherwise
     """
     state = load_voice_state(file_path)
     guild_id_str = str(guild_id)
 
     if guild_id_str in state:
-        return state[guild_id_str].get("channel_id")
+        return state[guild_id_str]
 
     return None
 

@@ -247,16 +247,18 @@ async def rejoin_saved_voice_channels():
                     vc.listen(sink)
                     voice_cog.active_sinks[guild_id] = sink
 
-                    # Start transcript session
+                    # Resume or start transcript session
                     if users_in_channel:
                         first_member = users_in_channel[0]
-                        voice_cog.transcript_manager.start_session(
+                        existing_session_id = state_data.get("session_id")
+                        voice_cog.transcript_manager.resume_or_start_session(
                             channel_id=str(channel.id),
                             guild_id=str(guild_id),
                             guild_name=guild.name,
                             channel_name=channel.name,
                             first_user_id=str(first_member.id),
-                            first_username=first_member.display_name
+                            first_username=first_member.display_name,
+                            existing_session_id=existing_session_id
                         )
 
                     logger.info(f"✅ Rejoined and started listening in {channel.name} ({guild.name})")
