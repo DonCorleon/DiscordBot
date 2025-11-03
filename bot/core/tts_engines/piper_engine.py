@@ -110,6 +110,20 @@ class PiperEngine(TTSEngine):
                         ld_path = f"{path}:{ld_path}" if ld_path else path
                 env["LD_LIBRARY_PATH"] = ld_path
 
+            # Set espeak-ng data path if not already set
+            if "ESPEAK_DATA_PATH" not in env:
+                # Try common locations
+                espeak_paths = [
+                    "/usr/lib/x86_64-linux-gnu/espeak-ng-data",
+                    "/usr/lib/aarch64-linux-gnu/espeak-ng-data",
+                    "/usr/share/espeak-ng-data",
+                    "/usr/local/share/espeak-ng-data"
+                ]
+                for espeak_path in espeak_paths:
+                    if os.path.exists(espeak_path):
+                        env["ESPEAK_DATA_PATH"] = espeak_path
+                        break
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.PIPE,
