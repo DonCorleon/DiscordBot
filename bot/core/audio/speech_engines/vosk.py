@@ -89,10 +89,8 @@ class VoskSink(voice_recv.AudioSink):
                     if user.id not in self.buffers:
                         self.buffers[user.id] = deque()
                         self.last_chunk_time[user.id] = time.time()
-                        self.recognizers[user.id] = KaldiRecognizer(
-                            self.vosk_model,
-                            self.SAMPLE_RATE
-                        )
+                        # Don't create recognizer here - will be created in executor thread
+                        # for thread safety (KaldiRecognizer is not thread-safe)
 
                     # Add audio to buffer
                     self.buffers[user.id].append(data.pcm)
@@ -128,15 +126,24 @@ class VoskSink(voice_recv.AudioSink):
         except Exception as e:
             logger.error(f"VoskSink write error: {e}", exc_info=True)
 
-    def transcribe_user(self, pcm_data: bytes, member: discord.Member, recognizer: KaldiRecognizer):
+    def transcribe_user(self, pcm_data: bytes, member: discord.Member, recognizer: Optional[KaldiRecognizer]):
         """
         Transcribe audio using Vosk (runs in thread pool).
 
         Args:
             pcm_data: Raw PCM audio bytes (stereo)
             member: Discord member who spoke
-            recognizer: KaldiRecognizer instance for this user
+            recognizer: KaldiRecognizer instance for this user (or None to create new)
         """
+        # Ensure recognizer exists (create in executor thread for thread safety)
+        if recognizer is None:
+            try:
+                recognizer = KaldiRecognizer(self.vosk_model, self.SAMPLE_RATE)
+                self.recognizers[member.id] = recognizer
+            except Exception as e:
+                logger.error(f"Failed to create recognizer for {member.display_name}: {e}", exc_info=True)
+                return
+
         try:
             # Convert stereo to mono
             audio_array = np.frombuffer(pcm_data, dtype=np.int16)
