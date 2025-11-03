@@ -166,7 +166,8 @@ class VoskSink(voice_recv.AudioSink):
 
             # Threshold for silence detection (typical speech is > 500 RMS)
             # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
-            SILENCE_THRESHOLD = 300
+            # Lowered to 100 based on observed RMS values (280-290 for normal speech)
+            SILENCE_THRESHOLD = 100
 
             if rms < SILENCE_THRESHOLD:
                 logger.debug(f"[Guild {self.vc.guild.id}] Vosk: Skipping silence for {member.display_name} (RMS: {rms:.1f})")
