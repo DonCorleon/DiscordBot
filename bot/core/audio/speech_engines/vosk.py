@@ -34,8 +34,6 @@ class VoskSink(voice_recv.AudioSink):
     Based on proven pattern from user's working implementation.
     """
 
-    CHUNK_TIME = 4  # Process audio every 4 seconds
-    OVERLAP_TIME = 0.5  # Keep 0.5s overlap between chunks
     SAMPLE_RATE = 48000  # Discord's sample rate
     CHANNELS = 2  # Stereo
     SAMPLE_WIDTH = 2  # 16-bit audio
@@ -46,7 +44,9 @@ class VoskSink(voice_recv.AudioSink):
         callback,
         vosk_model,
         executor: ThreadPoolExecutor,
-        ducking_callback=None
+        ducking_callback=None,
+        chunk_duration: float = 4.0,
+        chunk_overlap: float = 0.5
     ):
         """
         Initialize Vosk sink.
@@ -57,6 +57,8 @@ class VoskSink(voice_recv.AudioSink):
             vosk_model: Loaded Vosk Model instance
             executor: ThreadPoolExecutor for blocking Vosk calls
             ducking_callback: Optional callback for ducking events
+            chunk_duration: Process audio every N seconds
+            chunk_overlap: Overlap between chunks in seconds
         """
         super().__init__()
         self.vc = vc
@@ -64,6 +66,10 @@ class VoskSink(voice_recv.AudioSink):
         self.vosk_model = vosk_model
         self.executor = executor
         self.ducking_callback = ducking_callback
+
+        # Configurable timing parameters
+        self.chunk_duration = chunk_duration
+        self.chunk_overlap = chunk_overlap
 
         # Per-user state
         self.buffers = {}  # {user_id: deque([audio_chunks])}
@@ -74,7 +80,7 @@ class VoskSink(voice_recv.AudioSink):
         self.recognizers = {}  # {user_id: KaldiRecognizer}
         self.recognizer_locks = defaultdict(lambda: __import__('threading').Lock())
 
-        logger.info(f"[Guild {vc.guild.id}] VoskSink initialized")
+        logger.info(f"[Guild {vc.guild.id}] VoskSink initialized (chunk={chunk_duration}s, overlap={chunk_overlap}s)")
 
     def write(self, user: discord.User, data: voice_recv.VoiceData):
         """
@@ -98,13 +104,13 @@ class VoskSink(voice_recv.AudioSink):
                     self.buffers[user.id].append(data.pcm)
 
                     # Check if it's time to process this chunk
-                    if time.time() - self.last_chunk_time[user.id] >= self.CHUNK_TIME:
+                    if time.time() - self.last_chunk_time[user.id] >= self.chunk_duration:
                         # Concatenate all buffered audio
                         pcm_data = b''.join(self.buffers[user.id])
 
                         # Keep overlap for next chunk (prevents missing words)
                         bytes_per_second = self.SAMPLE_RATE * self.CHANNELS * self.SAMPLE_WIDTH
-                        overlap_bytes = int(bytes_per_second * self.OVERLAP_TIME)
+                        overlap_bytes = int(bytes_per_second * self.chunk_overlap)
                         self.buffers[user.id] = deque([pcm_data[-overlap_bytes:]])
                         self.last_chunk_time[user.id] = time.time()
 
@@ -306,13 +312,18 @@ class VoskEngine(SpeechEngine):
                 logger.error(f"Failed to load Vosk model: {e}", exc_info=True)
                 raise
 
-        # Create VoskSink
+        # Get Vosk config from ConfigManager
+        speech_cfg = self.bot.config_manager.for_guild("Speech")
+
+        # Create VoskSink with config values
         self.sink = VoskSink(
             voice_client,
             self.callback,
             self.model,
             self.executor,
-            ducking_callback=self.ducking_callback
+            ducking_callback=self.ducking_callback,
+            chunk_duration=speech_cfg.vosk_chunk_duration,
+            chunk_overlap=speech_cfg.vosk_chunk_overlap
         )
 
         # Attach to voice client

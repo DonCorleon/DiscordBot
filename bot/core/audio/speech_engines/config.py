@@ -32,6 +32,26 @@ class SpeechConfig(ConfigBase):
         requires_restart=True
     )
 
+    vosk_chunk_duration: float = config_field(
+        default=4.0,
+        description="Process audio every N seconds (Vosk)",
+        category="Audio/Speech Recognition/Vosk",
+        guild_override=False,
+        admin_only=True,
+        min_value=1.0,
+        max_value=10.0
+    )
+
+    vosk_chunk_overlap: float = config_field(
+        default=0.5,
+        description="Overlap between chunks in seconds to prevent missing words (Vosk)",
+        category="Audio/Speech Recognition/Vosk",
+        guild_override=False,
+        admin_only=True,
+        min_value=0.0,
+        max_value=2.0
+    )
+
     # Whisper Settings
     whisper_model: str = config_field(
         default="tiny.en",
