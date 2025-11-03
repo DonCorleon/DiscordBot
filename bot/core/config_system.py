@@ -568,13 +568,18 @@ class ConfigManager:
 
     def _invalidate_cache(self, cog_name: str, key: str, guild_id: Optional[int]):
         """Invalidate cache entries for a specific key."""
-        # Invalidate global entry
-        cache_key = (cog_name, key, None)
-        if cache_key in self._cache:
-            del self._cache[cache_key]
+        # When a global setting changes, we need to invalidate ALL cached entries
+        # for this key (across all guilds), since they inherit from global
+        # When a guild setting changes, only invalidate that specific guild
 
-        # Invalidate guild entry if specified
-        if guild_id is not None:
+        if guild_id is None:
+            # Global change - invalidate all entries for this key
+            keys_to_delete = [k for k in self._cache.keys()
+                            if k[0] == cog_name and k[1] == key]
+            for k in keys_to_delete:
+                del self._cache[k]
+        else:
+            # Guild-specific change - invalidate only that guild
             cache_key = (cog_name, key, guild_id)
             if cache_key in self._cache:
                 del self._cache[cache_key]
