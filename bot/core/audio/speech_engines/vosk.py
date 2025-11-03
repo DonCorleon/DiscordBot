@@ -165,8 +165,18 @@ class VoskSink(voice_recv.AudioSink):
             recognizer.AcceptWaveform(mono_audio.tobytes())
             vosk_result = json.loads(recognizer.Result())
             vosk_text = vosk_result.get("text", "").strip()
+
+            # CRITICAL: Reset recognizer after Result() to clear internal state
+            # Vosk's KaldiRecognizer accumulates state and must be reset
+            # or recreated after each Result() call to prevent assertion failures
+            recognizer.Reset()
         except Exception as e:
             logger.error(f"Vosk transcription error for {member.display_name}: {e}", exc_info=True)
+            # Try to reset recognizer on error to clear corrupted state
+            try:
+                recognizer.Reset()
+            except Exception:
+                pass
             return
 
         if vosk_text:
