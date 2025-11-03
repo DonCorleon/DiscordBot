@@ -20,6 +20,20 @@ PREFERENCES_FILE = "data/config/tts_preferences.json"
 
 # -------- Configuration Schema --------
 
+def _validate_voice_choice(value: str):
+    """Validator for voice choice - extracts voice ID if it contains comma."""
+    if not value:
+        return True, ""
+
+    # Handle malformed values like "zle/ru,Russian" - extract just the ID part
+    if "," in value:
+        value_parts = value.split(",")
+        cleaned_value = value_parts[0].strip()
+        return True, cleaned_value
+
+    return True, ""
+
+
 @dataclass
 class TTSConfig(ConfigBase):
     """TTS (Text-to-Speech) configuration schema."""
@@ -29,7 +43,8 @@ class TTSConfig(ConfigBase):
         description="Default TTS voice (leave empty for system default)",
         category="Audio/Text-to-Speech",
         guild_override=True,
-        choices=[]  # Will be populated dynamically with available voices
+        choices=[],  # Will be populated dynamically with available voices
+        validator=_validate_voice_choice
     )
 
     tts_default_volume: float = config_field(
@@ -95,10 +110,19 @@ class TtsCog(BaseCog):
             discovered = []
 
             for voice in system_voices:
+                # On Linux (espeak), voice.id might be like 'gmw/en' or 'zle/ru'
+                # On Windows, voice.id is a full path or GUID
+                # We'll store the full ID for proper voice selection
+                voice_id = voice.id
+
+                # Create a display name for the dropdown
+                # For espeak voices, the name is typically the language name
+                display_name = voice.name if hasattr(voice, 'name') else voice_id
+
                 # Parse voice metadata
                 voice_info = {
-                    "id": voice.id,
-                    "name": voice.name,
+                    "id": voice_id,
+                    "name": display_name,
                     "languages": voice.languages if hasattr(voice, "languages") else [],
                     "gender": voice.gender if hasattr(voice, "gender") else "unknown",
                     "age": voice.age if hasattr(voice, "age") else None
@@ -129,8 +153,8 @@ class TtsCog(BaseCog):
                         country = country_map.get(country_code.upper(), country_code)
 
                 # Extract country from name if present (e.g., "English (United States)")
-                if "(" in voice.name and ")" in voice.name:
-                    country_from_name = voice.name.split("(")[-1].split(")")[0]
+                if "(" in display_name and ")" in display_name:
+                    country_from_name = display_name.split("(")[-1].split(")")[0]
                     if country_from_name:
                         country = country_from_name
 
@@ -138,6 +162,7 @@ class TtsCog(BaseCog):
                 discovered.append(voice_info)
 
             engine.stop()
+            logger.debug(f"Discovered {len(discovered)} voices: {[v['id'] for v in discovered[:5]]}")
             return discovered
 
         except Exception as e:
