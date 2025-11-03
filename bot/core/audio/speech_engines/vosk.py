@@ -69,7 +69,10 @@ class VoskSink(voice_recv.AudioSink):
         self.buffers = {}  # {user_id: deque([audio_chunks])}
         self.last_chunk_time = {}  # {user_id: timestamp}
         self.user_locks = defaultdict(asyncio.Lock)
-        # Note: NOT storing recognizers - create new for each transcription for thread safety
+        # Store recognizers per user for continuous recognition
+        # Thread safety via per-user threading.Lock (not asyncio.Lock)
+        self.recognizers = {}  # {user_id: KaldiRecognizer}
+        self.recognizer_locks = defaultdict(lambda: __import__('threading').Lock())
 
         logger.info(f"[Guild {vc.guild.id}] VoskSink initialized")
 
@@ -89,8 +92,7 @@ class VoskSink(voice_recv.AudioSink):
                     if user.id not in self.buffers:
                         self.buffers[user.id] = deque()
                         self.last_chunk_time[user.id] = time.time()
-                        # Don't create recognizer here - will be created in executor thread
-                        # for thread safety (KaldiRecognizer is not thread-safe)
+                        # Recognizer will be created on first use in executor thread
 
                     # Add audio to buffer
                     self.buffers[user.id].append(data.pcm)
@@ -112,13 +114,12 @@ class VoskSink(voice_recv.AudioSink):
                             return
 
                         # Process in thread pool (blocking Vosk call)
-                        # Pass None for recognizer - will be created fresh in transcribe_user
+                        # Pass user_id to transcribe_user (will get/create recognizer with lock)
                         self.vc.loop.run_in_executor(
                             self.executor,
                             self.transcribe_user,
                             pcm_data,
-                            member,
-                            None
+                            member
                         )
 
             asyncio.run_coroutine_threadsafe(process_user_audio(), self.vc.loop)
@@ -126,71 +127,85 @@ class VoskSink(voice_recv.AudioSink):
         except Exception as e:
             logger.error(f"VoskSink write error: {e}", exc_info=True)
 
-    def transcribe_user(self, pcm_data: bytes, member: discord.Member, recognizer: Optional[KaldiRecognizer]):
+    def transcribe_user(self, pcm_data: bytes, member: discord.Member):
         """
         Transcribe audio using Vosk (runs in thread pool).
 
         Args:
             pcm_data: Raw PCM audio bytes (stereo)
             member: Discord member who spoke
-            recognizer: UNUSED - always create new recognizer for thread safety
         """
-        # CRITICAL: Create NEW recognizer for each transcription
-        # KaldiRecognizer is NOT thread-safe and cannot be shared
-        # Reusing recognizers causes "double free or corruption" when
-        # multiple executor threads process audio from same user simultaneously
-        try:
-            recognizer = KaldiRecognizer(self.vosk_model, self.SAMPLE_RATE)
-        except Exception as e:
-            logger.error(f"Failed to create recognizer for {member.display_name}: {e}", exc_info=True)
-            return
+        # Use per-user lock to serialize access to recognizer
+        # This prevents race conditions while maintaining context across chunks
+        with self.recognizer_locks[member.id]:
+            # Get or create recognizer for this user
+            if member.id not in self.recognizers:
+                try:
+                    self.recognizers[member.id] = KaldiRecognizer(self.vosk_model, self.SAMPLE_RATE)
+                    logger.debug(f"Created new recognizer for {member.display_name}")
+                except Exception as e:
+                    logger.error(f"Failed to create recognizer for {member.display_name}: {e}", exc_info=True)
+                    return
 
-        try:
-            # Convert stereo to mono
-            audio_array = np.frombuffer(pcm_data, dtype=np.int16)
-            if len(audio_array) % 2 != 0:
-                audio_array = audio_array[:-1]
-            audio_array = audio_array.reshape(-1, 2)
-            mono_audio = audio_array.mean(axis=1).astype(np.int16)
-        except Exception as e:
-            logger.error(f"Audio processing error for {member.display_name}: {e}", exc_info=True)
-            return
+            recognizer = self.recognizers[member.id]
 
-        # VAD: Check if audio contains speech using RMS energy threshold
-        # Calculate RMS (Root Mean Square) energy
-        rms = np.sqrt(np.mean(mono_audio.astype(np.float32) ** 2))
-
-        # Threshold for silence detection (typical speech is > 500 RMS)
-        # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
-        SILENCE_THRESHOLD = 300
-
-        if rms < SILENCE_THRESHOLD:
-            logger.debug(f"[Guild {self.vc.guild.id}] Vosk: Skipping silence for {member.display_name} (RMS: {rms:.1f})")
-            return
-
-        try:
-            # Feed to Vosk
-            # AcceptWaveform returns True when end of utterance is detected
-            if recognizer.AcceptWaveform(mono_audio.tobytes()):
-                # Complete utterance recognized - get final result
-                vosk_result = json.loads(recognizer.Result())
-            else:
-                # Partial recognition - utterance not complete
-                # Use PartialResult() instead of Result() to avoid corrupting state
-                vosk_result = json.loads(recognizer.PartialResult())
-
-            vosk_text = vosk_result.get("text", "").strip()
-        except Exception as e:
-            logger.error(f"Vosk transcription error for {member.display_name}: {e}", exc_info=True)
-            return
-
-        if vosk_text:
-            logger.info(f"[Guild {self.vc.guild.id}] Vosk transcribed {member.display_name}: {vosk_text}")
-            # Invoke callback
             try:
-                self.callback(member, vosk_text)
+                # Convert stereo to mono (outside lock - no state access)
+                audio_array = np.frombuffer(pcm_data, dtype=np.int16)
+                if len(audio_array) % 2 != 0:
+                    audio_array = audio_array[:-1]
+                audio_array = audio_array.reshape(-1, 2)
+                mono_audio = audio_array.mean(axis=1).astype(np.int16)
             except Exception as e:
-                logger.error(f"Error in Vosk callback: {e}", exc_info=True)
+                logger.error(f"Audio processing error for {member.display_name}: {e}", exc_info=True)
+                return
+
+            # VAD: Check if audio contains speech using RMS energy threshold
+            # Calculate RMS (Root Mean Square) energy
+            rms = np.sqrt(np.mean(mono_audio.astype(np.float32) ** 2))
+
+            # Threshold for silence detection (typical speech is > 500 RMS)
+            # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
+            SILENCE_THRESHOLD = 300
+
+            if rms < SILENCE_THRESHOLD:
+                logger.debug(f"[Guild {self.vc.guild.id}] Vosk: Skipping silence for {member.display_name} (RMS: {rms:.1f})")
+                return
+
+            try:
+                # Feed to Vosk (inside lock - accesses recognizer state)
+                # AcceptWaveform returns True when end of utterance is detected
+                if recognizer.AcceptWaveform(mono_audio.tobytes()):
+                    # Complete utterance recognized - get final result
+                    vosk_result = json.loads(recognizer.Result())
+                    # CRITICAL: Reset recognizer after Result() to prevent state corruption
+                    # Vosk's internal queue must be cleared after getting final result
+                    # See: https://github.com/alphacep/vosk-api/issues/XXX
+                    recognizer.Reset()
+                    logger.debug(f"[Guild {self.vc.guild.id}] Reset recognizer for {member.display_name} after complete utterance")
+                else:
+                    # Partial recognition - utterance not complete
+                    # Use PartialResult() instead of Result() to avoid corrupting state
+                    # Do NOT reset - we want to keep building the utterance
+                    vosk_result = json.loads(recognizer.PartialResult())
+
+                vosk_text = vosk_result.get("text", "").strip()
+            except Exception as e:
+                logger.error(f"Vosk transcription error for {member.display_name}: {e}", exc_info=True)
+                # Reset on error to clear any corrupted state
+                try:
+                    recognizer.Reset()
+                except:
+                    pass
+                return
+
+            if vosk_text:
+                logger.info(f"[Guild {self.vc.guild.id}] Vosk transcribed {member.display_name}: {vosk_text}")
+                # Invoke callback (outside lock - callback doesn't touch recognizer)
+                try:
+                    self.callback(member, vosk_text)
+                except Exception as e:
+                    logger.error(f"Error in Vosk callback: {e}", exc_info=True)
 
     @voice_recv.AudioSink.listener()
     def on_voice_member_speaking_start(self, member: discord.Member):
@@ -222,8 +237,7 @@ class VoskSink(voice_recv.AudioSink):
                     self.executor,
                     self.transcribe_user,
                     pcm_data,
-                    member,
-                    None  # recognizer created fresh in transcribe_user
+                    member
                 )
 
         # Notify ducking callback
@@ -237,6 +251,7 @@ class VoskSink(voice_recv.AudioSink):
         """Cleanup resources."""
         self.buffers.clear()
         self.last_chunk_time.clear()
+        self.recognizers.clear()
         logger.debug(f"[Guild {self.vc.guild.id}] VoskSink cleaned up")
 
     def wants_opus(self) -> bool:
