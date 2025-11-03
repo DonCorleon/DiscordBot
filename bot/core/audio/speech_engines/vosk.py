@@ -315,4 +315,6 @@ class VoskEngine(SpeechEngine):
     def __del__(self):
         """Cleanup executor on engine destruction."""
         if hasattr(self, 'executor'):
-            self.executor.shutdown(wait=False)
+            # Use wait=True to prevent segfaults from forcefully killing threads
+            # that are executing Vosk native code
+            self.executor.shutdown(wait=True)
