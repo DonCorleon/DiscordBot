@@ -8,12 +8,18 @@
 
 ## 📍 Current Focus
 
-**Status**: Fixed two voice connection issues:
+**Status**: Fixed five critical issues:
 1. ✅ OpusError crashes (COMPLETED - monkey patch working)
 2. ✅ Keepalive struct.error (COMPLETED - added connection ready check)
-3. ⚠️ OpusError reconnection timeout (OBSERVED - needs investigation)
+3. ✅ pyttsx3 SEGFAULT (COMPLETED - removed engine.stop() calls)
+4. ✅ Vosk executor shutdown (COMPLETED - defensive fix)
+5. ✅ **Vosk KaldiRecognizer SEGFAULT** (COMPLETED - Reset() after Result()) **← THE REAL FIX**
+6. ⚠️ OpusError reconnection timeout (OBSERVED - needs investigation)
 
-**Goal**: Ensure stable voice connections with graceful error handling.
+**Goal**: Ensure stable voice connections and eliminate all crashes.
+
+**Latest**: Vosk crash was caused by not resetting KaldiRecognizer after Result() call.
+Internal queue state was corrupting, causing assertion failure in Vosk C++ code.
 
 ---
 
@@ -120,6 +126,22 @@ Update `cog_unload()` (~line 439):
 **No other files need changes** - self-contained fix.
 
 ---
+
+## ✅ 7. Unified TTS Engine System (Committed)
+   - ✅ Created TTS engine abstraction layer (bot/core/tts_engines/)
+   - ✅ Base TTSEngine class with generate_audio(), list_voices(), get_default_voice()
+   - ✅ Three engine implementations:
+     - Pyttsx3Engine: Local TTS (espeak/SAPI)
+     - EdgeEngine: Microsoft Edge TTS (cloud neural)
+     - PiperEngine: Piper TTS (local neural, high quality)
+   - ✅ Added tts_engine config field to switch engines via web UI
+   - ✅ Refactored tts.py to use engine system with per-guild caching
+   - ✅ Updated ~voices command to show engine-specific voices
+   - ✅ Engine auto-switches when config changes
+   - ✅ Fallback to pyttsx3 if selected engine unavailable
+   - ✅ Committed (commit: f0a3237)
+
+   **Note**: edge_tts.py cog still exists with separate `~edge` commands. It can be removed/deprecated now that functionality is merged into main TTS system.
 
 ## ✅ Previously Completed (Earlier Session)
 
@@ -265,6 +287,27 @@ bac70b8 fix: catch JSONDecodeError from speech recognition text
    - ✅ Prevents struct.error when connection not fully established
    - ✅ Added debug logging for skipped keepalives
    - ✅ Committed (commit: 03e6cc1)
+
+### ✅ 4. pyttsx3 SEGFAULT Fix (Committed)
+   - ✅ Removed engine.stop() from _discover_voices()
+   - ✅ Removed engine.stop() from generate_tts()
+   - ✅ Added comments explaining why stop() causes segfaults
+   - ✅ Prevents crashes on bot startup and TTS usage
+   - ✅ Committed (commit: 3c345cb)
+
+### ✅ 5. Vosk ThreadPoolExecutor SEGFAULT Fix (Committed)
+   - ✅ Changed executor.shutdown(wait=False) to wait=True
+   - ✅ Prevents forceful termination of Vosk native code
+   - ✅ Committed (commit: ebca5d4)
+   - ⚠️ NOTE: This was a good defensive fix but NOT the root cause
+
+### ✅ 6. Vosk KaldiRecognizer Reset SEGFAULT Fix (Committed) **THE REAL FIX**
+   - ✅ Added recognizer.Reset() after recognizer.Result()
+   - ✅ Added reset on exception to clear corrupted state
+   - ✅ Fixes Vosk assertion failure: queue_.empty()
+   - ✅ Root cause: Reusing recognizer without reset corrupts internal state
+   - ✅ Committed (commit: 62dc431)
+   - **THIS IS THE ACTUAL FIX FOR THE VOSK CRASHES**
 
 ## ⚠️ Known Issues
 

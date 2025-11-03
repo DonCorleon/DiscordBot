@@ -38,10 +38,9 @@ class TTSConfig(ConfigBase):
 
     tts_default_voice: str = config_field(
         default="",
-        description="Default TTS voice (leave empty for system default)",
+        description="Default TTS voice ID (use ~voices command to see available voices, leave empty for engine default)",
         category="Audio/Text-to-Speech",
-        guild_override=True,
-        choices=[]  # Will be populated dynamically with available voices as tuples (id, name)
+        guild_override=True
     )
 
     tts_default_volume: float = config_field(
