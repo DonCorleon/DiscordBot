@@ -170,7 +170,6 @@ except Exception as e:
 def _patched_decode_packet(self, packet):
     """Patched version of _decode_packet that handles OpusError gracefully."""
     from discord.opus import OpusError
-    from discord.ext.voice_recv.opus import VoiceData
 
     pcm = None
     if not self.sink.wants_opus():
@@ -207,17 +206,8 @@ def _patched_decode_packet(self, packet):
             # Skip bad packet by returning None for pcm
             pcm = None
 
-    # Continue with original data structure
-    member = self._get_cached_member()
-    if member is None:
-        self._cached_id = self.sink.voice_client._get_id_from_ssrc(self.ssrc)
-        member = self._get_cached_member()
-
-    data = VoiceData(packet, member, pcm=pcm)
-    self._last_seq = packet.sequence
-    self._last_ts = packet.timestamp
-
-    return data
+    # Return tuple as expected by _process_packet
+    return packet, pcm
 
 
 # Apply the OpusError patch
