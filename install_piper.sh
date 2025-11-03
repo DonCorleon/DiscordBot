@@ -9,6 +9,20 @@ echo "Piper TTS Installation Script"
 echo "================================"
 echo ""
 
+# Install dependencies
+echo "Installing dependencies..."
+if command -v apt-get &> /dev/null; then
+    sudo apt-get update -qq
+    sudo apt-get install -y espeak-ng
+elif command -v yum &> /dev/null; then
+    sudo yum install -y espeak-ng
+elif command -v pacman &> /dev/null; then
+    sudo pacman -S --noconfirm espeak-ng
+else
+    echo "Warning: Could not detect package manager. Please manually install espeak-ng"
+fi
+echo ""
+
 # Detect architecture
 ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then
@@ -36,23 +50,24 @@ echo "Latest version: $LATEST_VERSION"
 echo ""
 
 # Download and install Piper binary
-PIPER_URL="https://github.com/rhasspy/piper/releases/download/${LATEST_VERSION}/piper_${PIPER_ARCH}.tar.gz"
+# The actual filename format is: piper_linux_x86_64.tar.gz or piper_linux_aarch64.tar.gz
+if [ "$PIPER_ARCH" = "amd64" ]; then
+    PIPER_FILE="piper_linux_x86_64.tar.gz"
+elif [ "$PIPER_ARCH" = "arm64" ]; then
+    PIPER_FILE="piper_linux_aarch64.tar.gz"
+fi
+
+PIPER_URL="https://github.com/rhasspy/piper/releases/download/${LATEST_VERSION}/${PIPER_FILE}"
 echo "Downloading Piper from: $PIPER_URL"
 
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR"
 
 if ! wget --show-progress "$PIPER_URL" -O piper.tar.gz; then
-    echo "Error: Failed to download Piper. URL may be incorrect."
-    echo "Trying alternative URL format..."
-    # Try without underscore
-    PIPER_URL="https://github.com/rhasspy/piper/releases/download/${LATEST_VERSION}/piper-${PIPER_ARCH}.tar.gz"
-    if ! wget --show-progress "$PIPER_URL" -O piper.tar.gz; then
-        echo "Error: Could not download Piper from GitHub."
-        echo "Please check: https://github.com/rhasspy/piper/releases"
-        rm -rf "$TEMP_DIR"
-        exit 1
-    fi
+    echo "Error: Could not download Piper from GitHub."
+    echo "Please manually download from: https://github.com/rhasspy/piper/releases"
+    rm -rf "$TEMP_DIR"
+    exit 1
 fi
 
 echo "Extracting..."
