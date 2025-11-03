@@ -358,9 +358,11 @@ class TtsCog(BaseCog):
             return await UserFeedback.warning(ctx, "I'm not connected to a voice channel! Use ~join first.")
 
         prefs = self.get_user_preferences(ctx.author.id, guild_id=ctx.guild.id)
-        gender = prefs["gender"]
-        country = prefs["country"]
-        name = prefs["name"]
+        # Only use user prefs if they're actually set (not None)
+        # This allows guild default voice to be used when user hasn't set preferences
+        gender = prefs["gender"] if prefs["gender"] else None
+        country = prefs["country"] if prefs["country"] else None
+        name = prefs["name"] if prefs["name"] else None
         rate = prefs["rate"]
 
         words = message.split()
