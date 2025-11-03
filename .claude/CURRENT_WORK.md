@@ -1,16 +1,19 @@
-# Current Work: Fix OpusError Crashes in Voice Reception
+# Current Work: Voice Connection Stability Fixes
 
 **Branch:** `master`
 **Last Updated:** 2025-11-03
-**Status:** ✅ OpusError monkey patch implemented and compiled successfully
+**Status:** ✅ OpusError handling and keepalive fixes implemented
 
 ---
 
 ## 📍 Current Focus
 
-**Status**: Investigating OpusError crashes that stop speech recognition
+**Status**: Fixed two voice connection issues:
+1. ✅ OpusError crashes (COMPLETED - monkey patch working)
+2. ✅ Keepalive struct.error (COMPLETED - added connection ready check)
+3. ⚠️ OpusError reconnection timeout (OBSERVED - needs investigation)
 
-**Goal**: Add monkey patch to handle `OpusError: corrupted stream` gracefully with threshold-based reconnection.
+**Goal**: Ensure stable voice connections with graceful error handling.
 
 ---
 
@@ -236,32 +239,55 @@ bac70b8 fix: catch JSONDecodeError from speech recognition text
 
 ---
 
-## 🔄 Pending Tasks
+## 🔄 Completed Tasks (Current Session)
 
-### ✅ Completed (Current Session):
-
-1. **✅ Implemented OpusError Monkey Patch**:
+### ✅ 1. OpusError Monkey Patch (Committed)
    - ✅ Added 3 config fields to VoiceConfig (lines 115-144)
    - ✅ Added monkey patch for PacketDecoder._decode_packet() (lines 169-229)
    - ✅ Added error tracker to VoiceSpeechCog.__init__ (line 272)
    - ✅ Added _handle_opus_error() method (lines 912-958)
    - ✅ Added _reconnect_voice_after_opus_errors() method (lines 960-1020)
    - ✅ Updated cog_unload() cleanup (line 536)
-   - ✅ Tested compilation - no errors
+   - ✅ Fixed TypeError in monkey patch return value
+   - ✅ Committed and pushed
 
-### Immediate Next Steps:
+### ✅ 2. TTS Dynamic Voice System (Committed)
+   - ✅ Removed hardcoded Windows-only voices
+   - ✅ Added _discover_voices() for cross-platform compatibility
+   - ✅ Added tts_default_voice config field
+   - ✅ Updated voice selection to use discovered voices
+   - ✅ Fixed tuple choice validation in config system
+   - ✅ Fixed web UI dropdown handling for tuple choices
+   - ✅ Committed and pushed
 
-1. **Test the implementation** (requires bot running):
-   - Test with low threshold (2) to trigger reconnection
-   - Verify rate limiting works
-   - Confirm per-guild isolation
-   - Check that bad packets are skipped without crashing
+### ✅ 3. Keepalive struct.error Fix (Committed)
+   - ✅ Added check for MISSING/invalid ssrc before sending packets
+   - ✅ Prevents struct.error when connection not fully established
+   - ✅ Added debug logging for skipped keepalives
+   - ✅ Committed (commit: 03e6cc1)
 
-2. **Commit when tested**:
-   ```bash
-   git add bot/cogs/audio/voice_speech.py .claude/CURRENT_WORK.md
-   git commit -m "fix: add OpusError handling with threshold-based reconnection"
-   ```
+## ⚠️ Known Issues
+
+### 1. OpusError Reconnection Timeout
+**Status**: Observed in production logs, not yet investigated
+
+**Error**:
+```
+TimeoutError during channel.connect() in _reconnect_voice_after_opus_errors()
+```
+
+**Impact**: When OpusError threshold is exceeded, auto-reconnect times out instead of successfully reconnecting.
+
+**Potential Causes**:
+- Discord voice server not responding
+- Bot trying to reconnect too quickly after disconnect
+- May need longer timeout or delay before reconnect
+
+**Next Steps**:
+- Add longer delay before reconnect attempt (currently 1.5s)
+- Increase connect timeout
+- Add retry logic with exponential backoff
+- Consider whether auto-reconnect is needed (OpusError skip might be sufficient)
 
 ---
 

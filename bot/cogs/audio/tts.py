@@ -146,7 +146,9 @@ class TtsCog(BaseCog):
                 voice_info["country"] = country
                 discovered.append(voice_info)
 
-            engine.stop()
+            # Note: Don't call engine.stop() - let it clean up naturally
+            # Calling stop() can cause segfaults on Linux with espeak
+            del engine
             logger.debug(f"Discovered {len(discovered)} voices: {[v['id'] for v in discovered[:5]]}")
             return discovered
 
@@ -299,7 +301,9 @@ class TtsCog(BaseCog):
                 engine.setProperty("voice", voice_id)
             engine.save_to_file(text, temp_file.name)
             engine.runAndWait()
-            engine.stop()
+            # Note: Don't call engine.stop() after runAndWait()
+            # This can cause segfaults on Linux with espeak
+            # runAndWait() already handles cleanup properly
 
         await loop.run_in_executor(None, generate_tts)
         return temp_file.name
