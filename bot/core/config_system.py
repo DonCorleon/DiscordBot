@@ -108,8 +108,17 @@ class ConfigField:
             return False, f"Value {value} above maximum {self.max_value}"
 
         # Choice validation
-        if self.choices is not None and value not in self.choices:
-            return False, f"Value {value} not in valid choices: {self.choices}"
+        if self.choices is not None:
+            # Extract valid values from choices (handles both simple values and tuples)
+            valid_values = []
+            for choice in self.choices:
+                if isinstance(choice, (tuple, list)) and len(choice) >= 1:
+                    valid_values.append(choice[0])  # Extract value from (value, label) tuple
+                else:
+                    valid_values.append(choice)
+
+            if value not in valid_values:
+                return False, f"Value {value} not in valid choices: {self.choices}"
 
         # Custom validator
         if self.validator is not None:

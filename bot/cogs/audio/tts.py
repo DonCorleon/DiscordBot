@@ -20,20 +20,6 @@ PREFERENCES_FILE = "data/config/tts_preferences.json"
 
 # -------- Configuration Schema --------
 
-def _validate_voice_choice(value: str):
-    """Validator for voice choice - extracts voice ID if it contains comma."""
-    if not value:
-        return True, ""
-
-    # Handle malformed values like "zle/ru,Russian" - extract just the ID part
-    if "," in value:
-        value_parts = value.split(",")
-        cleaned_value = value_parts[0].strip()
-        return True, cleaned_value
-
-    return True, ""
-
-
 @dataclass
 class TTSConfig(ConfigBase):
     """TTS (Text-to-Speech) configuration schema."""
@@ -43,8 +29,7 @@ class TTSConfig(ConfigBase):
         description="Default TTS voice (leave empty for system default)",
         category="Audio/Text-to-Speech",
         guild_override=True,
-        choices=[],  # Will be populated dynamically with available voices
-        validator=_validate_voice_choice
+        choices=[]  # Will be populated dynamically with available voices as tuples (id, name)
     )
 
     tts_default_volume: float = config_field(

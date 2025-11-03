@@ -360,11 +360,16 @@ function renderControl(key, setting) {
     if (setting.choices) {
         return `
             <select data-key="${escapeHtml(key)}">
-                ${setting.choices.map(choice => `
-                    <option value="${escapeHtml(choice)}" ${value === choice ? 'selected' : ''}>
-                        ${escapeHtml(choice)}
-                    </option>
-                `).join('')}
+                ${setting.choices.map(choice => {
+                    // Handle tuple format: [value, label] or simple value
+                    const choiceValue = Array.isArray(choice) ? choice[0] : choice;
+                    const choiceLabel = Array.isArray(choice) ? choice[1] : choice;
+                    return `
+                        <option value="${escapeHtml(choiceValue)}" ${value === choiceValue ? 'selected' : ''}>
+                            ${escapeHtml(choiceLabel)}
+                        </option>
+                    `;
+                }).join('')}
             </select>
         `;
     }
