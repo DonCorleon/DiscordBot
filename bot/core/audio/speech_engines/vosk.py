@@ -169,21 +169,18 @@ class VoskSink(voice_recv.AudioSink):
 
         try:
             # Feed to Vosk
-            recognizer.AcceptWaveform(mono_audio.tobytes())
-            vosk_result = json.loads(recognizer.Result())
-            vosk_text = vosk_result.get("text", "").strip()
+            # AcceptWaveform returns True when end of utterance is detected
+            if recognizer.AcceptWaveform(mono_audio.tobytes()):
+                # Complete utterance recognized - get final result
+                vosk_result = json.loads(recognizer.Result())
+            else:
+                # Partial recognition - utterance not complete
+                # Use PartialResult() instead of Result() to avoid corrupting state
+                vosk_result = json.loads(recognizer.PartialResult())
 
-            # CRITICAL: Reset recognizer after Result() to clear internal state
-            # Vosk's KaldiRecognizer accumulates state and must be reset
-            # or recreated after each Result() call to prevent assertion failures
-            recognizer.Reset()
+            vosk_text = vosk_result.get("text", "").strip()
         except Exception as e:
             logger.error(f"Vosk transcription error for {member.display_name}: {e}", exc_info=True)
-            # Try to reset recognizer on error to clear corrupted state
-            try:
-                recognizer.Reset()
-            except Exception:
-                pass
             return
 
         if vosk_text:
