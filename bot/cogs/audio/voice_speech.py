@@ -713,6 +713,12 @@ class VoiceSpeechCog(BaseCog):
                         if vc.is_playing():
                             continue
 
+                        # Check if voice connection is fully established (ssrc must be an integer)
+                        from discord.utils import MISSING
+                        if vc.ssrc is MISSING or not isinstance(vc.ssrc, int):
+                            logger.debug(f"[Guild {guild_id}] Skipping keepalive - connection not ready (ssrc={vc.ssrc})")
+                            continue
+
                         silence = b'\xf8\xff\xfe'
                         vc.send_audio_packet(silence, encode=False)
                         logger.info(f"[Guild {guild_id}] Keepalive Sent")
