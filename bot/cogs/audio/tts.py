@@ -24,6 +24,14 @@ PREFERENCES_FILE = "data/config/tts_preferences.json"
 class TTSConfig(ConfigBase):
     """TTS (Text-to-Speech) configuration schema."""
 
+    tts_default_voice: str = config_field(
+        default="",
+        description="Default TTS voice (leave empty for system default)",
+        category="Audio/Text-to-Speech",
+        guild_override=True,
+        choices=[]  # Will be populated dynamically with available voices
+    )
+
     tts_default_volume: float = config_field(
         default=1.5,
         description="Default TTS playback volume (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
@@ -56,55 +64,85 @@ class TTSConfig(ConfigBase):
 class TtsCog(BaseCog):
     """Local TTS Cog using pyttsx3 for offline speech in VC with queue integration."""
 
-    voices = [
-        {"name": "James", "country": "Australia", "gender": "male", "voice": "Microsoft James - English (Australia)"},
-        {"name": "Catherine", "country": "Australia", "gender": "female",
-         "voice": "Microsoft Catherine - English (Australia)"},
-        {"name": "Richard", "country": "Canada", "gender": "male", "voice": "Microsoft Richard - English (Canada)"},
-        {"name": "Linda", "country": "Canada", "gender": "female", "voice": "Microsoft Linda - English (Canada)"},
-        {"name": "Huihui Desktop", "country": "China (Simplified)", "gender": "male",
-         "voice": "Microsoft Huihui Desktop - Chinese (Simplified)"},
-        {"name": "Hedda Desktop", "country": "Germany", "gender": "female",
-         "voice": "Microsoft Hedda Desktop - German"},
-        {"name": "Ravi", "country": "India", "gender": "male", "voice": "Microsoft Ravi - English (India)"},
-        {"name": "Heera", "country": "India", "gender": "female", "voice": "Microsoft Heera - English (India)"},
-        {"name": "Sean", "country": "Ireland", "gender": "male", "voice": "Microsoft Sean - English (Ireland)"},
-        {"name": "Irina Desktop", "country": "Russia", "gender": "female",
-         "voice": "Microsoft Irina Desktop - Russian"},
-        {"name": "Pavel", "country": "Russia", "gender": "male", "voice": "Microsoft Pavel - Russian (Russia)"},
-        {"name": "Lado", "country": "Slovenia", "gender": "male", "voice": "Microsoft Lado - Slovenian (Slovenia)"},
-        {"name": "George", "country": "United Kingdom", "gender": "male",
-         "voice": "Microsoft George - English (United Kingdom)"},
-        {"name": "Hazel", "country": "United Kingdom", "gender": "female",
-         "voice": "Microsoft Hazel - English (United Kingdom)"},
-        {"name": "Susan", "country": "United Kingdom", "gender": "female",
-         "voice": "Microsoft Susan - English (United Kingdom)"},
-        {"name": "Hazel Desktop", "country": "United Kingdom", "gender": "female",
-         "voice": "Microsoft Hazel Desktop - English (Great Britain)"},
-        {"name": "David", "country": "United States", "gender": "male",
-         "voice": "Microsoft David - English (United States)"},
-        {"name": "Mark", "country": "United States", "gender": "male",
-         "voice": "Microsoft Mark - English (United States)"},
-        {"name": "David Desktop", "country": "United States", "gender": "male",
-         "voice": "Microsoft David Desktop - English (United States)"},
-        {"name": "Zira", "country": "United States", "gender": "female",
-         "voice": "Microsoft Zira - English (United States)"},
-        {"name": "Zira Desktop", "country": "United States", "gender": "female",
-         "voice": "Microsoft Zira Desktop - English (United States)"},
-    ]
-
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
 
-        # Register config schema
+        # Discover available voices from the system
+        self.available_voices = self._discover_voices()
+        logger.info(f"Discovered {len(self.available_voices)} TTS voices on this system")
+
+        # Register config schema with dynamic voice choices
         from bot.core.config_system import CogConfigSchema
         schema = CogConfigSchema.from_dataclass("TTS", TTSConfig)
+
+        # Populate voice choices dynamically
+        voice_choices = [("", "System Default")] + [(v["id"], v["name"]) for v in self.available_voices]
+        if hasattr(schema.fields["tts_default_voice"], "choices"):
+            schema.fields["tts_default_voice"].choices = voice_choices
+
         bot.config_manager.register_schema("TTS", schema)
         logger.info("Registered TTS config schema")
 
         self.user_preferences = {}
         self.load_preferences()
+
+    def _discover_voices(self):
+        """Discover all available TTS voices on the system."""
+        try:
+            engine = pyttsx3.init()
+            system_voices = engine.getProperty("voices")
+            discovered = []
+
+            for voice in system_voices:
+                # Parse voice metadata
+                voice_info = {
+                    "id": voice.id,
+                    "name": voice.name,
+                    "languages": voice.languages if hasattr(voice, "languages") else [],
+                    "gender": voice.gender if hasattr(voice, "gender") else "unknown",
+                    "age": voice.age if hasattr(voice, "age") else None
+                }
+
+                # Try to extract country/language info from name or languages
+                country = "Unknown"
+                if voice_info["languages"]:
+                    # Languages are typically in format like ['en_US', 'en-US']
+                    lang = str(voice_info["languages"][0]) if voice_info["languages"] else ""
+                    if "_" in lang or "-" in lang:
+                        country_code = lang.split("_")[-1].split("-")[-1]
+                        country_map = {
+                            "US": "United States",
+                            "GB": "United Kingdom",
+                            "AU": "Australia",
+                            "CA": "Canada",
+                            "IN": "India",
+                            "IE": "Ireland",
+                            "DE": "Germany",
+                            "FR": "France",
+                            "ES": "Spain",
+                            "IT": "Italy",
+                            "RU": "Russia",
+                            "CN": "China",
+                            "JP": "Japan"
+                        }
+                        country = country_map.get(country_code.upper(), country_code)
+
+                # Extract country from name if present (e.g., "English (United States)")
+                if "(" in voice.name and ")" in voice.name:
+                    country_from_name = voice.name.split("(")[-1].split(")")[0]
+                    if country_from_name:
+                        country = country_from_name
+
+                voice_info["country"] = country
+                discovered.append(voice_info)
+
+            engine.stop()
+            return discovered
+
+        except Exception as e:
+            logger.error(f"Failed to discover TTS voices: {e}", exc_info=True)
+            return []
 
     def load_preferences(self):
         """Load user preferences from JSON file."""
@@ -153,28 +191,37 @@ class TtsCog(BaseCog):
 
         self.save_preferences()
 
-    def _select_voice(self, name=None, gender=None, country=None):
-        """Return pyttsx3 voice ID matching criteria."""
-        engine = pyttsx3.init()
-        voice_list = engine.getProperty("voices")
-        selected = None
+    def _select_voice(self, name=None, gender=None, country=None, guild_id=None):
+        """Return pyttsx3 voice ID matching criteria or configured default voice."""
+        # If no criteria provided, use the configured default voice
+        if not name and not gender and not country and guild_id:
+            default_voice = self.bot.config_manager.get("TTS", "tts_default_voice", guild_id)
+            if default_voice:
+                return default_voice
 
-        for v in self.voices:
-            if name and name.lower() != v["name"].lower():
-                continue
-            if gender and gender.lower() != v["gender"].lower():
-                continue
-            if country and country.lower() not in v["country"].lower():
-                continue
-            selected = v
-            break
+        # Search for matching voice in discovered voices
+        for voice in self.available_voices:
+            # Match by exact voice ID if name matches the full voice ID
+            if name and name == voice["id"]:
+                return voice["id"]
 
-        if selected:
-            for py_name, py_id in [(v.name, v.id) for v in voice_list]:
-                if selected["voice"] in py_name:
-                    engine.stop()
-                    return py_id
-        engine.stop()
+            # Match by name (partial or full)
+            if name and name.lower() in voice["name"].lower():
+                # Check gender and country if specified
+                if gender and str(voice.get("gender", "")).lower() != gender.lower():
+                    continue
+                if country and country.lower() not in voice.get("country", "").lower():
+                    continue
+                return voice["id"]
+
+            # Match by gender and/or country only
+            if not name:
+                gender_match = (not gender or str(voice.get("gender", "")).lower() == gender.lower())
+                country_match = (not country or country.lower() in voice.get("country", "").lower())
+                if gender_match and country_match:
+                    return voice["id"]
+
+        # No match found, return None (will use system default)
         return None
 
     def split_text(self, text: str, max_length: int = 500) -> list:
@@ -227,7 +274,7 @@ class TtsCog(BaseCog):
 
         return chunks if chunks else [text]
 
-    async def generate_tts_file(self, text: str, name=None, gender=None, country=None, rate=150, volume=1.5) -> str:
+    async def generate_tts_file(self, text: str, name=None, gender=None, country=None, rate=150, volume=1.5, guild_id=None) -> str:
         """Generate TTS and save to temp file. Returns filepath."""
         loop = asyncio.get_running_loop()
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
@@ -237,7 +284,7 @@ class TtsCog(BaseCog):
             engine = pyttsx3.init()
             engine.setProperty("rate", rate)
             engine.setProperty("volume", volume)
-            voice_id = self._select_voice(name=name, gender=gender, country=country)
+            voice_id = self._select_voice(name=name, gender=gender, country=country, guild_id=guild_id)
             if voice_id:
                 engine.setProperty("voice", voice_id)
             engine.save_to_file(text, temp_file.name)
@@ -268,7 +315,7 @@ class TtsCog(BaseCog):
 
         for i, chunk in enumerate(chunks):
             try:
-                filepath = await self.generate_tts_file(chunk, name=name, gender=gender, country=country, rate=rate, volume=volume)
+                filepath = await self.generate_tts_file(chunk, name=name, gender=gender, country=country, rate=rate, volume=volume, guild_id=ctx.guild.id)
 
                 # CRITICAL FIX: Pass ctx.guild.id to queue_sound for guild isolation
                 await voice_cog.queue_sound(ctx.guild.id, filepath, ctx.author, None, 1.0)
@@ -409,23 +456,70 @@ class TtsCog(BaseCog):
     @commands.command(name="voices", help="List available TTS voices")
     async def list_voices(self, ctx):
         """Show all available TTS voices grouped by country."""
+        if not self.available_voices:
+            return await UserFeedback.error(ctx, "No TTS voices available on this system!")
+
         embed = discord.Embed(
-            title="Available TTS Voices",
-            description="Use ~setvoice --name <n> to set your default voice",
+            title=f"Available TTS Voices ({len(self.available_voices)} total)",
+            description="Use ~setvoice --name <voice_name> or configure default in web UI",
             color=discord.Color.blue()
         )
 
+        # Group voices by country
         by_country = {}
-        for voice in self.voices:
-            country = voice["country"]
+        for voice in self.available_voices:
+            country = voice.get("country", "Unknown")
             if country not in by_country:
                 by_country[country] = []
-            by_country[country].append(f"**{voice['name']}** ({voice['gender']})")
 
+            # Extract short name from full voice name
+            short_name = voice["name"]
+            if " - " in short_name:
+                short_name = short_name.split(" - ")[0].replace("Microsoft ", "")
+
+            gender = voice.get("gender", "unknown")
+            gender_emoji = "♂️" if str(gender).lower() == "male" else "♀️" if str(gender).lower() == "female" else "⚧"
+
+            by_country[country].append(f"{gender_emoji} **{short_name}**")
+
+        # Add fields to embed (Discord limit: 25 fields, 1024 chars per field)
+        field_count = 0
         for country, voices_list in sorted(by_country.items()):
-            embed.add_field(name=f"{country}", value="\n".join(voices_list), inline=False)
+            if field_count >= 25:
+                break
 
-        embed.set_footer(text="Tip: Use --rate to adjust speaking speed (default: 150)")
+            # Split long voice lists into multiple fields if needed
+            voices_text = "\n".join(voices_list)
+            if len(voices_text) > 1024:
+                # Split into chunks
+                chunks = []
+                current_chunk = []
+                current_length = 0
+
+                for voice_entry in voices_list:
+                    entry_length = len(voice_entry) + 1  # +1 for newline
+                    if current_length + entry_length > 1024:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [voice_entry]
+                        current_length = entry_length
+                    else:
+                        current_chunk.append(voice_entry)
+                        current_length += entry_length
+
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+
+                for i, chunk in enumerate(chunks):
+                    field_name = f"{country}" if i == 0 else f"{country} (cont.)"
+                    embed.add_field(name=field_name, value=chunk, inline=False)
+                    field_count += 1
+                    if field_count >= 25:
+                        break
+            else:
+                embed.add_field(name=country, value=voices_text, inline=False)
+                field_count += 1
+
+        embed.set_footer(text="💡 Tip: Set default voice in web UI or use --rate to adjust speech speed")
         await ctx.send(embed=embed)
 
 
