@@ -299,6 +299,9 @@ class TtsCog(BaseCog):
             voice_id = self._select_voice(name=name, gender=gender, country=country, guild_id=guild_id)
             if voice_id:
                 engine.setProperty("voice", voice_id)
+                logger.info(f"[Guild {guild_id}] Using TTS voice: {voice_id}")
+            else:
+                logger.info(f"[Guild {guild_id}] Using system default TTS voice")
             engine.save_to_file(text, temp_file.name)
             engine.runAndWait()
             # Note: Don't call engine.stop() after runAndWait()
