@@ -56,6 +56,16 @@ class VoiceConfig(ConfigBase):
         max_value=500
     )
 
+    keepalive_interval: int = config_field(
+        default=30,
+        description="Seconds between keepalive packets to prevent voice disconnection",
+        category="Playback",
+        guild_override=False,
+        admin_only=True,
+        min_value=10,
+        max_value=120
+    )
+
     # Speech Recognition Settings (Technical - Advanced Users)
     voice_speech_phrase_time_limit: int = config_field(
         default=10,
@@ -135,53 +145,11 @@ except Exception as e:
     logger.warning(f"Could not apply voice_recv patch: {e}")
 
 
-# Store reference to cog for PacketRouter error handling
-_voice_cog_instance = None
-
-
-def _patched_packet_router_run(original_run):
-    """Wrap PacketRouter.run to catch OpusError and trigger restart."""
-    def wrapper(self):
-        try:
-            original_run(self)
-        except Exception as e:
-            logger.error(f"PacketRouter crashed: {e}", exc_info=True)
-
-            # Try to restart the listener automatically
-            if _voice_cog_instance:
-                try:
-                    # Find which guild this router belongs to
-                    import asyncio
-                    asyncio.run_coroutine_threadsafe(
-                        _voice_cog_instance._restart_dead_listeners(),
-                        _voice_cog_instance.bot.loop
-                    )
-                except Exception as restart_error:
-                    logger.error(f"Failed to trigger listener restart: {restart_error}", exc_info=True)
-    return wrapper
-
-
-# Apply PacketRouter patch
-try:
-    from discord.ext.voice_recv.router import PacketRouter
-
-    if not hasattr(PacketRouter.run, '_patched'):
-        PacketRouter.run = _patched_packet_router_run(PacketRouter.run)
-        PacketRouter.run._patched = True
-        logger.info("Applied PacketRouter error recovery patch")
-except Exception as e:
-    logger.warning(f"Could not apply PacketRouter patch: {e}")
-
-
 class VoiceSpeechCog(BaseCog):
 
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
-
-        # Set global instance for PacketRouter error handling
-        global _voice_cog_instance
-        _voice_cog_instance = self
 
         # Register config schemas
         from bot.core.config_system import CogConfigSchema
@@ -215,6 +183,12 @@ class VoiceSpeechCog(BaseCog):
         # Transcript session manager (pass bot for ConfigManager access)
         self.transcript_manager = TranscriptSessionManager(bot)
         logger.info("Initialized TranscriptSessionManager")
+
+    async def cog_load(self):
+        """Called when the cog is loaded."""
+        # Start transcript flush task
+        self.transcript_manager.start_flush_task()
+        logger.info("Started transcript flush task")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
@@ -663,52 +637,16 @@ class VoiceSpeechCog(BaseCog):
 
                         silence = b'\xf8\xff\xfe'
                         vc.send_audio_packet(silence, encode=False)
+                        logger.info(f"[Guild {guild_id}] Keepalive Sent")
                     except Exception as e:
                         logger.error(f"[Guild {guild_id}] Keepalive error: {e}", exc_info=True)
                 # Read from config dynamically for hot-reload support
-                sys_cfg = self.bot.config_manager.for_guild("System")
-                await asyncio.sleep(sys_cfg.keepalive_interval)
+                voice_cfg = self.bot.config_manager.for_guild("Voice", "System")
+                await asyncio.sleep(voice_cfg.keepalive_interval)
         except asyncio.CancelledError:
             logger.info("Keepalive loop cancelled")
             raise
 
-    async def _restart_dead_listeners(self):
-        """Restart all speech listeners after PacketRouter crash."""
-        logger.warning("PacketRouter crashed globally, restarting all speech listeners...")
-
-        for guild_id, sink in list(self.active_sinks.items()):
-            try:
-                guild = self.bot.get_guild(guild_id)
-                if not guild or not guild.voice_client:
-                    continue
-
-                vc = guild.voice_client
-
-                # Stop the old sink
-                try:
-                    vc.stop_listening()
-                except Exception as e:
-                    logger.error(f"[{guild.name}] Error stopping dead listener: {e}")
-
-                # Create a minimal context for restart
-                class RestartContext:
-                    def __init__(self, guild, voice_client):
-                        self.guild = guild
-                        self.voice_client = voice_client
-
-                # Restart the listener
-                ctx = RestartContext(guild, vc)
-                new_engine = self._create_speech_listener(ctx)
-                await new_engine.start_listening(vc)
-                self.active_sinks[guild_id] = {
-                    'engine': new_engine,
-                    'sink': new_engine.get_sink()
-                }
-
-                logger.info(f"[{guild.name}] ✅ Speech listener restarted successfully")
-
-            except Exception as e:
-                logger.error(f"[Guild {guild_id}] Failed to restart listener: {e}", exc_info=True)
 
     def _create_speech_listener(self, ctx):
         """Create a speech recognition listener with ducking support and error handling."""
@@ -718,16 +656,21 @@ class VoiceSpeechCog(BaseCog):
 
         def text_callback(member: discord.Member, text: str):
             """
-            Callback for speech engines.
+            CRITICAL: Keep this callback MINIMAL and FAST.
+            This runs in the speech recognition thread - any blocking delays voice packets.
+            Offload ALL heavy work to async tasks via run_coroutine_threadsafe.
+
             Args:
                 member: Discord member who spoke
-                text: Transcribed text (plain string, already parsed)
+                text: Transcribed text (plain string from pluggable engines, already parsed)
             """
             try:
+                # ===== FAST: Parse and validate (keep in callback) =====
                 transcribed_text = text.strip()
                 if not transcribed_text:
                     return
 
+                # ===== FAST: Create data dict (keep in callback) =====
                 guild_name = ctx.guild.name
                 channel_name = ctx.guild.voice_client.channel.name if ctx.guild.voice_client else "Unknown"
 
@@ -744,72 +687,68 @@ class VoiceSpeechCog(BaseCog):
                     "triggers": []
                 }
 
-                # Detailed colored console output (debug level)
-                logger.debug(
+                # ===== FAST: Console log (keep in callback) =====
+                logger.info(
                     f"\033[92m[{guild_name}] [{member.id}] [{member.display_name}] : {transcribed_text}\033[0m"
                 )
 
-                # Update user info in data collector
-                from bot.core.admin.data_collector import get_data_collector
-                data_collector = get_data_collector()
-                if data_collector:
-                    data_collector.update_user_info(member)
+                # ===== OFFLOAD: Everything else to async task =====
+                async def process_transcription():
+                    """Process transcription asynchronously - all heavy/blocking operations here."""
+                    try:
+                        # Get data collector
+                        from bot.core.admin.data_collector import get_data_collector
+                        data_collector = get_data_collector()
 
-                # Add transcription to session
-                self.transcript_manager.add_transcript(
-                    channel_id=voice_channel_id,
-                    user_id=str(member.id),
-                    username=member.display_name,
-                    text=transcribed_text,
-                    confidence=1.0  # Speech engines don't provide confidence
-                )
+                        # Update user info
+                        if data_collector:
+                            data_collector.update_user_info(member)
 
-                soundboard_cog = self.bot.get_cog("Soundboard")
-                if not soundboard_cog:
-                    # Full JSON for debug
-                    logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
-                    # Minimal info log
-                    logger.info(f"[TRANSCRIPTION] {member.display_name}: {transcribed_text}")
-                    # Record transcription to data collector for web dashboard
-                    if data_collector:
-                        data_collector.record_transcription(transcription_data)
-                    return
+                        # Add to transcript session
+                        self.transcript_manager.add_transcript(
+                            channel_id=voice_channel_id,
+                            user_id=str(member.id),
+                            username=member.display_name,
+                            text=transcribed_text,
+                            confidence=1.0
+                        )
 
-                # Check for soundboard triggers
-                files = soundboard_cog.get_soundfiles_for_text(guild_id, member.id, transcribed_text)
-                if files:
-                    async def queue_all():
-                        for soundfile, sound_key, volume, trigger_word in files:
-                            if os.path.isfile(soundfile):
-                                # Add trigger info to transcription data
-                                transcription_data["triggers"].append({
-                                    "word": trigger_word,
-                                    "sound": os.path.basename(soundfile),
-                                    "volume": volume
-                                })
-                                # Queue sound for THIS guild only (speech-triggered)
-                                await self.queue_sound(guild_id, soundfile, member, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
+                        # Check for soundboard triggers
+                        soundboard_cog = self.bot.get_cog("Soundboard")
+                        if not soundboard_cog:
+                            # No soundboard - just log and record
+                            logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                            if data_collector:
+                                data_collector.record_transcription(transcription_data)
+                            return
 
-                        # Full JSON for debug (includes trigger details)
-                        logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
+                        # Get triggered sound files
+                        files = soundboard_cog.get_soundfiles_for_text(guild_id, member.id, transcribed_text)
+                        if files:
+                            # Queue all triggered sounds
+                            for soundfile, sound_key, volume, trigger_word in files:
+                                if os.path.isfile(soundfile):
+                                    # Add trigger info
+                                    transcription_data["triggers"].append({
+                                        "word": trigger_word,
+                                        "sound": os.path.basename(soundfile),
+                                        "volume": volume
+                                    })
+                                    # Queue sound (speech-triggered)
+                                    await self.queue_sound(guild_id, soundfile, member, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
 
-                        # Minimal info log with triggers
-                        trigger_words = ", ".join([t["word"] for t in transcription_data["triggers"]])
-                        logger.info(f"[TRANSCRIPTION] {member.display_name}: {transcribed_text} → triggers: {trigger_words}")
+                        # Log transcription with triggers
+                        logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
 
-                        # Record transcription to data collector for web dashboard
+                        # Record to data collector (websocket broadcast)
                         if data_collector:
                             data_collector.record_transcription(transcription_data)
 
-                    asyncio.run_coroutine_threadsafe(queue_all(), self.bot.loop)
-                else:
-                    # Full JSON for debug (no triggers)
-                    logger.debug(f"[TRANSCRIPTION_DEBUG] {json.dumps(transcription_data)}")
-                    # Minimal info log (no triggers)
-                    logger.info(f"[TRANSCRIPTION] {member.display_name}: {transcribed_text}")
-                    # Record transcription to data collector for web dashboard
-                    if data_collector:
-                        data_collector.record_transcription(transcription_data)
+                    except Exception as e:
+                        logger.error(f"Error processing transcription: {e}", exc_info=True)
+
+                # Schedule async processing - don't wait for it
+                asyncio.run_coroutine_threadsafe(process_transcription(), self.bot.loop)
 
             except Exception as e:
                 logger.error(f"Error in text_callback: {e}", exc_info=True)

@@ -13,6 +13,17 @@ let transcripts = [];
 let historicalSessions = [];
 let currentSession = null;
 
+/**
+ * Convert UTC timestamp to local time string
+ * Timestamps from the bot are in UTC (without 'Z' suffix)
+ */
+function formatTimestamp(utcTimestamp) {
+    // Add 'Z' to indicate UTC if not present
+    const isoString = utcTimestamp.endsWith('Z') ? utcTimestamp : utcTimestamp + 'Z';
+    const date = new Date(isoString);
+    return date.toLocaleString();
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadGuilds();
@@ -268,7 +279,7 @@ function displayTranscripts(transcriptList) {
     const reversed = [...transcriptList].reverse();
 
     container.innerHTML = reversed.map(t => {
-        const timestamp = new Date(t.timestamp).toLocaleString();
+        const timestamp = formatTimestamp(t.timestamp);
         const triggers = t.triggers && t.triggers.length > 0
             ? ` | 🔊 ${t.triggers.map(tr => `${escapeHtml(tr.word)}→${escapeHtml(tr.sound)}`).join(', ')}`
             : '';
@@ -306,7 +317,15 @@ function displayTranscripts(transcriptList) {
 
 function addTranscriptionToView(transcription) {
     console.log('addTranscriptionToView called with:', transcription);
+    console.log('Current view mode:', viewMode);
     console.log('Current filters - Guild:', currentGuild, 'Channel:', currentChannel, 'Search:', currentSearch);
+
+    // IMPORTANT: Only add to view if we're in live mode
+    // Historical transcripts should not be added via WebSocket
+    if (viewMode !== 'live') {
+        console.log('❌ Not in live mode, ignoring real-time transcription');
+        return;
+    }
 
     // Only add if it matches current filters
     // IDs are now strings from backend for JavaScript compatibility
@@ -347,7 +366,7 @@ function addTranscriptionToView(transcription) {
         container.innerHTML = '';
     }
 
-    const timestamp = new Date(transcription.timestamp).toLocaleString();
+    const timestamp = formatTimestamp(transcription.timestamp);
     const triggers = transcription.triggers && transcription.triggers.length > 0
         ? ` | 🔊 ${transcription.triggers.map(tr => `${escapeHtml(tr.word)}→${escapeHtml(tr.sound)}`).join(', ')}`
         : '';
@@ -444,8 +463,8 @@ function displayHistoricalSessions(sessions) {
     }
 
     container.innerHTML = sessions.map(session => {
-        const startTime = new Date(session.start_time).toLocaleString();
-        const endTime = session.end_time ? new Date(session.end_time).toLocaleString() : 'In Progress';
+        const startTime = formatTimestamp(session.start_time);
+        const endTime = session.end_time ? formatTimestamp(session.end_time) : 'In Progress';
         const duration = session.duration_seconds
             ? formatDuration(session.duration_seconds)
             : 'N/A';
@@ -498,7 +517,7 @@ function displaySessionTranscript(session) {
 
     // Build transcript HTML
     const transcriptHtml = session.transcript.map(entry => {
-        const timestamp = new Date(entry.timestamp).toLocaleString();
+        const timestamp = formatTimestamp(entry.timestamp);
         const confidenceBadge = entry.confidence < 0.8
             ? ` <span class="confidence-low">(${Math.round(entry.confidence * 100)}%)</span>`
             : '';
@@ -513,8 +532,8 @@ function displaySessionTranscript(session) {
     }).join('');
 
     // Session header info
-    const startTime = new Date(session.start_time).toLocaleString();
-    const endTime = session.end_time ? new Date(session.end_time).toLocaleString() : 'In Progress';
+    const startTime = formatTimestamp(session.start_time);
+    const endTime = session.end_time ? formatTimestamp(session.end_time) : 'In Progress';
     const duration = session.stats?.duration_seconds
         ? formatDuration(session.stats.duration_seconds)
         : 'N/A';

@@ -1,23 +1,22 @@
 """
-PyAudio-based audio player with ducking support for Discord bots.
+Audio player with ducking support for Discord bots.
 Automatically reduces volume when users speak in the voice channel.
 """
 
 import asyncio
 import threading
-import pyaudio
 import wave
 import numpy as np
 from pathlib import Path
 from typing import Optional, Callable
 import logging
 
-logger = logging.getLogger("discordbot.pyaudio_player")
+logger = logging.getLogger("discordbot.audio_player")
 
 
-class PyAudioPlayer:
+class AudioPlayer:
     """
-    PyAudio-based audio player with support for:
+    Audio player with support for:
     - Volume control
     - Audio ducking when users speak
     - Queue management
@@ -33,7 +32,7 @@ class PyAudioPlayer:
         duck_transition_ms: int = 50,
     ):
         """
-        Initialize PyAudio player.
+        Initialize audio player.
 
         Args:
             sample_rate: Audio sample rate (Discord uses 48kHz)
@@ -49,10 +48,6 @@ class PyAudioPlayer:
         self.duck_transition_frames = int(
             (duck_transition_ms / 1000.0) * sample_rate
         )
-
-        # PyAudio setup
-        self.pyaudio = pyaudio.PyAudio()
-        self.stream: Optional[pyaudio.Stream] = None
 
         # Playback state
         self.is_playing = False
@@ -390,7 +385,4 @@ class PyAudioPlayer:
     def cleanup(self):
         """Clean up resources."""
         self.stop()
-        if self.stream:
-            self.stream.close()
-        self.pyaudio.terminate()
-        logger.info("PyAudio player cleaned up")
+        logger.info("Audio player cleaned up")
