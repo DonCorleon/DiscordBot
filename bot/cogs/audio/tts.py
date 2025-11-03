@@ -24,6 +24,18 @@ PREFERENCES_FILE = "data/config/tts_preferences.json"
 class TTSConfig(ConfigBase):
     """TTS (Text-to-Speech) configuration schema."""
 
+    tts_engine: str = config_field(
+        default="pyttsx3",
+        description="TTS engine to use",
+        category="Audio/Text-to-Speech",
+        guild_override=True,
+        choices=[
+            ("pyttsx3", "Pyttsx3 (Local - espeak/SAPI)"),
+            ("edge", "Edge TTS (Cloud - Microsoft Neural)"),
+            ("piper", "Piper (Local Neural - High Quality)")
+        ]
+    )
+
     tts_default_voice: str = config_field(
         default="",
         description="Default TTS voice (leave empty for system default)",
@@ -62,99 +74,60 @@ class TTSConfig(ConfigBase):
 
 
 class TtsCog(BaseCog):
-    """Local TTS Cog using pyttsx3 for offline speech in VC with queue integration."""
+    """TTS Cog with support for multiple engines (pyttsx3, Edge TTS, Piper)."""
 
     def __init__(self, bot):
         super().__init__(bot)
         self.bot = bot
 
-        # Discover available voices from the system
-        self.available_voices = self._discover_voices()
-        logger.info(f"Discovered {len(self.available_voices)} TTS voices on this system")
+        # TTS engines (per-guild caching)
+        self.engines = {}  # {guild_id: TTSEngine}
 
-        # Register config schema with dynamic voice choices
+        # Register config schema first (before creating engines)
         from bot.core.config_system import CogConfigSchema
         schema = CogConfigSchema.from_dataclass("TTS", TTSConfig)
-
-        # Populate voice choices dynamically
-        voice_choices = [("", "System Default")] + [(v["id"], v["name"]) for v in self.available_voices]
-        if hasattr(schema.fields["tts_default_voice"], "choices"):
-            schema.fields["tts_default_voice"].choices = voice_choices
-
         bot.config_manager.register_schema("TTS", schema)
         logger.info("Registered TTS config schema")
 
+        # User preferences (voice customization)
         self.user_preferences = {}
         self.load_preferences()
 
-    def _discover_voices(self):
-        """Discover all available TTS voices on the system."""
+    async def get_engine(self, guild_id: int):
+        """Get or create TTS engine for this guild based on config."""
+        from bot.core.tts_engines import create_tts_engine
+
+        # Get configured engine type
+        engine_type = self.bot.config_manager.get("TTS", "tts_engine", guild_id)
+
+        # Check if we have a cached engine of the right type
+        if guild_id in self.engines:
+            cached_engine = self.engines[guild_id]
+            cached_type = type(cached_engine).__name__.replace("Engine", "").lower()
+            if cached_type == engine_type:
+                return cached_engine
+            else:
+                # Engine type changed, clean up old engine
+                logger.info(f"[Guild {guild_id}] TTS engine changed from {cached_type} to {engine_type}")
+                if hasattr(cached_engine, 'cleanup'):
+                    cached_engine.cleanup()
+                del self.engines[guild_id]
+
+        # Create new engine
         try:
-            engine = pyttsx3.init()
-            system_voices = engine.getProperty("voices")
-            discovered = []
-
-            for voice in system_voices:
-                # On Linux (espeak), voice.id might be like 'gmw/en' or 'zle/ru'
-                # On Windows, voice.id is a full path or GUID
-                # We'll store the full ID for proper voice selection
-                voice_id = voice.id
-
-                # Create a display name for the dropdown
-                # For espeak voices, the name is typically the language name
-                display_name = voice.name if hasattr(voice, 'name') else voice_id
-
-                # Parse voice metadata
-                voice_info = {
-                    "id": voice_id,
-                    "name": display_name,
-                    "languages": voice.languages if hasattr(voice, "languages") else [],
-                    "gender": voice.gender if hasattr(voice, "gender") else "unknown",
-                    "age": voice.age if hasattr(voice, "age") else None
-                }
-
-                # Try to extract country/language info from name or languages
-                country = "Unknown"
-                if voice_info["languages"]:
-                    # Languages are typically in format like ['en_US', 'en-US']
-                    lang = str(voice_info["languages"][0]) if voice_info["languages"] else ""
-                    if "_" in lang or "-" in lang:
-                        country_code = lang.split("_")[-1].split("-")[-1]
-                        country_map = {
-                            "US": "United States",
-                            "GB": "United Kingdom",
-                            "AU": "Australia",
-                            "CA": "Canada",
-                            "IN": "India",
-                            "IE": "Ireland",
-                            "DE": "Germany",
-                            "FR": "France",
-                            "ES": "Spain",
-                            "IT": "Italy",
-                            "RU": "Russia",
-                            "CN": "China",
-                            "JP": "Japan"
-                        }
-                        country = country_map.get(country_code.upper(), country_code)
-
-                # Extract country from name if present (e.g., "English (United States)")
-                if "(" in display_name and ")" in display_name:
-                    country_from_name = display_name.split("(")[-1].split(")")[0]
-                    if country_from_name:
-                        country = country_from_name
-
-                voice_info["country"] = country
-                discovered.append(voice_info)
-
-            # Note: Don't call engine.stop() - let it clean up naturally
-            # Calling stop() can cause segfaults on Linux with espeak
-            del engine
-            logger.debug(f"Discovered {len(discovered)} voices: {[v['id'] for v in discovered[:5]]}")
-            return discovered
-
-        except Exception as e:
-            logger.error(f"Failed to discover TTS voices: {e}", exc_info=True)
-            return []
+            engine = create_tts_engine(self.bot, engine_type)
+            self.engines[guild_id] = engine
+            logger.info(f"[Guild {guild_id}] Created TTS engine: {engine_type}")
+            return engine
+        except ImportError as e:
+            logger.error(f"[Guild {guild_id}] Failed to create {engine_type} engine: {e}")
+            # Fallback to pyttsx3
+            if engine_type != "pyttsx3":
+                logger.info(f"[Guild {guild_id}] Falling back to pyttsx3")
+                engine = create_tts_engine(self.bot, "pyttsx3")
+                self.engines[guild_id] = engine
+                return engine
+            raise
 
     def load_preferences(self):
         """Load user preferences from JSON file."""
@@ -202,42 +175,6 @@ class TtsCog(BaseCog):
                 self.user_preferences[user_id_str][key] = value
 
         self.save_preferences()
-
-    def _select_voice(self, name=None, gender=None, country=None, guild_id=None):
-        """Return pyttsx3 voice ID matching criteria or configured default voice."""
-        # If no criteria provided, use the configured default voice
-        if not name and not gender and not country and guild_id:
-            default_voice = self.bot.config_manager.get("TTS", "tts_default_voice", guild_id)
-            logger.info(f"[Guild {guild_id}] _select_voice: No criteria, using guild default: {default_voice}")
-            if default_voice:
-                return default_voice
-        else:
-            logger.info(f"[Guild {guild_id}] _select_voice: Searching with name={name}, gender={gender}, country={country}")
-
-        # Search for matching voice in discovered voices
-        for voice in self.available_voices:
-            # Match by exact voice ID if name matches the full voice ID
-            if name and name == voice["id"]:
-                return voice["id"]
-
-            # Match by name (partial or full)
-            if name and name.lower() in voice["name"].lower():
-                # Check gender and country if specified
-                if gender and str(voice.get("gender", "")).lower() != gender.lower():
-                    continue
-                if country and country.lower() not in voice.get("country", "").lower():
-                    continue
-                return voice["id"]
-
-            # Match by gender and/or country only
-            if not name:
-                gender_match = (not gender or str(voice.get("gender", "")).lower() == gender.lower())
-                country_match = (not country or country.lower() in voice.get("country", "").lower())
-                if gender_match and country_match:
-                    return voice["id"]
-
-        # No match found, return None (will use system default)
-        return None
 
     def split_text(self, text: str, max_length: int = 500) -> list:
         """Split text into chunks at sentence boundaries."""
@@ -291,28 +228,32 @@ class TtsCog(BaseCog):
 
     async def generate_tts_file(self, text: str, name=None, gender=None, country=None, rate=150, volume=1.5, guild_id=None) -> str:
         """Generate TTS and save to temp file. Returns filepath."""
-        loop = asyncio.get_running_loop()
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        temp_file.close()
+        # Get the appropriate engine for this guild
+        engine = await self.get_engine(guild_id)
 
-        def generate_tts():
-            engine = pyttsx3.init()
-            engine.setProperty("rate", rate)
-            engine.setProperty("volume", volume)
-            voice_id = self._select_voice(name=name, gender=gender, country=country, guild_id=guild_id)
-            if voice_id:
-                engine.setProperty("voice", voice_id)
-                logger.info(f"[Guild {guild_id}] Using TTS voice: {voice_id}")
-            else:
-                logger.info(f"[Guild {guild_id}] Using system default TTS voice")
-            engine.save_to_file(text, temp_file.name)
-            engine.runAndWait()
-            # Note: Don't call engine.stop() after runAndWait()
-            # This can cause segfaults on Linux with espeak
-            # runAndWait() already handles cleanup properly
+        # Determine voice to use
+        # For pyttsx3: name/gender/country can be used for voice selection (legacy support)
+        # For other engines: name is the voice ID
+        voice = None
+        if name:
+            voice = name
+        elif not name and not gender and not country:
+            # No preferences specified, use engine's default voice
+            voice = engine.get_default_voice(guild_id)
 
-        await loop.run_in_executor(None, generate_tts)
-        return temp_file.name
+        # Generate audio using the engine
+        try:
+            filepath = await engine.generate_audio(
+                text=text,
+                voice=voice,
+                rate=rate,
+                volume=volume,
+                guild_id=guild_id
+            )
+            return filepath
+        except Exception as e:
+            logger.error(f"[Guild {guild_id}] TTS generation failed: {e}", exc_info=True)
+            raise
 
     async def queue_tts(self, ctx, text: str, name=None, gender=None, country=None, rate=150):
         """Generate TTS and queue it for playback."""
@@ -479,36 +420,48 @@ class TtsCog(BaseCog):
 
     @commands.command(name="voices", help="List available TTS voices")
     async def list_voices(self, ctx):
-        """Show all available TTS voices grouped by country."""
-        if not self.available_voices:
-            return await UserFeedback.error(ctx, "No TTS voices available on this system!")
+        """Show all available TTS voices for current engine."""
+        # Get engine for this guild
+        try:
+            engine = await self.get_engine(ctx.guild.id)
+            engine_type = self.bot.config_manager.get("TTS", "tts_engine", ctx.guild.id)
+        except Exception as e:
+            return await UserFeedback.error(ctx, f"Failed to get TTS engine: {e}")
+
+        # Get available voices from engine
+        try:
+            available_voices = await engine.list_voices()
+        except Exception as e:
+            logger.error(f"Failed to list voices: {e}", exc_info=True)
+            return await UserFeedback.error(ctx, f"Failed to list voices: {e}")
+
+        if not available_voices:
+            return await UserFeedback.error(ctx, f"No TTS voices available for {engine_type} engine!")
 
         embed = discord.Embed(
-            title=f"Available TTS Voices ({len(self.available_voices)} total)",
-            description="Use ~setvoice --name <voice_name> or configure default in web UI",
+            title=f"Available TTS Voices ({len(available_voices)} total)",
+            description=f"Engine: **{engine_type}**\nUse ~setvoice --name <voice_id> or configure in web UI",
             color=discord.Color.blue()
         )
 
-        # Group voices by country
-        by_country = {}
-        for voice in self.available_voices:
-            country = voice.get("country", "Unknown")
-            if country not in by_country:
-                by_country[country] = []
+        # Group voices by language
+        by_language = {}
+        for voice in available_voices:
+            language = voice.get("language", "Unknown")
+            if language not in by_language:
+                by_language[language] = []
 
-            # Extract short name from full voice name
-            short_name = voice["name"]
-            if " - " in short_name:
-                short_name = short_name.split(" - ")[0].replace("Microsoft ", "")
-
+            # Extract info
+            voice_id = voice["id"]
+            voice_name = voice["name"]
             gender = voice.get("gender", "unknown")
             gender_emoji = "♂️" if str(gender).lower() == "male" else "♀️" if str(gender).lower() == "female" else "⚧"
 
-            by_country[country].append(f"{gender_emoji} **{short_name}**")
+            by_language[language].append(f"{gender_emoji} `{voice_id}`\n  {voice_name}")
 
         # Add fields to embed (Discord limit: 25 fields, 1024 chars per field)
         field_count = 0
-        for country, voices_list in sorted(by_country.items()):
+        for language, voices_list in sorted(by_language.items()):
             if field_count >= 25:
                 break
 
@@ -534,17 +487,27 @@ class TtsCog(BaseCog):
                     chunks.append("\n".join(current_chunk))
 
                 for i, chunk in enumerate(chunks):
-                    field_name = f"{country}" if i == 0 else f"{country} (cont.)"
+                    field_name = f"{language}" if i == 0 else f"{language} (cont.)"
                     embed.add_field(name=field_name, value=chunk, inline=False)
                     field_count += 1
                     if field_count >= 25:
                         break
             else:
-                embed.add_field(name=country, value=voices_text, inline=False)
+                embed.add_field(name=language, value=voices_text, inline=False)
                 field_count += 1
 
-        embed.set_footer(text="💡 Tip: Set default voice in web UI or use --rate to adjust speech speed")
+        embed.set_footer(text="💡 Tip: Switch engine in web UI (pyttsx3/edge/piper)")
         await ctx.send(embed=embed)
+
+    def cog_unload(self):
+        """Cleanup when cog is unloaded."""
+        for guild_id, engine in self.engines.items():
+            if hasattr(engine, 'cleanup'):
+                try:
+                    engine.cleanup()
+                    logger.info(f"[Guild {guild_id}] Cleaned up TTS engine")
+                except Exception as e:
+                    logger.error(f"[Guild {guild_id}] Failed to cleanup TTS engine: {e}")
 
 
 async def setup(bot):
