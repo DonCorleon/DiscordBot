@@ -4,7 +4,7 @@ Discord audio source with ducking support.
 
 import discord
 import numpy as np
-from bot.core.audio.player import PyAudioPlayer
+from bot.core.audio.player import AudioPlayer
 import logging
 
 logger = logging.getLogger("discordbot.discord_audio_source")
@@ -13,7 +13,7 @@ logger = logging.getLogger("discordbot.discord_audio_source")
 class DuckedAudioSource(discord.AudioSource):
     """
     Discord audio source with real-time ducking support.
-    Integrates PyAudioPlayer's ducking with Discord's audio streaming.
+    Integrates AudioPlayer's ducking with Discord's audio streaming.
     """
 
     def __init__(
@@ -39,7 +39,7 @@ class DuckedAudioSource(discord.AudioSource):
             chunk_size: Audio chunk size in frames (default: 960)
         """
         self.file_path = file_path
-        self.player = PyAudioPlayer(
+        self.player = AudioPlayer(
             sample_rate=sample_rate,
             channels=channels,
             chunk_size=chunk_size,

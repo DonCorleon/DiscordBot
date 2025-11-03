@@ -168,16 +168,20 @@ class TranscriptSessionManager:
         Args:
             session: TranscriptSession to create file for
         """
+        logger.info(f"_create_session_file called for session {session.session_id}")
         try:
             # Create nested directory structure: guild_id/channel_id/
             base_dir = self._get_transcripts_dir()
+            logger.info(f"Base dir: {base_dir}")
             session_dir = base_dir / session.guild_id / session.channel_id
+            logger.info(f"Creating session dir: {session_dir}")
             session_dir.mkdir(parents=True, exist_ok=True)
 
             # Create filename with timestamp and session ID
             start_dt = datetime.fromisoformat(session.start_time)
             filename = f"{start_dt.strftime('%Y%m%d_%H%M%S')}_{session.session_id}.json"
             filepath = session_dir / filename
+            logger.info(f"Writing to filepath: {filepath}")
 
             # Store filepath in session
             session.file_path = str(filepath)
@@ -522,7 +526,7 @@ class TranscriptSessionManager:
         # Mark session as dirty for next flush
         session._dirty = True
 
-        logger.debug(f"Added transcript to session {session.session_id}: {username}: {text[:50]}")
+        logger.info(f"Added transcript to session {session.session_id}: {username}: {text[:50]}")
 
     def add_bot_message(
         self,
