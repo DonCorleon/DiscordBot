@@ -112,6 +112,37 @@ class VoiceConfig(ConfigBase):
         guild_override=False
     )
 
+    # OpusError Handling Settings
+    opus_error_threshold: int = config_field(
+        default=5,
+        description="Number of OpusErrors before triggering voice reconnection",
+        category="Audio/Voice Channels/Error Handling",
+        guild_override=False,
+        admin_only=True,
+        min_value=1,
+        max_value=100
+    )
+
+    opus_error_window: int = config_field(
+        default=10,
+        description="Time window in seconds for counting OpusErrors",
+        category="Audio/Voice Channels/Error Handling",
+        guild_override=False,
+        admin_only=True,
+        min_value=5,
+        max_value=300
+    )
+
+    opus_error_log_interval: int = config_field(
+        default=5,
+        description="Log every Nth OpusError to prevent log spam",
+        category="Audio/Voice Channels/Error Handling",
+        guild_override=False,
+        admin_only=True,
+        min_value=1,
+        max_value=50
+    )
+
 
 # Monkey patch for discord-ext-voice-recv bug
 def _patched_remove_ssrc(self, *, user_id: int):
@@ -133,6 +164,69 @@ try:
     logger.info("Applied voice_recv _remove_ssrc patch")
 except Exception as e:
     logger.warning(f"Could not apply voice_recv patch: {e}")
+
+
+# Monkey patch for PacketDecoder to handle OpusError gracefully
+def _patched_decode_packet(self, packet):
+    """Patched version of _decode_packet that handles OpusError gracefully."""
+    from discord.opus import OpusError
+    from discord.ext.voice_recv.opus import VoiceData
+
+    pcm = None
+    if not self.sink.wants_opus():
+        try:
+            # Original decode logic
+            if packet:
+                pcm = self._decoder.decode(packet.decrypted_data, fec=False)
+            else:
+                # FEC logic for fake packets
+                next_packet = self._buffer.peek_next()
+                if next_packet is not None:
+                    nextdata = next_packet.decrypted_data
+                    pcm = self._decoder.decode(nextdata, fec=True)
+                else:
+                    pcm = self._decoder.decode(None, fec=False)
+
+        except OpusError as e:
+            # Get guild_id and call error handler
+            guild_id = None
+            try:
+                voice_client = self.sink.voice_client
+                if voice_client and voice_client.guild:
+                    guild_id = voice_client.guild.id
+            except Exception:
+                pass
+
+            if guild_id:
+                bot = getattr(voice_client, 'client', None)
+                if bot:
+                    voice_cog = bot.get_cog("VoiceSpeechCog")
+                    if voice_cog:
+                        voice_cog._handle_opus_error(guild_id, e, packet)
+
+            # Skip bad packet by returning None for pcm
+            pcm = None
+
+    # Continue with original data structure
+    member = self._get_cached_member()
+    if member is None:
+        self._cached_id = self.sink.voice_client._get_id_from_ssrc(self.ssrc)
+        member = self._get_cached_member()
+
+    data = VoiceData(packet, member, pcm=pcm)
+    self._last_seq = packet.sequence
+    self._last_ts = packet.timestamp
+
+    return data
+
+
+# Apply the OpusError patch
+try:
+    from discord.ext.voice_recv.opus import PacketDecoder
+    PacketDecoder._decode_packet = _patched_decode_packet
+    logger.info("Applied voice_recv OpusError handling patch")
+except Exception as e:
+    logger.warning(f"Could not apply OpusError patch: {e}")
 
 
 class VoiceSpeechCog(BaseCog):
@@ -173,6 +267,9 @@ class VoiceSpeechCog(BaseCog):
         # Transcript session manager (pass bot for ConfigManager access)
         self.transcript_manager = TranscriptSessionManager(bot)
         logger.info("Initialized TranscriptSessionManager")
+
+        # OpusError tracking per guild {guild_id: {"timestamps": deque, "logged_count": int}}
+        self.opus_error_tracker = {}
 
     async def cog_load(self):
         """Called when the cog is loaded."""
@@ -436,6 +533,7 @@ class VoiceSpeechCog(BaseCog):
         self.queue_tasks.clear()
         self.current_sources.clear()
         self.speaking_users.clear()
+        self.opus_error_tracker.clear()
         logger.info("VoiceSpeechCog cleanup complete.")
 
     async def _process_sound_queue(self, guild_id: int):
@@ -811,6 +909,116 @@ class VoiceSpeechCog(BaseCog):
         if not self.speaking_users[guild_id] and guild_id in self.current_sources:
             self.current_sources[guild_id].unduck()
             logger.debug(f"[Guild {guild_id}] 🔊 Unducking audio (no users speaking)")
+
+    def _handle_opus_error(self, guild_id: int, error: Exception, packet):
+        """Handle OpusError with rate-limited logging and threshold-based reconnection."""
+        from collections import deque
+        from datetime import datetime, UTC
+
+        voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
+
+        # Initialize tracker
+        if guild_id not in self.opus_error_tracker:
+            self.opus_error_tracker[guild_id] = {
+                "timestamps": deque(maxlen=100),
+                "logged_count": 0
+            }
+
+        tracker = self.opus_error_tracker[guild_id]
+        current_time = datetime.now(UTC)
+        tracker["timestamps"].append(current_time)
+
+        # Count errors in window
+        window_start = current_time.timestamp() - voice_cfg.opus_error_window
+        errors_in_window = sum(1 for ts in tracker["timestamps"]
+                              if ts.timestamp() >= window_start)
+
+        # Rate-limited logging
+        tracker["logged_count"] += 1
+        if tracker["logged_count"] % voice_cfg.opus_error_log_interval == 0:
+            logger.warning(
+                f"[Guild {guild_id}] OpusError #{tracker['logged_count']}: {error} "
+                f"({errors_in_window} errors in last {voice_cfg.opus_error_window}s)"
+            )
+
+        # Check threshold
+        if errors_in_window >= voice_cfg.opus_error_threshold:
+            logger.error(
+                f"[Guild {guild_id}] OpusError threshold exceeded "
+                f"({errors_in_window}/{voice_cfg.opus_error_threshold}), "
+                f"scheduling reconnection..."
+            )
+
+            # Schedule reconnection
+            self.bot.loop.create_task(
+                self._reconnect_voice_after_opus_errors(guild_id)
+            )
+
+            # Clear tracker
+            tracker["timestamps"].clear()
+            tracker["logged_count"] = 0
+
+    async def _reconnect_voice_after_opus_errors(self, guild_id: int):
+        """Reconnect voice client after OpusError threshold exceeded."""
+        try:
+            guild = self.bot.get_guild(guild_id)
+            if not guild or not guild.voice_client:
+                logger.warning(f"[Guild {guild_id}] Cannot reconnect - no voice client")
+                return
+
+            vc = guild.voice_client
+            channel = vc.channel
+
+            if not channel:
+                logger.warning(f"[Guild {guild_id}] Cannot reconnect - no channel")
+                return
+
+            logger.info(f"[{guild.name}] Reconnecting to {channel.name} due to OpusErrors...")
+
+            # Stop listening
+            if guild_id in self.active_sinks:
+                try:
+                    sink_data = self.active_sinks[guild_id]
+                    if isinstance(sink_data, dict):
+                        engine = sink_data.get('engine')
+                        if engine:
+                            await engine.stop_listening()
+                    vc.stop_listening()
+                except Exception as e:
+                    logger.error(f"[{guild.name}] Error stopping listener: {e}")
+                del self.active_sinks[guild_id]
+
+            # Disconnect
+            await vc.disconnect()
+            await asyncio.sleep(1.5)
+
+            # Reconnect
+            from discord.ext import voice_recv
+            new_vc = await channel.connect(cls=voice_recv.VoiceRecvClient, self_deaf=False)
+
+            # Restart listening
+            class ReconnectContext:
+                def __init__(self, guild, voice_client):
+                    self.guild = guild
+                    self.voice_client = voice_client
+
+            ctx = ReconnectContext(guild, new_vc)
+            engine = self._create_speech_listener(ctx)
+            await engine.start_listening(new_vc)
+            self.active_sinks[guild_id] = {
+                'engine': engine,
+                'sink': engine.get_sink()
+            }
+
+            # Clear error tracker
+            if guild_id in self.opus_error_tracker:
+                self.opus_error_tracker[guild_id]["timestamps"].clear()
+                self.opus_error_tracker[guild_id]["logged_count"] = 0
+
+            logger.info(f"[{guild.name}] ✅ Reconnected successfully after OpusErrors")
+
+        except Exception as e:
+            logger.error(f"[Guild {guild_id}] Failed to reconnect after OpusErrors: {e}", exc_info=True)
 
     @commands.command(help="Configure audio ducking settings")
     async def ducking(self, ctx, setting: str = None, value: str = None):

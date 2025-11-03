@@ -1,20 +1,124 @@
-# Current Work: Config System Cleanup & Version Tracking
+# Current Work: Fix OpusError Crashes in Voice Reception
 
-**Branch:** `backup-2025-11-01-current`
+**Branch:** `master`
 **Last Updated:** 2025-11-03
-**Status:** Config duplicates removed, categories reorganized, version tracking system added
+**Status:** ✅ OpusError monkey patch implemented and compiled successfully
 
 ---
 
 ## 📍 Current Focus
 
-**Status**: Implemented version tracking, config migration system, removed duplicate settings, reorganized config categories
+**Status**: Investigating OpusError crashes that stop speech recognition
 
-**Goal**: Clean up configuration system by removing dead/duplicate settings and grouping functionally related settings together.
+**Goal**: Add monkey patch to handle `OpusError: corrupted stream` gracefully with threshold-based reconnection.
 
 ---
 
-## ✅ Completed This Session (2025-11-03)
+## 🔍 Problem Analysis
+
+**Error Observed:**
+```
+[2025-11-03 18:22:52] [ERROR] discord.ext.voice_recv.router: Error in <PacketRouter> loop
+discord.opus.OpusError: corrupted stream
+```
+
+**Root Cause:**
+- `discord-ext-voice-recv` library crashes when Discord audio packets are corrupted/lost
+- OpusError is raised in `discord.opus.Decoder.decode()` during packet decoding
+- Exception bubbles up through `PacketDecoder._decode_packet()` → `PacketRouter._do_run()`
+- **Entire PacketRouter thread dies** → Speech recognition stops completely
+- User must manually restart listening with `~start` command
+
+**Impact:** Complete loss of speech recognition until manual intervention.
+
+---
+
+## 💡 Proposed Solution
+
+### Approach: Monkey Patch + Threshold-Based Reconnection
+
+**Primary Behavior:**
+- Patch `PacketDecoder._decode_packet()` to catch OpusError
+- Skip bad packets (return None for pcm)
+- Continue with existing connection (no disruption to users)
+
+**Threshold-Based Reconnection:**
+- Track OpusErrors per guild with timestamps
+- When X errors occur within Y seconds: auto-reconnect
+- Configurable thresholds via ConfigManager
+
+**Logging:**
+- WARNING level for visibility
+- Rate-limited (log every Nth error) to prevent spam
+- Include error count and window stats
+
+### User Requirements (from clarification):
+1. ✅ Continue with existing connection (skip bad packets)
+2. ✅ Add threshold-based reconnection with ConfigManager vars
+3. ✅ WARNING level with rate limiting (mixture of approaches)
+
+---
+
+## 📋 Implementation Plan
+
+### 1. Config Fields (VoiceConfig)
+Add to `bot/cogs/audio/voice_speech.py` (~line 79-103):
+```python
+opus_error_threshold: int = 5  # Errors before reconnecting
+opus_error_window: int = 10    # Time window in seconds
+opus_error_log_interval: int = 5  # Log every Nth error
+```
+
+### 2. Monkey Patch
+Add to `bot/cogs/audio/voice_speech.py` (~line 137-220):
+- Patch `discord.ext.voice_recv.opus.PacketDecoder._decode_packet()`
+- Wrap `self._decoder.decode()` in try/except OpusError
+- On error: call `VoiceSpeechCog._handle_opus_error()`, return None
+- Continue with original data structure return
+
+### 3. Error Tracking
+Add to `VoiceSpeechCog.__init__` (~line 176):
+```python
+self.opus_error_tracker = {}  # {guild_id: {"timestamps": deque, "logged_count": int}}
+```
+
+### 4. Error Handler Method
+Add to `VoiceSpeechCog` (~line 442-510):
+- `_handle_opus_error(guild_id, error, packet)`:
+  - Track error timestamp in sliding window
+  - Rate-limited logging (every Nth error)
+  - Check threshold: if exceeded, schedule reconnection task
+  - Clear tracker to prevent duplicate reconnections
+
+### 5. Reconnection Method
+Add to `VoiceSpeechCog` (~line 512-575):
+- `_reconnect_voice_after_opus_errors(guild_id)`:
+  - Stop listening, disconnect, wait 1.5s
+  - Reconnect to same channel
+  - Restart speech listener
+  - Clear error tracker (fresh start)
+
+### 6. Cleanup
+Update `cog_unload()` (~line 439):
+- Clear `self.opus_error_tracker`
+
+---
+
+## 📁 Files to Modify
+
+**Single File:**
+- `bot/cogs/audio/voice_speech.py`
+  - Add 3 config fields
+  - Add monkey patch function
+  - Add error tracker to __init__
+  - Add 2 new methods (_handle_opus_error, _reconnect_voice_after_opus_errors)
+  - Update cog_unload
+
+**No other files need changes** - self-contained fix.
+
+---
+
+## ✅ Previously Completed (Earlier Session)
 
 ### 1. Version Tracking System
 
@@ -134,23 +238,30 @@ bac70b8 fix: catch JSONDecodeError from speech recognition text
 
 ## 🔄 Pending Tasks
 
+### ✅ Completed (Current Session):
+
+1. **✅ Implemented OpusError Monkey Patch**:
+   - ✅ Added 3 config fields to VoiceConfig (lines 115-144)
+   - ✅ Added monkey patch for PacketDecoder._decode_packet() (lines 169-229)
+   - ✅ Added error tracker to VoiceSpeechCog.__init__ (line 272)
+   - ✅ Added _handle_opus_error() method (lines 912-958)
+   - ✅ Added _reconnect_voice_after_opus_errors() method (lines 960-1020)
+   - ✅ Updated cog_unload() cleanup (line 536)
+   - ✅ Tested compilation - no errors
+
 ### Immediate Next Steps:
 
-1. **Test the changes** - Start bot and verify:
-   - Version logged on startup
-   - Config migrations work (test with old config containing `auto_join_timeout`)
-   - Web UI shows reorganized categories correctly
-   - All features work as expected
+1. **Test the implementation** (requires bot running):
+   - Test with low threshold (2) to trigger reconnection
+   - Verify rate limiting works
+   - Confirm per-guild isolation
+   - Check that bad packets are skipped without crashing
 
-2. **Commit the work** - When ready:
+2. **Commit when tested**:
    ```bash
-   git add bot/ docs/ test_migration.py
-   git commit -m "feat: add version tracking and config migration system, clean up duplicate settings, reorganize categories"
+   git add bot/cogs/audio/voice_speech.py .claude/CURRENT_WORK.md
+   git commit -m "fix: add OpusError handling with threshold-based reconnection"
    ```
-
-3. **Optional cleanup**:
-   - Consider removing the standalone docs (VERSION_AND_MIGRATION_SYSTEM.md, CONFIG_CLEANUP_AND_REORGANIZATION.md) if all info is in CLAUDE.md
-   - Update docs/CLAUDE.md with version/migration system details
 
 ---
 
@@ -186,37 +297,47 @@ bac70b8 fix: catch JSONDecodeError from speech recognition text
 **If session interrupted, resume with:**
 
 ```
-Current branch: backup-2025-11-01-current
+Current branch: master
 Bot Version: 1.0.0
-Status: Config cleanup complete, all files compile
+Status: Planning OpusError monkey patch - ready to implement
 
-Completed:
-✅ Version tracking system (bot/version.py)
-✅ Config migration system (bot/core/config_migrations.py)
-✅ First migration: auto_join_timeout → auto_disconnect_timeout
-✅ Removed 4 duplicate/dead config settings
-✅ Reorganized 9 config settings into logical categories
-✅ Updated all code references
-✅ Test script passes all tests
-✅ All files compile successfully
+Problem:
+- OpusError: corrupted stream crashes PacketRouter thread
+- Speech recognition stops completely until manual restart
+- Occurs when Discord audio packets are corrupted/lost
 
-Next steps:
-1. Test bot startup and config migrations
-2. Verify web UI shows reorganized categories
-3. Commit the work when satisfied
-4. Optional: Clean up standalone docs, update docs/CLAUDE.md
+Solution Plan:
+1. Monkey patch PacketDecoder._decode_packet() to catch OpusError
+2. Skip bad packets (return None) and continue connection
+3. Track errors per guild with sliding window
+4. Auto-reconnect when threshold exceeded (5 errors in 10 seconds)
+5. Rate-limited WARNING logging (every 5th error)
 
-Key files:
-- bot/version.py (new)
-- bot/core/config_migrations.py (new)
-- bot/core/config_system.py (migration integration)
-- bot/cogs/audio/soundboard.py (3 settings removed)
-- bot/cogs/audio/voice_speech.py (1 setting removed, categories updated, keepalive usage changed)
-- test_migration.py (all tests pass)
+Implementation Details:
+- Single file change: bot/cogs/audio/voice_speech.py
+- Add 3 config fields (opus_error_threshold, opus_error_window, opus_error_log_interval)
+- Add monkey patch function (~line 137-220)
+- Add error tracker to __init__ (~line 176)
+- Add 2 methods: _handle_opus_error(), _reconnect_voice_after_opus_errors()
+- Update cog_unload() for cleanup
+
+User Requirements:
+✅ Continue with existing connection (skip bad packets)
+✅ Add threshold-based reconnection with ConfigManager
+✅ WARNING level logging with rate limiting
+
+Next Steps:
+1. Implement the monkey patch and methods
+2. Test compilation
+3. Test with low threshold to verify reconnection
+4. Commit when working
 ```
+
+**Detailed Implementation Reference:**
+See "Implementation Plan" section above for line-by-line code structure and placement.
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 2.0
 **Last Updated By**: Claude (2025-11-03)
-**Next Review**: After testing or when committing changes
+**Next Review**: After OpusError fix is implemented and tested
