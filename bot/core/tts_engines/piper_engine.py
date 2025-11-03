@@ -99,12 +99,23 @@ class PiperEngine(TTSEngine):
                 "--length_scale", str(length_scale)
             ]
 
-            # Run Piper
+            # Run Piper with library path if installed in /opt/piper
+            env = os.environ.copy()
+            if os.path.exists("/opt/piper"):
+                # Add /opt/piper and subdirectories to library path
+                ld_path = env.get("LD_LIBRARY_PATH", "")
+                piper_lib_paths = ["/opt/piper", "/opt/piper/lib"]
+                for path in piper_lib_paths:
+                    if os.path.exists(path) and path not in ld_path:
+                        ld_path = f"{path}:{ld_path}" if ld_path else path
+                env["LD_LIBRARY_PATH"] = ld_path
+
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                env=env
             )
 
             stdout, stderr = await process.communicate(input=text.encode())
