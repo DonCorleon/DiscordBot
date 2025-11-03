@@ -105,57 +105,13 @@ class TtsCog(BaseCog):
         bot.config_manager.register_schema("TTS", schema)
         logger.info("Registered TTS config schema")
 
-        # Populate voice choices dynamically for each engine
-        # This happens asynchronously after bot is ready
-        bot.loop.create_task(self._populate_voice_choices())
+        # Voice choices populated on-demand (lazy loading)
+        # Don't populate on startup to avoid interfering with audio subsystem
+        self._voices_populated = False
 
         # User preferences (voice customization)
         self.user_preferences = {}
         self.load_preferences()
-
-    async def _populate_voice_choices(self):
-        """Populate voice choices for all three engines."""
-        await self.bot.wait_until_ready()
-
-        from bot.core.tts_engines import create_tts_engine
-
-        try:
-            # Pyttsx3 voices
-            try:
-                pyttsx3_engine = create_tts_engine(self.bot, "pyttsx3")
-                pyttsx3_voices = await pyttsx3_engine.list_voices()
-                pyttsx3_choices = [("", "System Default")] + [
-                    (v["id"], v["name"]) for v in pyttsx3_voices[:50]  # Limit to 50 voices
-                ]
-                self.bot.config_manager.schemas["TTS"].fields["tts_voice_pyttsx3"].choices = pyttsx3_choices
-                logger.info(f"Populated {len(pyttsx3_choices)} pyttsx3 voice choices")
-            except Exception as e:
-                logger.warning(f"Failed to populate pyttsx3 voices: {e}")
-
-            # Edge TTS voices
-            try:
-                edge_engine = create_tts_engine(self.bot, "edge")
-                edge_voices = await edge_engine.list_voices()
-                # Filter to common English voices to keep dropdown manageable
-                edge_common = [v for v in edge_voices if v["language"].startswith("en")][:30]
-                edge_choices = [(v["id"], v["name"]) for v in edge_common]
-                self.bot.config_manager.schemas["TTS"].fields["tts_voice_edge"].choices = edge_choices
-                logger.info(f"Populated {len(edge_choices)} edge voice choices")
-            except Exception as e:
-                logger.warning(f"Failed to populate edge voices: {e}")
-
-            # Piper voices
-            try:
-                piper_engine = create_tts_engine(self.bot, "piper")
-                piper_voices = await piper_engine.list_voices()
-                piper_choices = [(v["id"], v["name"]) for v in piper_voices]
-                self.bot.config_manager.schemas["TTS"].fields["tts_voice_piper"].choices = piper_choices
-                logger.info(f"Populated {len(piper_choices)} piper voice choices")
-            except Exception as e:
-                logger.warning(f"Failed to populate piper voices: {e}")
-
-        except Exception as e:
-            logger.error(f"Failed to populate voice choices: {e}", exc_info=True)
 
     async def get_engine(self, guild_id: int):
         """Get or create TTS engine for this guild based on config."""
