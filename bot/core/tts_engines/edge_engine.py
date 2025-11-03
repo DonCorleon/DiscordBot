@@ -95,17 +95,30 @@ class EdgeEngine(TTSEngine):
                 self.voices_cache = []
 
                 for voice in all_voices:
+                    # Handle different possible key names (API may vary)
+                    voice_id = voice.get("ShortName") or voice.get("Name", "unknown")
+                    voice_name = voice.get("FriendlyName") or voice.get("DisplayName") or voice_id
+                    locale = voice.get("Locale") or voice.get("Language", "unknown")
+                    gender = voice.get("Gender", "unknown")
+
                     self.voices_cache.append({
-                        "id": voice["ShortName"],
-                        "name": voice["FriendlyName"],
-                        "language": voice["Locale"],
-                        "gender": voice.get("Gender", "unknown")
+                        "id": voice_id,
+                        "name": voice_name,
+                        "language": locale,
+                        "gender": gender
                     })
 
                 logger.info(f"Cached {len(self.voices_cache)} Edge TTS voices")
 
             except Exception as e:
                 logger.error(f"Failed to list Edge TTS voices: {e}", exc_info=True)
+                # Log first voice structure for debugging
+                try:
+                    all_voices = await edge_tts.list_voices()
+                    if all_voices:
+                        logger.debug(f"Edge TTS voice structure example: {list(all_voices[0].keys())}")
+                except:
+                    pass
                 self.voices_cache = []
 
         return self.voices_cache
