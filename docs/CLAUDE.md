@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**IMPORTANT:** At the start of every session (new or after conversation compaction), you MUST acknowledge that you have read this file by saying "I've read docs/CLAUDE.md" in your first response. This confirms you understand the project structure, rules, and conventions.
+
 **Note:** This project was restructured in October 2024 to use a domain-organized architecture. All code now lives in the `bot/` package with clear separation between cogs, core utilities, and UI components.
 
 ## Development Commands
@@ -221,13 +223,22 @@ The cog will be loaded automatically on bot startup.
 - **Batch compilation:** Use `python -m compileall bot/` to test all Python files at once instead of individual file compilation
 - **Parallel operations:** When tasks are independent, use multiple tool calls in a single message
 
-### Session Management
+### Session Management & Documentation
 - **CRITICAL: Always update `.claude/CURRENT_WORK.md` after completing significant work**
   - Windows updates can force restart and lose session history
   - Document what was accomplished, current branch, and next steps
   - Update commit references and mark completed tasks
   - Add new pending tasks if discovered
   - This file is ESSENTIAL for session continuity - treat it as high priority
+
+- **Documentation Rules:**
+  - **DO NOT create standalone documentation files** (e.g., FEATURE_NAME.md, SYSTEM_NAME.md)
+  - **ALWAYS update these two files instead:**
+    - `.claude/CURRENT_WORK.md` - Current session work, completed tasks, pending tasks, recovery info
+    - `docs/CLAUDE.md` - Permanent architectural knowledge, patterns, conventions, rules
+  - **Exception:** Only create new docs if explicitly requested by user
+  - **Rationale:** Keeps documentation centralized and prevents doc sprawl
+
 - **File Reading Efficiency:** If asked to read any file that was already read in the current session, simply respond "I've already read [filename] in this session" instead of re-reading it
 
 ### Communication Style
@@ -269,6 +280,19 @@ The cog will be loaded automatically on bot startup.
 - Document config fields with clear descriptions and categories
 - Use `config_field()` with appropriate metadata (guild_override, admin_only, etc.)
 - Test config changes via web UI before committing
+
+**Version Tracking & Migration** (Added 2025-11-03):
+- Bot version tracked in `bot/version.py` (semantic versioning)
+- Config migrations in `bot/core/config_migrations.py` handle renamed/moved settings
+- Migrations automatically applied on config load (global and guild)
+- To add a migration: register in `_register_migrations()`, update code, test with `test_migration.py`
+- Example: `auto_join_timeout` → `auto_disconnect_timeout` (v1.0.0)
+
+**Config Organization Principles**:
+- Group related settings together (e.g., enable toggle + dependent settings)
+- Use hierarchical categories with "/" separator (e.g., "Audio/Voice Channels/Auto-Disconnect")
+- Engine-specific settings in sub-categories (e.g., "Audio/Speech Recognition/Whisper")
+- Avoid duplicate settings across schemas - consolidate to single source of truth
 
 ### Testing Requirements
 - Write unit tests for new features (aim for 70%+ coverage on critical paths)

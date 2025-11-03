@@ -47,7 +47,12 @@ function setupEventListeners() {
     document.getElementById('guild-select').addEventListener('change', (e) => {
         currentGuild = e.target.value;
         loadChannels();
-        loadTranscripts();
+        // Filter existing transcripts instead of reloading
+        if (viewMode === 'live') {
+            filterAndDisplayTranscripts();
+        } else {
+            loadTranscripts();
+        }
     });
 
     // Channel selection
@@ -62,10 +67,19 @@ function setupEventListeners() {
             currentChannel = e.target.value;
             // Reload channels for the selected guild
             loadChannels();
-            loadTranscripts();
+            if (viewMode === 'live') {
+                filterAndDisplayTranscripts();
+            } else {
+                loadTranscripts();
+            }
         } else {
             currentChannel = e.target.value;
-            loadTranscripts();
+            // Filter existing transcripts instead of reloading
+            if (viewMode === 'live') {
+                filterAndDisplayTranscripts();
+            } else {
+                loadTranscripts();
+            }
         }
     });
 
@@ -75,7 +89,12 @@ function setupEventListeners() {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
             currentSearch = e.target.value;
-            loadTranscripts();
+            // Filter existing transcripts instead of reloading
+            if (viewMode === 'live') {
+                filterAndDisplayTranscripts();
+            } else {
+                loadTranscripts();
+            }
         }, 300);
     });
 
@@ -265,6 +284,36 @@ async function loadHistoricalSessions() {
         console.error('Error loading historical sessions:', error);
         showError('Failed to load historical sessions');
     }
+}
+
+function filterAndDisplayTranscripts() {
+    // Filter the existing transcripts array based on current filters
+    const filtered = transcripts.filter(t => {
+        // Guild filter
+        if (currentGuild && t.guild_id !== currentGuild) {
+            return false;
+        }
+        // Channel filter
+        if (currentChannel && t.channel_id !== currentChannel) {
+            return false;
+        }
+        // Search filter
+        if (currentSearch) {
+            const searchLower = currentSearch.toLowerCase();
+            if (!t.text.toLowerCase().includes(searchLower) &&
+                !t.user.toLowerCase().includes(searchLower)) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    displayTranscripts(filtered);
+
+    // Update stats with filtered count
+    document.getElementById('total-transcripts').textContent = transcripts.length.toLocaleString();
+    document.getElementById('filtered-transcripts').textContent = filtered.length.toLocaleString();
+    document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
 }
 
 function displayTranscripts(transcriptList) {

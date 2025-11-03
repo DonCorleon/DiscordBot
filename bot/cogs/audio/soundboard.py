@@ -27,7 +27,7 @@ class SoundboardConfig(ConfigBase):
     default_volume: float = config_field(
         default=0.5,
         description="Default playback volume for sounds (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
-        category="Playback",
+        category="Audio/Playback",
         guild_override=True,
         min_value=0.0,
         max_value=2.0
@@ -36,53 +36,24 @@ class SoundboardConfig(ConfigBase):
     ducking_enabled: bool = config_field(
         default=True,
         description="Auto-reduce volume when users speak to prevent drowning out voices",
-        category="Playback",
+        category="Audio/Playback",
         guild_override=True
     )
 
     ducking_level: float = config_field(
         default=0.5,
         description="Volume reduction level when ducking (0.0 = mute, 1.0 = no reduction)",
-        category="Playback",
+        category="Audio/Playback",
         guild_override=True,
         min_value=0.0,
         max_value=1.0
-    )
-
-    ducking_transition_ms: int = config_field(
-        default=50,
-        description="Smooth transition time for ducking in milliseconds",
-        category="Playback",
-        guild_override=True,
-        min_value=10,
-        max_value=500
-    )
-
-    sound_playback_timeout: float = config_field(
-        default=30.0,
-        description="Maximum seconds to wait for sound playback before timeout",
-        category="Playback",
-        guild_override=True,
-        admin_only=True,
-        min_value=5.0,
-        max_value=300.0
-    )
-
-    sound_queue_warning_size: int = config_field(
-        default=50,
-        description="Queue size threshold for warnings (prevents queue flooding)",
-        category="Playback",
-        guild_override=True,
-        admin_only=True,
-        min_value=10,
-        max_value=500
     )
 
     # Admin Settings
     soundboard_dir: str = config_field(
         default="data/soundboard",
         description="Directory containing sound files",
-        category="Admin",
+        category="Data Storage",
         guild_override=False,  # Global only
         admin_only=True,
         requires_restart=True
@@ -92,7 +63,7 @@ class SoundboardConfig(ConfigBase):
     sound_upload_modal_timeout: int = config_field(
         default=180,
         description="Seconds before sound upload modal times out",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=60,
@@ -102,7 +73,7 @@ class SoundboardConfig(ConfigBase):
     sound_edit_modal_timeout: int = config_field(
         default=300,
         description="Seconds before sound edit modal times out",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=60,
@@ -112,7 +83,7 @@ class SoundboardConfig(ConfigBase):
     sound_title_max_length: int = config_field(
         default=100,
         description="Maximum characters for sound title",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=20,
@@ -122,7 +93,7 @@ class SoundboardConfig(ConfigBase):
     sound_description_max_length: int = config_field(
         default=500,
         description="Maximum characters for sound description in upload modal",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -132,7 +103,7 @@ class SoundboardConfig(ConfigBase):
     sound_description_edit_max_length: int = config_field(
         default=1000,
         description="Maximum characters for sound description when editing",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -142,7 +113,7 @@ class SoundboardConfig(ConfigBase):
     sound_triggers_max_length: int = config_field(
         default=500,
         description="Maximum characters for trigger words list",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -152,7 +123,7 @@ class SoundboardConfig(ConfigBase):
     sound_flags_max_length: int = config_field(
         default=100,
         description="Maximum characters for sound flags input",
-        category="DiscordUI/Uploading",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=50,
@@ -163,7 +134,7 @@ class SoundboardConfig(ConfigBase):
     sound_volume_min: int = config_field(
         default=0,
         description="Minimum volume percentage for sounds (0%)",
-        category="DiscordUI/Volume",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=0,
@@ -173,7 +144,7 @@ class SoundboardConfig(ConfigBase):
     sound_volume_max: int = config_field(
         default=200,
         description="Maximum volume percentage for sounds (200%)",
-        category="DiscordUI/Volume",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=100,
@@ -183,7 +154,7 @@ class SoundboardConfig(ConfigBase):
     sound_volume_input_max_length: int = config_field(
         default=3,
         description="Maximum characters for volume input field (0-200)",
-        category="DiscordUI/Volume",
+        category="User Interface/Sound Management",
         guild_override=False,
         admin_only=True,
         min_value=2,
@@ -194,7 +165,7 @@ class SoundboardConfig(ConfigBase):
     sound_browser_timeout: int = config_field(
         default=300,
         description="Seconds before soundboard browser UI times out",
-        category="DiscordUI/Commands",
+        category="User Interface/Commands",
         guild_override=False,
         admin_only=True,
         min_value=60,
@@ -204,7 +175,7 @@ class SoundboardConfig(ConfigBase):
     soundboard_pagination_size: int = config_field(
         default=10,
         description="Number of sounds shown per page in soundboard browser",
-        category="DiscordUI/Commands",
+        category="User Interface/Commands",
         guild_override=True,
         min_value=5,
         max_value=25
@@ -213,7 +184,7 @@ class SoundboardConfig(ConfigBase):
     sound_select_truncate_triggers: int = config_field(
         default=3,
         description="Number of triggers to show in sound selection dropdown before truncating",
-        category="DiscordUI/Commands",
+        category="User Interface/Commands",
         guild_override=False,
         admin_only=True,
         min_value=1,
@@ -1137,13 +1108,16 @@ class Soundboard(BaseCog):
         If multiple sounds share the same trigger, randomly selects one.
         Returns the sound_key, volume, and trigger_word along with soundfile so stats can be tracked properly.
         """
+        import string
+
         guild_id_str = str(guild_id)
         words = text.lower().split()
         matched_files = []
         seen_triggers = set()
 
         for word in words:
-            word_lower = word.strip()
+            # Strip whitespace and punctuation
+            word_lower = word.strip().strip(string.punctuation)
             if not word_lower:
                 continue
 

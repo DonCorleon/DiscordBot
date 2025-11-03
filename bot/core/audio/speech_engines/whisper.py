@@ -262,7 +262,7 @@ class WhisperSink(voice_recv.BasicSink):
             except Exception as e:
                 logger.error(f"Error in ducking callback (stop): {e}", exc_info=True)
 
-    async def cleanup(self):
+    def cleanup(self):
         """Cancel all transcription tasks and cleanup resources."""
         logger.info(f"[Guild {self.vc.guild.id}] Cleaning up WhisperSink...")
 
@@ -378,7 +378,7 @@ class WhisperEngine(SpeechEngine):
         Stop Whisper speech recognition and cleanup resources.
         """
         if self.sink:
-            await self.sink.cleanup()
+            self.sink.cleanup()
             self.sink = None
 
         # Note: Don't shutdown executor here - it may be reused if listening restarts

@@ -248,6 +248,9 @@ async def update_config_setting(request: Request):
         # Check if setting requires restart
         requires_restart = field_meta.requires_restart
 
+        # Get old value before changing
+        old_value = config_manager.get(cog_name, field_name)
+
         # Convert string back to int if needed (for large Discord IDs and other large ints)
         if field_meta.type == int and isinstance(value, str) and field_meta.is_large_int:
             try:
@@ -261,6 +264,9 @@ async def update_config_setting(request: Request):
         if not success:
             raise HTTPException(status_code=400, detail=f"Validation failed: {error}")
 
+        # Log the change
+        logger.info(f"Config changed via web UI: {full_key} | old: {old_value} -> new: {value}")
+
         # Save to disk
         config_manager.save()
 
@@ -270,6 +276,7 @@ async def update_config_setting(request: Request):
             "cog": cog_name,
             "field": field_name,
             "value": value,
+            "old_value": old_value,
             "requires_restart": requires_restart,
             "message": f"Successfully updated {full_key}" + (" (restart required)" if requires_restart else "")
         }
@@ -501,11 +508,17 @@ async def update_guild_config_setting(guild_id: int, request: Request):
         if not field_meta.guild_override:
             raise HTTPException(status_code=400, detail=f"Setting '{full_key}' cannot be overridden per-guild")
 
+        # Get old value before changing
+        old_value = config_manager.get(cog_name, field_name, guild_id)
+
         # Set the guild-specific value (validates automatically)
         success, error = config_manager.set(cog_name, field_name, value, guild_id)
 
         if not success:
             raise HTTPException(status_code=400, detail=f"Validation failed: {error}")
+
+        # Log the change
+        logger.info(f"Config changed via web UI (guild {guild_id}): {full_key} | old: {old_value} -> new: {value}")
 
         # Save to disk
         config_manager.save()
@@ -517,6 +530,7 @@ async def update_guild_config_setting(guild_id: int, request: Request):
             "cog": cog_name,
             "field": field_name,
             "value": value,
+            "old_value": old_value,
             "message": f"Successfully updated {full_key} for guild {guild_id}"
         }
 

@@ -22,6 +22,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 logger = logging.getLogger("discordbot.config_system")
 
+# Import migration system
+try:
+    from bot.core.config_migrations import migrate_config
+    MIGRATIONS_AVAILABLE = True
+except ImportError:
+    logger.warning("Config migrations module not available")
+    MIGRATIONS_AVAILABLE = False
+
 # Config file paths
 BASE_CONFIG_FILE = Path("data/config/base_config.json")
 GUILDS_CONFIG_DIR = Path("data/config/guilds")
@@ -445,7 +453,27 @@ class ConfigManager:
 
         try:
             with open(BASE_CONFIG_FILE, 'r', encoding='utf-8') as f:
-                self.global_overrides = json.load(f)
+                config_data = json.load(f)
+
+            # Apply migrations if available
+            if MIGRATIONS_AVAILABLE:
+                # Flatten config for migration (Voice.auto_join_timeout format)
+                flat_config = self._flatten_config(config_data)
+                migrated_flat, applied = migrate_config(flat_config)
+
+                if applied:
+                    logger.info(f"Applied {len(applied)} config migrations to global config:")
+                    for migration in applied:
+                        logger.info(f"  - {migration}")
+
+                    # Unflatten back to nested format
+                    config_data = self._unflatten_config(migrated_flat)
+
+                    # Save migrated config
+                    with open(BASE_CONFIG_FILE, 'w', encoding='utf-8') as f:
+                        json.dump(config_data, f, indent=2, ensure_ascii=False)
+
+            self.global_overrides = config_data
             logger.info(f"Loaded global config ({len(self.global_overrides)} cogs)")
         except Exception as e:
             logger.error(f"Failed to load global config: {e}")
@@ -488,7 +516,27 @@ class ConfigManager:
 
         try:
             with open(guild_file, 'r', encoding='utf-8') as f:
-                self.guild_overrides[guild_id] = json.load(f)
+                config_data = json.load(f)
+
+            # Apply migrations if available
+            if MIGRATIONS_AVAILABLE:
+                # Flatten config for migration (Voice.auto_join_timeout format)
+                flat_config = self._flatten_config(config_data)
+                migrated_flat, applied = migrate_config(flat_config)
+
+                if applied:
+                    logger.info(f"Applied {len(applied)} config migrations to guild {guild_id}:")
+                    for migration in applied:
+                        logger.info(f"  - {migration}")
+
+                    # Unflatten back to nested format
+                    config_data = self._unflatten_config(migrated_flat)
+
+                    # Save migrated config
+                    with open(guild_file, 'w', encoding='utf-8') as f:
+                        json.dump(config_data, f, indent=2, ensure_ascii=False)
+
+            self.guild_overrides[guild_id] = config_data
         except Exception as e:
             logger.error(f"Failed to load guild config {guild_id}: {e}")
 
@@ -521,3 +569,33 @@ class ConfigManager:
             cache_key = (cog_name, key, guild_id)
             if cache_key in self._cache:
                 del self._cache[cache_key]
+
+    def _flatten_config(self, nested_config: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Flatten nested config to migration format.
+
+        Input:  {"Voice": {"auto_join_timeout": 300}}
+        Output: {"Voice.auto_join_timeout": 300}
+        """
+        flat = {}
+        for cog_name, cog_config in nested_config.items():
+            if isinstance(cog_config, dict):
+                for key, value in cog_config.items():
+                    flat[f"{cog_name}.{key}"] = value
+        return flat
+
+    def _unflatten_config(self, flat_config: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+        """
+        Unflatten config from migration format back to nested.
+
+        Input:  {"Voice.auto_disconnect_timeout": 300}
+        Output: {"Voice": {"auto_disconnect_timeout": 300}}
+        """
+        nested = {}
+        for flat_key, value in flat_config.items():
+            if "." in flat_key:
+                cog_name, key = flat_key.split(".", 1)
+                if cog_name not in nested:
+                    nested[cog_name] = {}
+                nested[cog_name][key] = value
+        return nested

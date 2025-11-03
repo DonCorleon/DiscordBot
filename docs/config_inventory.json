@@ -1091,7 +1091,7 @@
     "per_guild": false
   },
   {
-    "var_name": "auto_join_timeout",
+    "var_name": "auto_disconnect_timeout",
     "files_where_used": [
       "bot/cogs/audio/voice_speech.py:180"
     ],
@@ -1101,7 +1101,8 @@
     "new_existing": true,
     "description": "Seconds to wait before disconnecting from empty voice channel",
     "cog_name": "Voice",
-    "per_guild": true
+    "per_guild": true,
+    "legacy_name": "auto_join_timeout"
   },
   {
     "var_name": "bot_owner_id",

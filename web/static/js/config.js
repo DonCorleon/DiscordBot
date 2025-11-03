@@ -564,12 +564,24 @@ async function restoreBackup() {
 }
 
 function findSetting(key) {
-    for (const category in allSettings) {
-        if (key in allSettings[category]) {
-            return allSettings[category][key];
+    // Recursively search through nested categories
+    function searchNested(obj) {
+        for (const prop in obj) {
+            const value = obj[prop];
+            if (typeof value === 'object' && value !== null) {
+                // Check if this is a setting (has 'key' property matching our search)
+                if (value.key === key) {
+                    return value;
+                }
+                // Otherwise recurse into nested object
+                const found = searchNested(value);
+                if (found) return found;
+            }
         }
+        return null;
     }
-    return null;
+
+    return searchNested(allSettings);
 }
 
 function updateStats(data) {

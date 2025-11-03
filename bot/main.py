@@ -300,6 +300,13 @@ async def rejoin_saved_voice_channels():
 
 @bot.event
 async def on_ready():
+    # Log bot version
+    from bot.version import get_version, VERSION_HISTORY
+    version = get_version()
+    logger.info(f"🤖 Bot Version: {version}")
+    if version in VERSION_HISTORY:
+        logger.info(f"   {VERSION_HISTORY[version]}")
+
     logger.info(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
     # Start data collection
     await data_collector.start()

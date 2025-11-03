@@ -604,7 +604,7 @@ All 17 tests should pass:
 
 #### Voice (2 settings)
 - `auto_join_enabled` - Enable auto-join for voice channels
-- `auto_join_timeout` - Leave timeout for empty channels (0-3600s)
+- `auto_disconnect_timeout` - Leave timeout for empty channels (0-3600s)
 
 ### Migration Status
 

@@ -27,7 +27,7 @@ class TTSConfig(ConfigBase):
     tts_default_volume: float = config_field(
         default=1.5,
         description="Default TTS playback volume (0.0 = muted, 1.0 = normal, 2.0 = 200%)",
-        category="TextToSpeech/PyTTS",
+        category="Audio/Text-to-Speech",
         guild_override=True,
         min_value=0.0,
         max_value=2.0
@@ -36,7 +36,7 @@ class TTSConfig(ConfigBase):
     tts_default_rate: int = config_field(
         default=150,
         description="Default TTS speech rate in words per minute",
-        category="TextToSpeech/PyTTS",
+        category="Audio/Text-to-Speech",
         guild_override=True,
         min_value=50,
         max_value=400
@@ -45,7 +45,7 @@ class TTSConfig(ConfigBase):
     tts_max_text_length: int = config_field(
         default=500,
         description="Maximum text length for TTS messages (prevents spam)",
-        category="TextToSpeech/PyTTS",
+        category="Audio/Text-to-Speech",
         guild_override=True,
         admin_only=True,
         min_value=50,

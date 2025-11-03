@@ -25,14 +25,14 @@ class VoiceConfig(ConfigBase):
     auto_join_enabled: bool = config_field(
         default=True,
         description="Enable auto-join when users enter voice channels",
-        category="Playback",
+        category="Audio/Voice Channels/Auto-Join",
         guild_override=True
     )
 
-    auto_join_timeout: int = config_field(
+    auto_disconnect_timeout: int = config_field(
         default=300,
         description="Seconds to wait before leaving empty voice channel (0 = stay forever)",
-        category="Playback",
+        category="Audio/Voice Channels/Auto-Disconnect",
         guild_override=True,
         min_value=0,
         max_value=3600
@@ -41,7 +41,7 @@ class VoiceConfig(ConfigBase):
     sound_playback_timeout: float = config_field(
         default=30.0,
         description="Maximum seconds to wait for sound playback to complete",
-        category="Playback",
+        category="Audio/Playback",
         guild_override=True,
         min_value=5.0,
         max_value=120.0
@@ -50,27 +50,17 @@ class VoiceConfig(ConfigBase):
     sound_queue_warning_size: int = config_field(
         default=50,
         description="Warn when sound queue exceeds this size",
-        category="Playback",
+        category="Audio/Playback",
         guild_override=True,
         min_value=10,
         max_value=500
-    )
-
-    keepalive_interval: int = config_field(
-        default=30,
-        description="Seconds between keepalive packets to prevent voice disconnection",
-        category="Playback",
-        guild_override=False,
-        admin_only=True,
-        min_value=10,
-        max_value=120
     )
 
     # Speech Recognition Settings (Technical - Advanced Users)
     voice_speech_phrase_time_limit: int = config_field(
         default=10,
         description="Maximum seconds of speech to process for recognition",
-        category="Admin/SpeechRecognition",
+        category="Audio/Speech Recognition/Advanced",
         guild_override=False,
         admin_only=True,
         min_value=1,
@@ -80,7 +70,7 @@ class VoiceConfig(ConfigBase):
     voice_speech_error_log_threshold: int = config_field(
         default=10,
         description="Number of audio errors before logging warning (prevents spam)",
-        category="Admin/SpeechRecognition",
+        category="Audio/Speech Recognition/Advanced",
         guild_override=False,
         admin_only=True,
         min_value=1,
@@ -90,7 +80,7 @@ class VoiceConfig(ConfigBase):
     voice_speech_chunk_size: int = config_field(
         default=3840,
         description="Audio chunk size in bytes (960 samples * 2 channels * 2 bytes = 3840)",
-        category="Admin/SpeechRecognition",
+        category="Audio/Speech Recognition/Advanced",
         guild_override=False,
         admin_only=True,
         requires_restart=True,
@@ -102,14 +92,14 @@ class VoiceConfig(ConfigBase):
     transcript_enabled: bool = config_field(
         default=True,
         description="Enable transcript session recording",
-        category="Transcription",
+        category="Audio/Speech Recognition",
         guild_override=True
     )
 
     transcript_flush_interval: int = config_field(
         default=30,
         description="Seconds between transcript file updates (lower = more writes, less data loss risk)",
-        category="Transcription",
+        category="Audio/Speech Recognition",
         guild_override=False,
         min_value=5,
         max_value=300
@@ -118,7 +108,7 @@ class VoiceConfig(ConfigBase):
     transcript_dir: str = config_field(
         default="data/transcripts/sessions",
         description="Directory to store transcript session files",
-        category="Transcription",
+        category="Data Storage",
         guild_override=False
     )
 
@@ -311,7 +301,7 @@ class VoiceSpeechCog(BaseCog):
                         guild = member.guild
                         # Get timeout from ConfigManager
                         voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
-                        timeout = voice_cfg.auto_join_timeout
+                        timeout = voice_cfg.auto_disconnect_timeout
                         await asyncio.sleep(timeout)
                         logger.info(f"[{guild.name}] Timeout reached ({timeout}s), disconnecting from {bot_channel.name}")
 
@@ -378,7 +368,7 @@ class VoiceSpeechCog(BaseCog):
                 self.disconnect_tasks[guild_id] = self.bot.loop.create_task(disconnect_after_timeout())
                 # Get timeout for logging
                 voice_cfg = self.bot.config_manager.for_guild("Voice", guild_id)
-                logger.info(f"[{member.guild.name}] All users left, starting {voice_cfg.auto_join_timeout}s disconnect timer")
+                logger.info(f"[{member.guild.name}] All users left, starting {voice_cfg.auto_disconnect_timeout}s disconnect timer")
 
     async def cog_unload(self):
         logger.info("Unloading VoiceSpeechCog...")
@@ -641,8 +631,8 @@ class VoiceSpeechCog(BaseCog):
                     except Exception as e:
                         logger.error(f"[Guild {guild_id}] Keepalive error: {e}", exc_info=True)
                 # Read from config dynamically for hot-reload support
-                voice_cfg = self.bot.config_manager.for_guild("Voice", "System")
-                await asyncio.sleep(voice_cfg.keepalive_interval)
+                sys_cfg = self.bot.config_manager.for_guild("System")
+                await asyncio.sleep(sys_cfg.keepalive_interval)
         except asyncio.CancelledError:
             logger.info("Keepalive loop cancelled")
             raise
