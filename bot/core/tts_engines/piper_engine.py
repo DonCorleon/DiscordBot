@@ -160,8 +160,7 @@ class PiperEngine(TTSEngine):
     def get_default_voice(self, guild_id: Optional[int] = None) -> Optional[str]:
         """Get default voice from config."""
         if guild_id and hasattr(self.bot, 'config_manager'):
-            default = self.bot.config_manager.get("TTS", "tts_default_voice", guild_id)
-            # If it's a valid Piper voice, use it
-            if default and default in self.COMMON_VOICES:
+            default = self.bot.config_manager.get("TTS", "tts_voice_piper", guild_id)
+            if default:
                 return default
         return "en_US-lessac-medium"

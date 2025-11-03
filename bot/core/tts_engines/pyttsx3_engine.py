@@ -104,5 +104,5 @@ class Pyttsx3Engine(TTSEngine):
     def get_default_voice(self, guild_id: Optional[int] = None) -> Optional[str]:
         """Get default voice from config."""
         if guild_id and hasattr(self.bot, 'config_manager'):
-            return self.bot.config_manager.get("TTS", "tts_default_voice", guild_id)
+            return self.bot.config_manager.get("TTS", "tts_voice_pyttsx3", guild_id)
         return None

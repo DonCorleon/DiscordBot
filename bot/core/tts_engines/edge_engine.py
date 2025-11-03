@@ -113,11 +113,7 @@ class EdgeEngine(TTSEngine):
     def get_default_voice(self, guild_id: Optional[int] = None) -> Optional[str]:
         """Get default voice from config."""
         if guild_id and hasattr(self.bot, 'config_manager'):
-            # Try to get Edge-specific default first
-            default = self.bot.config_manager.get("TTS", "tts_default_voice", guild_id)
-            # If it's a valid Edge voice, use it
-            if default and any(default in v for v in self.COMMON_VOICES):
+            default = self.bot.config_manager.get("TTS", "tts_voice_edge", guild_id)
+            if default:
                 return default
-            # Otherwise return first common voice
-            return self.COMMON_VOICES[0]
         return "en-US-AriaNeural"
