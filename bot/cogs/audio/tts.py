@@ -208,8 +208,11 @@ class TtsCog(BaseCog):
         # If no criteria provided, use the configured default voice
         if not name and not gender and not country and guild_id:
             default_voice = self.bot.config_manager.get("TTS", "tts_default_voice", guild_id)
+            logger.info(f"[Guild {guild_id}] _select_voice: No criteria, using guild default: {default_voice}")
             if default_voice:
                 return default_voice
+        else:
+            logger.info(f"[Guild {guild_id}] _select_voice: Searching with name={name}, gender={gender}, country={country}")
 
         # Search for matching voice in discovered voices
         for voice in self.available_voices:
@@ -367,6 +370,8 @@ class TtsCog(BaseCog):
         country = prefs["country"] if prefs["country"] else None
         name = prefs["name"] if prefs["name"] else None
         rate = prefs["rate"]
+
+        logger.info(f"[Guild {ctx.guild.id}] User {ctx.author.id} TTS prefs: name={name}, gender={gender}, country={country}, rate={rate}")
 
         words = message.split()
         text_parts = []
