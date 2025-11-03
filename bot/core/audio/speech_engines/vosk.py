@@ -175,22 +175,16 @@ class VoskSink(voice_recv.AudioSink):
 
             try:
                 # Feed to Vosk (inside lock - accesses recognizer state)
-                # AcceptWaveform returns True when end of utterance is detected
-                if recognizer.AcceptWaveform(mono_audio.tobytes()):
-                    # Complete utterance recognized - get final result
-                    vosk_result = json.loads(recognizer.Result())
-                    # CRITICAL: Reset recognizer after Result() to prevent state corruption
-                    # Vosk's internal queue must be cleared after getting final result
-                    # See: https://github.com/alphacep/vosk-api/issues/XXX
-                    recognizer.Reset()
-                    logger.debug(f"[Guild {self.vc.guild.id}] Reset recognizer for {member.display_name} after complete utterance")
-                else:
-                    # Partial recognition - utterance not complete
-                    # Use PartialResult() instead of Result() to avoid corrupting state
-                    # Do NOT reset - we want to keep building the utterance
-                    vosk_result = json.loads(recognizer.PartialResult())
-
+                # IMPORTANT: Always call Result() after AcceptWaveform(), not PartialResult()
+                # The working pattern is: AcceptWaveform() -> Result() -> Reset()
+                recognizer.AcceptWaveform(mono_audio.tobytes())
+                vosk_result = json.loads(recognizer.Result())
                 vosk_text = vosk_result.get("text", "").strip()
+
+                # CRITICAL: Reset recognizer after Result() to clear internal state
+                # Vosk's KaldiRecognizer accumulates state and must be reset
+                # after each Result() call to prevent assertion failures
+                recognizer.Reset()
             except Exception as e:
                 logger.error(f"Vosk transcription error for {member.display_name}: {e}", exc_info=True)
                 # Reset on error to clear any corrupted state
