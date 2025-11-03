@@ -67,9 +67,9 @@ class VoskSink(voice_recv.AudioSink):
 
         # Per-user state
         self.buffers = {}  # {user_id: deque([audio_chunks])}
-        self.recognizers = {}  # {user_id: KaldiRecognizer}
         self.last_chunk_time = {}  # {user_id: timestamp}
         self.user_locks = defaultdict(asyncio.Lock)
+        # Note: NOT storing recognizers - create new for each transcription for thread safety
 
         logger.info(f"[Guild {vc.guild.id}] VoskSink initialized")
 
@@ -112,13 +112,13 @@ class VoskSink(voice_recv.AudioSink):
                             return
 
                         # Process in thread pool (blocking Vosk call)
-                        recognizer = self.recognizers.get(user.id)
+                        # Pass None for recognizer - will be created fresh in transcribe_user
                         self.vc.loop.run_in_executor(
                             self.executor,
                             self.transcribe_user,
                             pcm_data,
                             member,
-                            recognizer
+                            None
                         )
 
             asyncio.run_coroutine_threadsafe(process_user_audio(), self.vc.loop)
@@ -133,16 +133,17 @@ class VoskSink(voice_recv.AudioSink):
         Args:
             pcm_data: Raw PCM audio bytes (stereo)
             member: Discord member who spoke
-            recognizer: KaldiRecognizer instance for this user (or None to create new)
+            recognizer: UNUSED - always create new recognizer for thread safety
         """
-        # Ensure recognizer exists (create in executor thread for thread safety)
-        if recognizer is None:
-            try:
-                recognizer = KaldiRecognizer(self.vosk_model, self.SAMPLE_RATE)
-                self.recognizers[member.id] = recognizer
-            except Exception as e:
-                logger.error(f"Failed to create recognizer for {member.display_name}: {e}", exc_info=True)
-                return
+        # CRITICAL: Create NEW recognizer for each transcription
+        # KaldiRecognizer is NOT thread-safe and cannot be shared
+        # Reusing recognizers causes "double free or corruption" when
+        # multiple executor threads process audio from same user simultaneously
+        try:
+            recognizer = KaldiRecognizer(self.vosk_model, self.SAMPLE_RATE)
+        except Exception as e:
+            logger.error(f"Failed to create recognizer for {member.display_name}: {e}", exc_info=True)
+            return
 
         try:
             # Convert stereo to mono
@@ -216,14 +217,13 @@ class VoskSink(voice_recv.AudioSink):
         if member.id in self.buffers and self.buffers[member.id]:
             pcm_data = b''.join(self.buffers[member.id])
             self.buffers[member.id].clear()
-            recognizer = self.recognizers.get(member.id)
-            if pcm_data and recognizer:
+            if pcm_data:
                 self.vc.loop.run_in_executor(
                     self.executor,
                     self.transcribe_user,
                     pcm_data,
                     member,
-                    recognizer
+                    None  # recognizer created fresh in transcribe_user
                 )
 
         # Notify ducking callback
@@ -236,7 +236,6 @@ class VoskSink(voice_recv.AudioSink):
     def cleanup(self):
         """Cleanup resources."""
         self.buffers.clear()
-        self.recognizers.clear()
         self.last_chunk_time.clear()
         logger.debug(f"[Guild {self.vc.guild.id}] VoskSink cleaned up")
 
