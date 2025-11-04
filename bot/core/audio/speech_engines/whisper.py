@@ -331,8 +331,6 @@ class WhisperEngine(SpeechEngine):
         bot,
         callback,
         model_size: str = "tiny.en",
-        buffer_duration: float = 3.0,
-        debounce_seconds: float = 1.0,
         ducking_callback=None
     ):
         """
@@ -342,8 +340,6 @@ class WhisperEngine(SpeechEngine):
             bot: Discord bot instance
             callback: Function called with (member, transcribed_text)
             model_size: Whisper model size (tiny.en, base.en, small.en, etc.)
-            buffer_duration: Audio buffer duration in seconds
-            debounce_seconds: Min seconds between transcriptions
             ducking_callback: Optional callback for audio ducking events
         """
         super().__init__(bot, callback)
@@ -354,14 +350,12 @@ class WhisperEngine(SpeechEngine):
             )
 
         self.model_size = model_size
-        self.buffer_duration = buffer_duration
-        self.debounce_seconds = debounce_seconds
         self.ducking_callback = ducking_callback
         self.sink = None
         self.model = None
         self.executor = ThreadPoolExecutor(max_workers=4)
 
-        logger.info(f"WhisperEngine initialized (model={model_size}, buffer={buffer_duration}s)")
+        logger.info(f"WhisperEngine initialized (model={model_size})")
 
     async def start_listening(self, voice_client):
         """

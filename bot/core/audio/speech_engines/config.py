@@ -91,26 +91,6 @@ class SpeechConfig(ConfigBase):
         requires_restart=True
     )
 
-    whisper_buffer_duration: float = config_field(
-        default=3.0,
-        description="Audio buffer duration in seconds (Whisper)",
-        category="Audio/Speech Recognition/Whisper",
-        guild_override=False,
-        admin_only=True,
-        min_value=1.0,
-        max_value=10.0
-    )
-
-    whisper_debounce_seconds: float = config_field(
-        default=1.0,
-        description="Min seconds between transcriptions (Whisper)",
-        category="Audio/Speech Recognition/Whisper",
-        guild_override=False,
-        admin_only=True,
-        min_value=0.5,
-        max_value=5.0
-    )
-
     # Faster-Whisper Settings (CTranslate2 backend - 4x faster than openai-whisper)
     faster_whisper_model: str = config_field(
         default="base",
@@ -139,24 +119,4 @@ class SpeechConfig(ConfigBase):
         admin_only=True,
         choices=["int8", "int8_float16", "float16", "float32"],
         requires_restart=True
-    )
-
-    faster_whisper_buffer_duration: float = config_field(
-        default=3.0,
-        description="Audio buffer duration in seconds (faster-whisper)",
-        category="Audio/Speech Recognition/Faster-Whisper",
-        guild_override=False,
-        admin_only=True,
-        min_value=1.0,
-        max_value=10.0
-    )
-
-    faster_whisper_debounce_seconds: float = config_field(
-        default=1.0,
-        description="Min seconds between transcriptions (faster-whisper)",
-        category="Audio/Speech Recognition/Faster-Whisper",
-        guild_override=False,
-        admin_only=True,
-        min_value=0.5,
-        max_value=5.0
     )
