@@ -142,6 +142,13 @@ class WhisperSink(voice_recv.BasicSink):
             logger.error(f"Audio processing error for {member.display_name}: {e}", exc_info=True)
             return
 
+        # Check minimum audio length (Whisper needs at least ~0.3 seconds)
+        MIN_AUDIO_SECONDS = 0.3
+        min_samples = int(SAMPLE_RATE * MIN_AUDIO_SECONDS)
+        if len(mono_audio) < min_samples:
+            logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Skipping short audio for {member.display_name} ({len(mono_audio)} samples < {min_samples}, {len(mono_audio)/SAMPLE_RATE:.2f}s)")
+            return
+
         # VAD: Check if audio contains speech using RMS energy threshold
         from bot.config import config as bot_config
         speech_cfg = bot_config.config_manager.for_guild("Speech", self.vc.guild.id) if hasattr(bot_config, 'config_manager') else None
@@ -165,6 +172,11 @@ class WhisperSink(voice_recv.BasicSink):
             audio_16k = resample(mono_audio, target_len)
         except Exception as e:
             logger.warning(f"[Guild {self.vc.guild.id}] Resample failed for {member.display_name}: {e}")
+            return
+
+        # Check for empty audio after resampling (prevents Whisper crash)
+        if len(audio_16k) == 0:
+            logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Empty audio after resample for {member.display_name}")
             return
 
         # Transcribe with Whisper (blocking call, runs in thread pool)
@@ -211,7 +223,16 @@ class WhisperSink(voice_recv.BasicSink):
                                 # Keep overlap for next chunk (prevents missing words)
                                 bytes_per_second = SAMPLE_RATE * CHANNELS * SAMPLE_WIDTH
                                 overlap_bytes = int(bytes_per_second * self.chunk_overlap)
-                                self.buffers[user_id] = deque([pcm_data[-overlap_bytes:]]) if len(pcm_data) > overlap_bytes else deque()
+
+                                # Ensure we never create empty buffers
+                                if len(pcm_data) > overlap_bytes:
+                                    self.buffers[user_id] = deque([pcm_data[-overlap_bytes:]])
+                                elif len(pcm_data) > 0:
+                                    # Keep what we have if non-empty but shorter than overlap
+                                    self.buffers[user_id] = deque([pcm_data])
+                                else:
+                                    self.buffers[user_id] = deque()
+
                                 self.last_chunk_time[user_id] = current_time
 
                                 # Add to processing list
