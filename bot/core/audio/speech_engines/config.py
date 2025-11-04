@@ -90,9 +90,9 @@ class SpeechConfig(ConfigBase):
         requires_restart=True
     )
 
-    whisper_chunk_duration: float = config_field(
-        default=4.0,
-        description="Process audio every N seconds (Whisper)",
+    whisper_buffer_duration: float = config_field(
+        default=3.0,
+        description="Audio buffer duration in seconds (Whisper)",
         category="Audio/Speech Recognition/Whisper",
         guild_override=False,
         admin_only=True,
@@ -100,24 +100,14 @@ class SpeechConfig(ConfigBase):
         max_value=10.0
     )
 
-    whisper_chunk_overlap: float = config_field(
-        default=0.5,
-        description="Overlap between chunks in seconds to prevent missing words (Whisper)",
+    whisper_debounce_seconds: float = config_field(
+        default=1.0,
+        description="Min seconds between transcriptions (Whisper)",
         category="Audio/Speech Recognition/Whisper",
         guild_override=False,
         admin_only=True,
-        min_value=0.0,
-        max_value=2.0
-    )
-
-    whisper_processing_interval: float = config_field(
-        default=0.1,
-        description="How often to check audio buffers for processing in seconds (Whisper)",
-        category="Audio/Speech Recognition/Whisper",
-        guild_override=False,
-        admin_only=True,
-        min_value=0.05,
-        max_value=0.5
+        min_value=0.5,
+        max_value=5.0
     )
 
     # Faster-Whisper Settings (CTranslate2 backend - 4x faster than openai-whisper)
@@ -150,9 +140,9 @@ class SpeechConfig(ConfigBase):
         requires_restart=True
     )
 
-    faster_whisper_chunk_duration: float = config_field(
-        default=4.0,
-        description="Process audio every N seconds (faster-whisper)",
+    faster_whisper_buffer_duration: float = config_field(
+        default=3.0,
+        description="Audio buffer duration in seconds (faster-whisper)",
         category="Audio/Speech Recognition/Faster-Whisper",
         guild_override=False,
         admin_only=True,
@@ -160,22 +150,12 @@ class SpeechConfig(ConfigBase):
         max_value=10.0
     )
 
-    faster_whisper_chunk_overlap: float = config_field(
-        default=0.5,
-        description="Overlap between chunks in seconds to prevent missing words (faster-whisper)",
+    faster_whisper_debounce_seconds: float = config_field(
+        default=1.0,
+        description="Min seconds between transcriptions (faster-whisper)",
         category="Audio/Speech Recognition/Faster-Whisper",
         guild_override=False,
         admin_only=True,
-        min_value=0.0,
-        max_value=2.0
-    )
-
-    faster_whisper_processing_interval: float = config_field(
-        default=0.1,
-        description="How often to check audio buffers for processing in seconds (faster-whisper)",
-        category="Audio/Speech Recognition/Faster-Whisper",
-        guild_override=False,
-        admin_only=True,
-        min_value=0.05,
-        max_value=0.5
+        min_value=0.5,
+        max_value=5.0
     )
