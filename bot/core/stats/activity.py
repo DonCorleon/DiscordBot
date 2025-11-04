@@ -148,24 +148,39 @@ def save_activity_stats(file_path: str, activity_stats: ActivityStatsData):
         raise
 
 
-def calculate_message_points(has_link: bool = False, has_attachment: bool = False) -> float:
+def calculate_message_points(
+    has_link: bool = False,
+    has_attachment: bool = False,
+    base_points_min: float = 0.8,
+    base_points_max: float = 1.2,
+    link_bonus: float = 2.0,
+    attachment_bonus: float = 2.0
+) -> float:
     """
-    Calculate points for a message.
+    Calculate points for a message using configurable values.
     Base points are randomized to keep exact message counts ambiguous.
+
+    Args:
+        has_link: Whether message contains links
+        has_attachment: Whether message has attachments
+        base_points_min: Minimum base points for message
+        base_points_max: Maximum base points for message
+        link_bonus: Bonus points for links
+        attachment_bonus: Bonus points for attachments
 
     Returns:
         Float points (randomized base + bonuses)
     """
-    # Base message points (randomized)
-    points = random.uniform(0.8, 1.2)
+    # Base message points (randomized between configured min/max)
+    points = random.uniform(base_points_min, base_points_max)
 
     # Bonus for links
     if has_link:
-        points += 2.0
+        points += link_bonus
 
     # Bonus for attachments/images
     if has_attachment:
-        points += 2.0
+        points += attachment_bonus
 
     return points
 
@@ -179,7 +194,11 @@ def add_message_activity(
     message_id: str,
     is_bot: bool = False,
     has_link: bool = False,
-    has_attachment: bool = False
+    has_attachment: bool = False,
+    base_points_min: float = 0.8,
+    base_points_max: float = 1.2,
+    link_bonus: float = 2.0,
+    attachment_bonus: float = 2.0
 ) -> ActivityStatsData:
     """
     Add activity for a message.
@@ -194,6 +213,10 @@ def add_message_activity(
         is_bot: Whether user is a bot
         has_link: Whether message contains a link
         has_attachment: Whether message has an attachment
+        base_points_min: Minimum base points (configurable)
+        base_points_max: Maximum base points (configurable)
+        link_bonus: Bonus points for links (configurable)
+        attachment_bonus: Bonus points for attachments (configurable)
 
     Returns:
         Updated ActivityStatsData object
@@ -220,8 +243,15 @@ def add_message_activity(
     user_stat = guild_stats.users[user_id_str]
     user_stat.username = username  # Update username
 
-    # Calculate points
-    points = calculate_message_points(has_link, has_attachment)
+    # Calculate points using config values
+    points = calculate_message_points(
+        has_link=has_link,
+        has_attachment=has_attachment,
+        base_points_min=base_points_min,
+        base_points_max=base_points_max,
+        link_bonus=link_bonus,
+        attachment_bonus=attachment_bonus
+    )
 
     # Add points
     user_stat.activity_stats.activity_score += points
@@ -251,7 +281,8 @@ def add_reaction_activity(
     author_name: str,
     guild_id: str,
     reactor_is_bot: bool = False,
-    author_is_bot: bool = False
+    author_is_bot: bool = False,
+    reaction_points: float = 1.0
 ) -> ActivityStatsData:
     """
     Add activity for a reaction (both reactor and author get points).
@@ -265,6 +296,7 @@ def add_reaction_activity(
         guild_id: Discord guild ID
         reactor_is_bot: Whether reactor is a bot
         author_is_bot: Whether author is a bot
+        reaction_points: Points to award for reactions (configurable)
 
     Returns:
         Updated ActivityStatsData object
@@ -291,10 +323,10 @@ def add_reaction_activity(
         )
 
     reactor_stat = guild_stats.users[reactor_id_str]
-    reactor_stat.activity_stats.activity_score += 1.0
-    reactor_stat.activity_stats.daily_score += 1.0
-    reactor_stat.activity_stats.weekly_score += 1.0
-    reactor_stat.activity_stats.monthly_score += 1.0
+    reactor_stat.activity_stats.activity_score += reaction_points
+    reactor_stat.activity_stats.daily_score += reaction_points
+    reactor_stat.activity_stats.weekly_score += reaction_points
+    reactor_stat.activity_stats.monthly_score += reaction_points
     reactor_stat.activity_stats._reaction_given += 1
     reactor_stat.activity_stats.last_active = datetime.utcnow().isoformat()
 
@@ -308,10 +340,10 @@ def add_reaction_activity(
         )
 
     author_stat = guild_stats.users[author_id_str]
-    author_stat.activity_stats.activity_score += 1.0
-    author_stat.activity_stats.daily_score += 1.0
-    author_stat.activity_stats.weekly_score += 1.0
-    author_stat.activity_stats.monthly_score += 1.0
+    author_stat.activity_stats.activity_score += reaction_points
+    author_stat.activity_stats.daily_score += reaction_points
+    author_stat.activity_stats.weekly_score += reaction_points
+    author_stat.activity_stats.monthly_score += reaction_points
     author_stat.activity_stats._reaction_received += 1
 
     return activity_stats
@@ -325,7 +357,8 @@ def add_reply_activity(
     original_author_name: str,
     guild_id: str,
     replier_is_bot: bool = False,
-    author_is_bot: bool = False
+    author_is_bot: bool = False,
+    reply_points: float = 1.0
 ) -> ActivityStatsData:
     """
     Add activity for a reply (both replier and original author get points).
@@ -339,6 +372,7 @@ def add_reply_activity(
         guild_id: Discord guild ID
         replier_is_bot: Whether replier is a bot
         author_is_bot: Whether original author is a bot
+        reply_points: Points to award for replies (configurable)
 
     Returns:
         Updated ActivityStatsData object
@@ -361,10 +395,10 @@ def add_reply_activity(
         )
 
     replier_stat = guild_stats.users[replier_id_str]
-    replier_stat.activity_stats.activity_score += 1.0
-    replier_stat.activity_stats.daily_score += 1.0
-    replier_stat.activity_stats.weekly_score += 1.0
-    replier_stat.activity_stats.monthly_score += 1.0
+    replier_stat.activity_stats.activity_score += reply_points
+    replier_stat.activity_stats.daily_score += reply_points
+    replier_stat.activity_stats.weekly_score += reply_points
+    replier_stat.activity_stats.monthly_score += reply_points
     replier_stat.activity_stats._replies_given += 1
     replier_stat.activity_stats.last_active = datetime.utcnow().isoformat()
 
@@ -379,10 +413,10 @@ def add_reply_activity(
             )
 
         author_stat = guild_stats.users[author_id_str]
-        author_stat.activity_stats.activity_score += 1.0
-        author_stat.activity_stats.daily_score += 1.0
-        author_stat.activity_stats.weekly_score += 1.0
-        author_stat.activity_stats.monthly_score += 1.0
+        author_stat.activity_stats.activity_score += reply_points
+        author_stat.activity_stats.daily_score += reply_points
+        author_stat.activity_stats.weekly_score += reply_points
+        author_stat.activity_stats.monthly_score += reply_points
         author_stat.activity_stats._replies_received += 1
 
     return activity_stats

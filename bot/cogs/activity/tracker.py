@@ -504,11 +504,14 @@ class ActivityTracker(BaseCog):
         try:
             activity_stats = self._get_stats()
 
+            # Get config values (hot-swappable)
+            cfg = self.bot.config_manager.for_guild("Activity", message.guild.id)
+
             # Check for links and attachments
             has_link = self._has_link(message.content)
             has_attachment = self._has_attachment(message)
 
-            # Add message activity
+            # Add message activity with config values
             activity_stats = add_message_activity(
                 activity_stats,
                 user_id=message.author.id,
@@ -518,7 +521,11 @@ class ActivityTracker(BaseCog):
                 message_id=message.id,
                 is_bot=message.author.bot,
                 has_link=has_link,
-                has_attachment=has_attachment
+                has_attachment=has_attachment,
+                base_points_min=cfg.activity_base_message_points_min,
+                base_points_max=cfg.activity_base_message_points_max,
+                link_bonus=cfg.activity_link_bonus_points,
+                attachment_bonus=cfg.activity_attachment_bonus_points
             )
 
             # Check if this is a reply
@@ -527,7 +534,7 @@ class ActivityTracker(BaseCog):
                     # Fetch the original message
                     original_message = await message.channel.fetch_message(message.reference.message_id)
 
-                    # Add reply activity
+                    # Add reply activity with config values
                     activity_stats = add_reply_activity(
                         activity_stats,
                         replier_id=message.author.id,
@@ -536,7 +543,8 @@ class ActivityTracker(BaseCog):
                         original_author_name=str(original_message.author),
                         guild_id=message.guild.id,
                         replier_is_bot=message.author.bot,
-                        author_is_bot=original_message.author.bot
+                        author_is_bot=original_message.author.bot,
+                        reply_points=cfg.activity_reply_points
                     )
 
                     logger.debug(f"[Activity] Reply tracked: {message.author} -> {original_message.author}")
@@ -579,12 +587,15 @@ class ActivityTracker(BaseCog):
             if new_link or new_attachment:
                 activity_stats = self._get_stats()
 
-                # Calculate bonus points for what was added
+                # Get config values (hot-swappable)
+                cfg = self.bot.config_manager.for_guild("Activity", after.guild.id)
+
+                # Calculate bonus points for what was added using config values
                 bonus_points = 0.0
                 if new_link:
-                    bonus_points += 2.0
+                    bonus_points += cfg.activity_link_bonus_points
                 if new_attachment:
-                    bonus_points += 2.0
+                    bonus_points += cfg.activity_attachment_bonus_points
 
                 # Get user stats
                 guild_id_str = str(after.guild.id)
@@ -668,7 +679,10 @@ class ActivityTracker(BaseCog):
 
             activity_stats = self._get_stats()
 
-            # Add reaction activity
+            # Get config values (hot-swappable)
+            cfg = self.bot.config_manager.for_guild("Activity", reaction.message.guild.id)
+
+            # Add reaction activity with config values
             activity_stats = add_reaction_activity(
                 activity_stats,
                 reactor_id=user.id,
@@ -677,7 +691,8 @@ class ActivityTracker(BaseCog):
                 author_name=str(reaction.message.author),
                 guild_id=reaction.message.guild.id,
                 reactor_is_bot=user.bot,
-                author_is_bot=reaction.message.author.bot
+                author_is_bot=reaction.message.author.bot,
+                reaction_points=cfg.activity_reaction_points
             )
 
             self._mark_dirty()
