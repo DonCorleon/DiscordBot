@@ -375,7 +375,7 @@ class FasterWhisperEngine(SpeechEngine):
                 logger.error(f"Failed to load faster-whisper model: {e}", exc_info=True)
                 raise
 
-        # Get config values
+        # Get config from ConfigManager
         speech_cfg = self.bot.config_manager.for_guild("Speech")
 
         # Create sink
@@ -385,9 +385,9 @@ class FasterWhisperEngine(SpeechEngine):
             self.model,
             self.executor,
             ducking_callback=self.ducking_callback,
-            chunk_duration=speech_cfg.faster_whisper_chunk_duration,
-            chunk_overlap=speech_cfg.faster_whisper_chunk_overlap,
-            processing_interval=speech_cfg.faster_whisper_processing_interval
+            chunk_duration=speech_cfg.speech_chunk_duration,
+            chunk_overlap=speech_cfg.speech_chunk_overlap,
+            processing_interval=speech_cfg.speech_processing_interval
         )
 
         # Attach to voice client

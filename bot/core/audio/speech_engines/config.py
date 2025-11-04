@@ -50,30 +50,31 @@ class SpeechConfig(ConfigBase):
         requires_restart=True
     )
 
-    vosk_chunk_duration: float = config_field(
+    # Shared buffering settings for all speech engines
+    speech_chunk_duration: float = config_field(
         default=4.0,
-        description="Process audio every N seconds (Vosk)",
-        category="Audio/Speech Recognition/Vosk",
+        description="Process audio every N seconds (all engines)",
+        category="Audio/Speech Recognition",
         guild_override=False,
         admin_only=True,
         min_value=1.0,
         max_value=10.0
     )
 
-    vosk_chunk_overlap: float = config_field(
+    speech_chunk_overlap: float = config_field(
         default=0.5,
-        description="Overlap between chunks in seconds to prevent missing words (Vosk)",
-        category="Audio/Speech Recognition/Vosk",
+        description="Overlap between chunks in seconds to prevent missing words (all engines)",
+        category="Audio/Speech Recognition",
         guild_override=False,
         admin_only=True,
         min_value=0.0,
         max_value=2.0
     )
 
-    vosk_processing_interval: float = config_field(
+    speech_processing_interval: float = config_field(
         default=0.1,
-        description="How often to check audio buffers for processing in seconds (lower = more responsive, higher = less CPU)",
-        category="Audio/Speech Recognition/Vosk",
+        description="How often to check audio buffers for processing in seconds (all engines, lower = more responsive, higher = less CPU)",
+        category="Audio/Speech Recognition",
         guild_override=False,
         admin_only=True,
         min_value=0.05,

@@ -367,7 +367,7 @@ class WhisperEngine(SpeechEngine):
                 logger.error(f"Failed to load Whisper model: {e}", exc_info=True)
                 raise
 
-        # Get Whisper config from ConfigManager
+        # Get config from ConfigManager
         speech_cfg = self.bot.config_manager.for_guild("Speech")
 
         # Create and attach WhisperSink
@@ -377,9 +377,9 @@ class WhisperEngine(SpeechEngine):
             self.model,
             self.executor,
             ducking_callback=self.ducking_callback,
-            chunk_duration=speech_cfg.whisper_chunk_duration,
-            chunk_overlap=speech_cfg.whisper_chunk_overlap,
-            processing_interval=speech_cfg.whisper_processing_interval
+            chunk_duration=speech_cfg.speech_chunk_duration,
+            chunk_overlap=speech_cfg.speech_chunk_overlap,
+            processing_interval=speech_cfg.speech_processing_interval
         )
 
         # Attach to voice client
