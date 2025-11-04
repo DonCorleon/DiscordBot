@@ -133,10 +133,37 @@ class FasterWhisperSink(voice_recv.BasicSink):
 
         # Start transcription task if not already running
         if user_name not in self.transcription_tasks or self.transcription_tasks[user_name].done():
-            self.transcription_tasks[user_name] = asyncio.run_coroutine_threadsafe(
-                self._transcribe_user(user_name, member),
-                self.loop
+            self.transcription_tasks[user_name] = self.loop.create_task(
+                self._resilient_transcribe(user_name, member)
             )
+
+    async def _resilient_transcribe(self, user_name: str, member: discord.Member):
+        """
+        Background loop per user - keeps retrying on errors.
+
+        This resilient loop ensures transcription continues even if individual
+        transcription attempts fail or timeout.
+        """
+        while True:
+            chunks = self.buffers.get(user_name, [])
+            if not chunks:
+                await asyncio.sleep(1.0)
+                continue
+
+            try:
+                # 30 second timeout per transcription attempt
+                await asyncio.wait_for(
+                    self._transcribe_user(user_name, member),
+                    timeout=TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"[Guild {self.vc.guild.id}] faster-whisper transcription timeout for {user_name}, restarting task...")
+                self.buffers[user_name] = []  # Clear buffer on timeout
+            except Exception:
+                logger.exception(f"[Guild {self.vc.guild.id}] Transcription loop crashed for {user_name}, restarting...")
+                self.buffers[user_name] = []  # Clear buffer on error
+
+            await asyncio.sleep(0.1)
 
     async def _transcribe_user(self, user_name: str, member: discord.Member):
         """
