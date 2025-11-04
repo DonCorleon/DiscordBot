@@ -147,7 +147,7 @@ class TranscriptSessionManager:
                 flushed_count = 0
                 for channel_id, session in self.active_sessions.items():
                     if session._dirty:
-                        self._update_session_file(session)
+                        await asyncio.to_thread(self._update_session_file, session)
                         session._dirty = False
                         flushed_count += 1
 

@@ -261,11 +261,20 @@ class VoiceSpeechCog(BaseCog):
         # OpusError tracking per guild {guild_id: {"timestamps": deque, "logged_count": int}}
         self.opus_error_tracker = {}
 
+        # Initialize user stats writer
+        from bot.core.stats.user_triggers import init_stats_writer
+        self.stats_writer = init_stats_writer(bot)
+        logger.info("Initialized UserStatsWriter")
+
     async def cog_load(self):
         """Called when the cog is loaded."""
         # Start transcript flush task
         self.transcript_manager.start_flush_task()
         logger.info("Started transcript flush task")
+
+        # Start user stats writer
+        self.stats_writer.start()
+        logger.info("Started UserStatsWriter background task")
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState,
@@ -460,6 +469,9 @@ class VoiceSpeechCog(BaseCog):
     async def cog_unload(self):
         logger.info("Unloading VoiceSpeechCog...")
 
+        # Stop user stats writer (flushes pending updates)
+        await self.stats_writer.stop()
+
         # Stop transcript flush task
         self.transcript_manager.stop_flush_task()
 
@@ -630,25 +642,24 @@ class VoiceSpeechCog(BaseCog):
                 if soundboard_cog and sound_key:
                     soundboard_cog.increment_play_stats(guild_id, soundfile, str(user_id), trigger_word)
 
-                # Track user trigger stats
+                # Track user trigger stats (queue for background writing - non-blocking)
                 if trigger_word and channel_id:
                     try:
-                        from bot.core.stats.user_triggers import (
-                            load_user_stats, save_user_stats, increment_user_trigger_stat, USER_STATS_FILE
-                        )
-                        user_stats = load_user_stats(USER_STATS_FILE)
-                        user_stats = increment_user_trigger_stat(
-                            user_stats,
-                            user_id,
-                            username,
-                            guild_id,
-                            channel_id,
-                            trigger_word
-                        )
-                        save_user_stats(USER_STATS_FILE, user_stats)
-                        logger.debug(f"[Guild {guild_id}] Tracked trigger '{trigger_word}' by user {username} (ID: {user_id})")
+                        from bot.core.stats.user_triggers import get_stats_writer
+                        stats_writer = get_stats_writer()
+                        if stats_writer:
+                            stats_writer.queue_update(
+                                user_id=str(user_id),
+                                username=username,
+                                guild_id=str(guild_id),
+                                channel_id=str(channel_id),
+                                trigger_word=trigger_word
+                            )
+                            logger.debug(f"[Guild {guild_id}] Queued trigger stat for '{trigger_word}' by {username}")
+                        else:
+                            logger.warning(f"[Guild {guild_id}] UserStatsWriter not initialized, skipping stat tracking")
                     except Exception as e:
-                        logger.error(f"[Guild {guild_id}] Failed to track user trigger stats: {e}", exc_info=True)
+                        logger.error(f"[Guild {guild_id}] Failed to queue user trigger stat: {e}", exc_info=True)
 
                 # Get playback timeout from unified config manager
                 playback_timeout = 30.0  # default

@@ -4,10 +4,12 @@ Tracks how many times users say trigger words, with guild and channel specificit
 Guilds are completely isolated - stats are tracked per guild.
 """
 import json
+import asyncio
 from dataclasses import dataclass, field, asdict
 from typing import Dict
 from datetime import datetime
 from pathlib import Path
+from collections import deque
 from bot.base_cog import logger
 
 USER_STATS_FILE = "data/stats/user_stats.json"
@@ -537,3 +539,151 @@ def render_progress_bar(current: int, target: int, bar_length: int = 10) -> str:
     bar = "█" * filled + "░" * empty
 
     return f"[{bar}] {percentage}%"
+
+
+# ========== Background Stats Writer ==========
+
+
+class UserStatsWriter:
+    """
+    Background worker that batches user trigger stat updates and writes to disk periodically.
+    Prevents blocking the sound queue with file I/O on every trigger.
+    """
+
+    def __init__(self, bot, file_path: str = USER_STATS_FILE):
+        """
+        Initialize the stats writer.
+
+        Args:
+            bot: Discord bot instance (for ConfigManager access)
+            file_path: Path to user stats JSON file
+        """
+        self.bot = bot
+        self.file_path = file_path
+        self.pending_updates = deque()  # Queue of (user_id, username, guild_id, channel_id, trigger_word)
+        self._write_task = None
+        self._stop_flag = False
+        logger.info(f"UserStatsWriter initialized (file={file_path})")
+
+    def queue_update(self, user_id: str, username: str, guild_id: str, channel_id: str, trigger_word: str = None):
+        """
+        Queue a trigger stat update to be written later (non-blocking).
+
+        Args:
+            user_id: Discord user ID
+            username: Discord username
+            guild_id: Discord guild ID
+            channel_id: Discord channel ID
+            trigger_word: Optional trigger word that was used
+        """
+        self.pending_updates.append((user_id, username, guild_id, channel_id, trigger_word))
+
+    def start(self):
+        """Start the background write task."""
+        if self._write_task is None or self._write_task.done():
+            self._stop_flag = False
+            self._write_task = asyncio.create_task(self._write_loop())
+            logger.info("UserStatsWriter background task started")
+
+    async def _write_loop(self):
+        """Background task that periodically flushes pending stats to disk."""
+        try:
+            while not self._stop_flag:
+                # Read interval from config (hot-swappable)
+                sys_cfg = self.bot.config_manager.for_guild("System")
+                interval = sys_cfg.stats_write_interval
+
+                await asyncio.sleep(interval)
+
+                # Process all pending updates
+                if self.pending_updates:
+                    await self._flush_pending_updates()
+
+        except asyncio.CancelledError:
+            logger.info("UserStatsWriter background task cancelled")
+            # Flush remaining updates before stopping
+            if self.pending_updates:
+                await self._flush_pending_updates()
+            raise
+        except Exception as e:
+            logger.error(f"Error in UserStatsWriter background task: {e}", exc_info=True)
+
+    async def _flush_pending_updates(self):
+        """Flush all pending updates to disk (runs in thread to avoid blocking event loop)."""
+        try:
+            # Get snapshot of pending updates
+            updates_to_process = list(self.pending_updates)
+            self.pending_updates.clear()
+
+            # Process in background thread to avoid blocking event loop
+            await asyncio.to_thread(self._apply_updates, updates_to_process)
+
+            logger.debug(f"Flushed {len(updates_to_process)} user trigger stat update(s)")
+
+        except Exception as e:
+            logger.error(f"Error flushing user trigger stats: {e}", exc_info=True)
+
+    def _apply_updates(self, updates: list):
+        """
+        Apply batched updates to stats file (runs in thread).
+
+        Args:
+            updates: List of (user_id, username, guild_id, channel_id, trigger_word) tuples
+        """
+        try:
+            # Load current stats
+            user_stats = load_user_stats(self.file_path)
+
+            # Apply all updates
+            for user_id, username, guild_id, channel_id, trigger_word in updates:
+                user_stats = increment_user_trigger_stat(
+                    user_stats,
+                    user_id,
+                    username,
+                    guild_id,
+                    channel_id,
+                    trigger_word
+                )
+
+            # Save once
+            save_user_stats(self.file_path, user_stats)
+
+        except Exception as e:
+            logger.error(f"Error applying user trigger stat updates: {e}", exc_info=True)
+            raise
+
+    async def stop(self):
+        """Stop the background task and flush remaining updates."""
+        self._stop_flag = True
+        if self._write_task and not self._write_task.done():
+            self._write_task.cancel()
+            try:
+                await self._write_task
+            except asyncio.CancelledError:
+                pass
+        logger.info("UserStatsWriter stopped")
+
+
+# Global singleton instance (initialized by VoiceSpeechCog)
+_stats_writer: UserStatsWriter = None
+
+
+def get_stats_writer() -> UserStatsWriter:
+    """Get the global UserStatsWriter instance."""
+    return _stats_writer
+
+
+def init_stats_writer(bot) -> UserStatsWriter:
+    """
+    Initialize the global UserStatsWriter instance.
+
+    Args:
+        bot: Discord bot instance
+
+    Returns:
+        UserStatsWriter instance
+    """
+    global _stats_writer
+    if _stats_writer is None:
+        _stats_writer = UserStatsWriter(bot)
+    return _stats_writer

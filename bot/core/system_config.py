@@ -98,6 +98,27 @@ class SystemConfig(ConfigBase):
         requires_restart=True
     )
 
+    # Stats File I/O Batching Settings
+    stats_write_interval: int = config_field(
+        default=30,
+        description="Seconds between writing user trigger stats to disk (batches multiple updates)",
+        category="Data Storage/Performance",
+        guild_override=False,
+        admin_only=True,
+        min_value=5,
+        max_value=300
+    )
+
+    soundboard_stats_write_interval: int = config_field(
+        default=30,
+        description="Seconds between writing soundboard play stats to disk (batches multiple updates)",
+        category="Data Storage/Performance",
+        guild_override=False,
+        admin_only=True,
+        min_value=5,
+        max_value=300
+    )
+
     # Monitoring Settings
     max_history: int = config_field(
         default=1000,

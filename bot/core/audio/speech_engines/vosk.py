@@ -13,6 +13,7 @@ import discord
 from discord.ext import voice_recv
 import numpy as np
 import time
+import threading
 from typing import Optional
 from collections import deque, defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -46,7 +47,8 @@ class VoskSink(voice_recv.AudioSink):
         executor: ThreadPoolExecutor,
         ducking_callback=None,
         chunk_duration: float = 4.0,
-        chunk_overlap: float = 0.5
+        chunk_overlap: float = 0.5,
+        processing_interval: float = 0.1
     ):
         """
         Initialize Vosk sink.
@@ -59,6 +61,7 @@ class VoskSink(voice_recv.AudioSink):
             ducking_callback: Optional callback for ducking events
             chunk_duration: Process audio every N seconds
             chunk_overlap: Overlap between chunks in seconds
+            processing_interval: How often to check buffers for processing (seconds)
         """
         super().__init__()
         self.vc = vc
@@ -70,65 +73,44 @@ class VoskSink(voice_recv.AudioSink):
         # Configurable timing parameters
         self.chunk_duration = chunk_duration
         self.chunk_overlap = chunk_overlap
+        self.processing_interval = processing_interval
 
-        # Per-user state
+        # Per-user state (thread-safe with threading.Lock, not asyncio.Lock)
         self.buffers = {}  # {user_id: deque([audio_chunks])}
         self.last_chunk_time = {}  # {user_id: timestamp}
-        self.user_locks = defaultdict(asyncio.Lock)
-        # Store recognizers per user for continuous recognition
-        # Thread safety via per-user threading.Lock (not asyncio.Lock)
-        self.recognizers = {}  # {user_id: KaldiRecognizer}
-        self.recognizer_locks = defaultdict(lambda: __import__('threading').Lock())
+        self.buffer_lock = threading.Lock()  # Single lock for all buffer operations
 
-        logger.info(f"[Guild {vc.guild.id}] VoskSink initialized (chunk={chunk_duration}s, overlap={chunk_overlap}s)")
+        # Store recognizers per user for continuous recognition
+        # Thread safety via per-user threading.Lock
+        self.recognizers = {}  # {user_id: KaldiRecognizer}
+        self.recognizer_locks = defaultdict(threading.Lock)
+
+        # Background processing task
+        self._processing_task = None
+        self._stop_processing = False
+
+        logger.info(f"[Guild {vc.guild.id}] VoskSink initialized (chunk={chunk_duration}s, overlap={chunk_overlap}s, interval={processing_interval}s)")
 
     def write(self, user: discord.User, data: voice_recv.VoiceData):
         """
-        Called for every audio packet from Discord.
+        Called for every audio packet from Discord (sync, must be FAST).
 
-        Buffers audio per user and processes chunks periodically.
+        Simply appends to buffer - no async operations, no event loop scheduling.
+        Background task processes buffers periodically.
         """
         try:
             if not data.pcm:
                 return
 
-            async def process_user_audio():
-                async with self.user_locks[user.id]:
-                    # Initialize user state
-                    if user.id not in self.buffers:
-                        self.buffers[user.id] = deque()
-                        self.last_chunk_time[user.id] = time.time()
-                        # Recognizer will be created on first use in executor thread
+            # Fast synchronous buffer append with thread lock
+            with self.buffer_lock:
+                # Initialize user state on first packet
+                if user.id not in self.buffers:
+                    self.buffers[user.id] = deque()
+                    self.last_chunk_time[user.id] = time.time()
 
-                    # Add audio to buffer
-                    self.buffers[user.id].append(data.pcm)
-
-                    # Check if it's time to process this chunk
-                    if time.time() - self.last_chunk_time[user.id] >= self.chunk_duration:
-                        # Concatenate all buffered audio
-                        pcm_data = b''.join(self.buffers[user.id])
-
-                        # Keep overlap for next chunk (prevents missing words)
-                        bytes_per_second = self.SAMPLE_RATE * self.CHANNELS * self.SAMPLE_WIDTH
-                        overlap_bytes = int(bytes_per_second * self.chunk_overlap)
-                        self.buffers[user.id] = deque([pcm_data[-overlap_bytes:]])
-                        self.last_chunk_time[user.id] = time.time()
-
-                        # Get member object
-                        member = self.vc.guild.get_member(user.id)
-                        if not member:
-                            return
-
-                        # Process in thread pool (blocking Vosk call)
-                        # Pass user_id to transcribe_user (will get/create recognizer with lock)
-                        self.vc.loop.run_in_executor(
-                            self.executor,
-                            self.transcribe_user,
-                            pcm_data,
-                            member
-                        )
-
-            asyncio.run_coroutine_threadsafe(process_user_audio(), self.vc.loop)
+                # Append audio to buffer (fast, no processing)
+                self.buffers[user.id].append(data.pcm)
 
         except Exception as e:
             logger.error(f"VoskSink write error: {e}", exc_info=True)
@@ -229,17 +211,19 @@ class VoskSink(voice_recv.AudioSink):
             return
         logger.debug(f"[Guild {self.vc.guild.id}] 🔇 {member.display_name} stopped speaking")
 
-        # Process any remaining audio
-        if member.id in self.buffers and self.buffers[member.id]:
-            pcm_data = b''.join(self.buffers[member.id])
-            self.buffers[member.id].clear()
-            if pcm_data:
-                self.vc.loop.run_in_executor(
-                    self.executor,
-                    self.transcribe_user,
-                    pcm_data,
-                    member
-                )
+        # Process any remaining audio (thread-safe)
+        with self.buffer_lock:
+            if member.id in self.buffers and self.buffers[member.id]:
+                pcm_data = b''.join(self.buffers[member.id])
+                self.buffers[member.id].clear()
+
+                if pcm_data:
+                    self.vc.loop.run_in_executor(
+                        self.executor,
+                        self.transcribe_user,
+                        pcm_data,
+                        member
+                    )
 
         # Notify ducking callback
         if self.ducking_callback:
@@ -248,8 +232,66 @@ class VoskSink(voice_recv.AudioSink):
             except Exception as e:
                 logger.error(f"Error in ducking callback (stop): {e}", exc_info=True)
 
+    def start_processing(self):
+        """Start background task to process audio buffers periodically."""
+        if self._processing_task is None or self._processing_task.done():
+            self._stop_processing = False
+            self._processing_task = asyncio.create_task(self._process_buffers_loop())
+            logger.info(f"[Guild {self.vc.guild.id}] Started Vosk buffer processing task")
+
+    async def _process_buffers_loop(self):
+        """Background task that periodically checks and processes audio buffers."""
+        try:
+            while not self._stop_processing:
+                await asyncio.sleep(self.processing_interval)
+
+                # Get snapshot of users to process (thread-safe)
+                with self.buffer_lock:
+                    users_to_process = []
+                    current_time = time.time()
+
+                    for user_id, buffer in list(self.buffers.items()):
+                        # Check if enough time has elapsed for this user
+                        if current_time - self.last_chunk_time.get(user_id, 0) >= self.chunk_duration:
+                            if buffer:  # Only process if buffer has data
+                                # Concatenate all buffered audio
+                                pcm_data = b''.join(buffer)
+
+                                # Keep overlap for next chunk (prevents missing words)
+                                bytes_per_second = self.SAMPLE_RATE * self.CHANNELS * self.SAMPLE_WIDTH
+                                overlap_bytes = int(bytes_per_second * self.chunk_overlap)
+                                self.buffers[user_id] = deque([pcm_data[-overlap_bytes:]]) if len(pcm_data) > overlap_bytes else deque()
+                                self.last_chunk_time[user_id] = current_time
+
+                                # Add to processing list
+                                users_to_process.append((user_id, pcm_data))
+
+                # Process users outside the lock
+                for user_id, pcm_data in users_to_process:
+                    # Get member object
+                    member = self.vc.guild.get_member(user_id)
+                    if not member:
+                        continue
+
+                    # Process in thread pool (blocking Vosk call)
+                    self.vc.loop.run_in_executor(
+                        self.executor,
+                        self.transcribe_user,
+                        pcm_data,
+                        member
+                    )
+
+        except asyncio.CancelledError:
+            logger.info(f"[Guild {self.vc.guild.id}] Vosk buffer processing task cancelled")
+            raise
+        except Exception as e:
+            logger.error(f"[Guild {self.vc.guild.id}] Error in Vosk buffer processing: {e}", exc_info=True)
+
     def cleanup(self):
-        """Cleanup resources."""
+        """Cleanup resources and stop background task."""
+        self._stop_processing = True
+        if self._processing_task and not self._processing_task.done():
+            self._processing_task.cancel()
         self.buffers.clear()
         self.last_chunk_time.clear()
         self.recognizers.clear()
@@ -323,11 +365,16 @@ class VoskEngine(SpeechEngine):
             self.executor,
             ducking_callback=self.ducking_callback,
             chunk_duration=speech_cfg.vosk_chunk_duration,
-            chunk_overlap=speech_cfg.vosk_chunk_overlap
+            chunk_overlap=speech_cfg.vosk_chunk_overlap,
+            processing_interval=speech_cfg.vosk_processing_interval
         )
 
         # Attach to voice client
         voice_client.listen(self.sink)
+
+        # Start background buffer processing task
+        self.sink.start_processing()
+
         self._is_listening = True
 
         logger.info(f"[Guild {voice_client.guild.id}] Started Vosk speech recognition")

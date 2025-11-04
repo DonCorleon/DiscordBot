@@ -52,6 +52,16 @@ class SpeechConfig(ConfigBase):
         max_value=2.0
     )
 
+    vosk_processing_interval: float = config_field(
+        default=0.1,
+        description="How often to check audio buffers for processing in seconds (lower = more responsive, higher = less CPU)",
+        category="Audio/Speech Recognition/Vosk",
+        guild_override=False,
+        admin_only=True,
+        min_value=0.05,
+        max_value=0.5
+    )
+
     # Whisper Settings
     whisper_model: str = config_field(
         default="tiny.en",

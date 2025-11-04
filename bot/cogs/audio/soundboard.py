@@ -1033,8 +1033,23 @@ class Soundboard(BaseCog):
         else:
             logger.warning(f"Soundboard file not found: {SOUNDBOARD_FILE}")
 
+        # Initialize soundboard stats writer
+        from bot.core.stats.soundboard_stats_writer import init_soundboard_stats_writer
+        self.stats_writer = init_soundboard_stats_writer(bot, self)
+        logger.info("Initialized SoundboardStatsWriter")
+
+    async def cog_load(self):
+        """Called when the cog is loaded."""
+        # Start soundboard stats writer
+        self.stats_writer.start()
+        logger.info("Started SoundboardStatsWriter background task")
+
     async def cog_unload(self):
         logger.info("Unloading Soundboard cog...")
+
+        # Stop soundboard stats writer (flushes pending updates)
+        await self.stats_writer.stop()
+
         try:
             if self.soundboard.sounds:
                 save_soundboard(SOUNDBOARD_FILE, self.soundboard)
@@ -1045,40 +1060,13 @@ class Soundboard(BaseCog):
         logger.info("Soundboard cog cleanup complete")
 
     def increment_play_stats(self, guild_id: int, soundfile: str, user_id: str, trigger_word: str = None):
-        """Increment play statistics for a sound and track trigger word usage."""
-        guild_id_str = str(guild_id)
-        user_id_str = str(user_id)
-
-        # Find sound by soundfile
-        sound_entry = None
-        sound_key = None
-        for key, entry in self.soundboard.sounds.items():
-            if entry.soundfile == soundfile:
-                sound_entry = entry
-                sound_key = key
-                break
-
-        if not sound_entry:
-            logger.warning(f"Soundfile '{soundfile}' not found")
-            return
-
-        stats = sound_entry.play_stats
-        stats.week += 1
-        stats.month += 1
-        stats.total += 1
-        stats.guild_play_count[guild_id_str] = stats.guild_play_count.get(guild_id_str, 0) + 1
-        stats.last_played = datetime.utcnow().isoformat()
-        stats.played_by = [user_id_str]
-
-        # Track trigger word usage
-        if trigger_word:
-            stats.trigger_word_stats[trigger_word] = stats.trigger_word_stats.get(trigger_word, 0) + 1
-
+        """Increment play statistics for a sound and track trigger word usage (queued for background writing)."""
+        # Queue stat update for background writing (non-blocking)
         try:
-            save_soundboard(SOUNDBOARD_FILE, self.soundboard)
-            logger.debug(f"Updated stats for '{sound_entry.title}'" + (f" (trigger: '{trigger_word}')" if trigger_word else ""))
+            self.stats_writer.queue_update(guild_id, soundfile, user_id, trigger_word)
+            logger.debug(f"Queued soundboard stat update for '{soundfile}'" + (f" (trigger: '{trigger_word}')" if trigger_word else ""))
         except Exception as e:
-            logger.error(f"Failed to save stats: {e}", exc_info=True)
+            logger.error(f"Failed to queue soundboard stat update: {e}", exc_info=True)
 
     def reset_play_stats(self, period: str) -> int:
         """Reset play statistics for a given period."""
