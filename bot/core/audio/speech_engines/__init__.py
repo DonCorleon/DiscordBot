@@ -8,6 +8,7 @@ implementations (Vosk, Whisper, etc.) without changing voice connection logic.
 from .base import SpeechEngine
 from .vosk import VoskEngine
 from .whisper import WhisperEngine
+from .faster_whisper import FasterWhisperEngine
 from .config import SpeechConfig
 import logging
 
@@ -26,7 +27,7 @@ def create_speech_engine(
     Args:
         bot: Discord bot instance
         callback: Function called with (member, transcribed_text) when speech is recognized
-        engine_type: Engine to use ("vosk" or "whisper")
+        engine_type: Engine to use ("vosk", "whisper", or "faster-whisper")
         ducking_callback: Optional callback for audio ducking events (guild_id, member, is_speaking)
 
     Returns:
@@ -34,7 +35,6 @@ def create_speech_engine(
 
     Raises:
         ValueError: If engine_type is unknown
-        NotImplementedError: If engine is not yet implemented (e.g., whisper)
     """
 
     if engine_type == "vosk":
@@ -75,10 +75,32 @@ def create_speech_engine(
             ducking_callback=ducking_callback
         )
 
+    elif engine_type == "faster-whisper":
+        # Get faster-whisper config from bot's ConfigManager
+        try:
+            speech_cfg = bot.config_manager.for_guild("Speech")
+            model_size = speech_cfg.faster_whisper_model
+            device = speech_cfg.faster_whisper_device
+            compute_type = speech_cfg.faster_whisper_compute_type
+        except Exception:
+            # Fallback to defaults
+            model_size = "base"
+            device = "cpu"
+            compute_type = "int8"
+
+        return FasterWhisperEngine(
+            bot,
+            callback,
+            model_size=model_size,
+            device=device,
+            compute_type=compute_type,
+            ducking_callback=ducking_callback
+        )
+
     else:
         raise ValueError(
             f"Unknown speech engine: '{engine_type}'. "
-            f"Valid options: 'vosk', 'whisper'"
+            f"Valid options: 'vosk', 'whisper', 'faster-whisper'"
         )
 
 
@@ -86,6 +108,7 @@ __all__ = [
     "SpeechEngine",
     "VoskEngine",
     "WhisperEngine",
+    "FasterWhisperEngine",
     "SpeechConfig",
     "create_speech_engine",
 ]
