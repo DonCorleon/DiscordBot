@@ -286,7 +286,8 @@ class VoiceSpeechCog(BaseCog):
                 )
 
         # Handle disconnect when channel becomes empty or cancel timer when someone rejoins
-        if member.guild.voice_client:
+        # Skip if the member is a bot (prevents bot's own disconnect from re-triggering)
+        if member.guild.voice_client and not member.bot:
             bot_channel = member.guild.voice_client.channel
             members_in_channel = [m for m in bot_channel.members if not m.bot]
 
