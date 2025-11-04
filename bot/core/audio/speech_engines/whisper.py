@@ -14,7 +14,10 @@ Implementation based on ResilientWhisperSink pattern with:
 import asyncio
 import discord
 from discord.ext import voice_recv
-from typing import Optional, Dict
+import time
+import threading
+from typing import Optional
+from collections import deque
 from .base import SpeechEngine, logger
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,20 +34,17 @@ except ImportError:
 
 
 # Audio constants
-SAMPLE_RATE = 96000      # Discord's sample rate
+SAMPLE_RATE = 48000      # Discord's sample rate (48kHz stereo)
 TARGET_SR = 16000        # Whisper expects 16kHz
-TIMEOUT_SECONDS = 30     # Transcription timeout
+CHANNELS = 2             # Stereo
+SAMPLE_WIDTH = 2         # 16-bit samples
 
 
 class WhisperSink(voice_recv.BasicSink):
     """
     Custom sink for capturing audio and processing with Whisper.
 
-    Features:
-    - Per-user audio buffering
-    - Rolling buffer (keeps last N seconds)
-    - Background transcription tasks per user
-    - Resilient error handling with auto-restart
+    Uses Vosk's proven periodic buffering pattern.
     """
 
     def __init__(
@@ -52,10 +52,11 @@ class WhisperSink(voice_recv.BasicSink):
         vc,
         callback,
         model,
-        buffer_duration: float,
-        debounce_seconds: float,
         executor: ThreadPoolExecutor,
-        ducking_callback=None
+        ducking_callback=None,
+        chunk_duration: float = 4.0,
+        chunk_overlap: float = 0.5,
+        processing_interval: float = 0.1
     ):
         """
         Initialize Whisper sink.
@@ -64,139 +65,89 @@ class WhisperSink(voice_recv.BasicSink):
             vc: Voice client
             callback: Function called with (member, text) when speech is recognized
             model: Loaded Whisper model
-            buffer_duration: Audio buffer duration in seconds
-            debounce_seconds: Min seconds between transcriptions
             executor: ThreadPoolExecutor for blocking Whisper calls
-            ducking_callback: Optional callback for ducking events (guild_id, member, is_speaking)
+            ducking_callback: Optional callback for ducking events
+            chunk_duration: Process audio every N seconds
+            chunk_overlap: Overlap between chunks in seconds
+            processing_interval: How often to check buffers for processing (seconds)
         """
         super().__init__(asyncio.Event())
         self.vc = vc
         self.callback = callback
         self.model = model
-        self.buffer_duration = buffer_duration
-        self.debounce = debounce_seconds
         self.executor = executor
         self.ducking_callback = ducking_callback
 
-        # Per-user state
-        self.buffers: Dict[str, list] = {}              # {user_name: [audio_chunks]}
-        self.last_transcription: Dict[str, float] = {}  # {user_name: timestamp}
-        self.speaking_state: Dict[str, bool] = {}       # {user_name: bool}
-        self.transcription_tasks: Dict[str, asyncio.Task] = {}  # {user_name: Task}
-        self.loop = asyncio.get_running_loop()
+        # Configurable timing parameters (same as Vosk)
+        self.chunk_duration = chunk_duration
+        self.chunk_overlap = chunk_overlap
+        self.processing_interval = processing_interval
 
-        logger.info(f"[Guild {vc.guild.id}] WhisperSink initialized (buffer={buffer_duration}s, debounce={debounce_seconds}s)")
+        # Per-user state (thread-safe with threading.Lock)
+        self.buffers = {}  # {user_id: deque([pcm_bytes])}
+        self.last_chunk_time = {}  # {user_id: timestamp}
+        self.buffer_lock = threading.Lock()  # Thread lock for buffer access
+
+        # Background processing task
+        self._processing_task = None
+        self._stop_processing = False
+
+        logger.info(f"[Guild {vc.guild.id}] WhisperSink initialized (chunk={chunk_duration}s, overlap={chunk_overlap}s, interval={processing_interval}s)")
 
     def write(self, source, data):
         """
-        Called for every audio packet from Discord.
+        Called for every audio packet from Discord (sync, must be FAST).
+
+        Simply appends to buffer - no async operations, no event loop scheduling.
+        Background task processes buffers periodically.
+        """
+        try:
+            if not data.pcm:
+                return
+
+            # source is the discord.Member object
+            member = source
+            if not member or member.bot:
+                return
+
+            # Fast synchronous buffer append with thread lock
+            with self.buffer_lock:
+                # Initialize user state on first packet
+                if member.id not in self.buffers:
+                    self.buffers[member.id] = deque()
+                    self.last_chunk_time[member.id] = time.time()
+
+                # Append audio to buffer (fast, no processing)
+                self.buffers[member.id].append(data.pcm)
+
+        except Exception as e:
+            logger.error(f"WhisperSink write error: {e}", exc_info=True)
+
+    def transcribe_user(self, pcm_data: bytes, member: discord.Member):
+        """
+        Transcribe audio using Whisper (runs in thread pool).
 
         Args:
-            source: discord.Member object who is speaking
-            data: VoiceData object containing PCM audio
-
-        Buffers audio per user and starts transcription tasks.
+            pcm_data: Raw PCM audio bytes (stereo int16)
+            member: Discord member who spoke
         """
-        if data.pcm is None:
-            return
-
-        # source is the discord.Member object directly
-        member = source
-        if not member or member.bot:
-            return
-
-        user_name = member.name
-
-        # Initialize per-user state
-        self.buffers.setdefault(user_name, [])
-        self.last_transcription.setdefault(user_name, 0)
-
-        # Convert PCM bytes to float32 numpy array
         try:
-            pcm_float = np.frombuffer(data.pcm, dtype=np.int16).astype(np.float32) / 32768.0
-            if pcm_float.size == 0:
-                return
+            # Convert stereo int16 to mono float32
+            audio_array = np.frombuffer(pcm_data, dtype=np.int16)
+            if len(audio_array) % 2 != 0:
+                audio_array = audio_array[:-1]
+            audio_array = audio_array.reshape(-1, 2)
+            mono_audio = audio_array.mean(axis=1).astype(np.float32) / 32768.0  # Normalize to [-1.0, 1.0]
         except Exception as e:
-            logger.debug(f"Failed to convert PCM data for {user_name}: {e}")
+            logger.error(f"Audio processing error for {member.display_name}: {e}", exc_info=True)
             return
-
-        # Add to user's buffer
-        self.buffers[user_name].append(pcm_float)
-
-        # Start transcription task if not running
-        if user_name not in self.transcription_tasks or self.transcription_tasks[user_name].done():
-            self.transcription_tasks[user_name] = self.loop.create_task(
-                self._resilient_transcribe(user_name, member)
-            )
-
-    async def _resilient_transcribe(self, user_name: str, member: discord.Member):
-        """
-        Background loop per user - keeps retrying on errors.
-
-        This resilient loop ensures transcription continues even if individual
-        transcription attempts fail or timeout.
-        """
-        while True:
-            chunks = self.buffers.get(user_name, [])
-            if not chunks:
-                await asyncio.sleep(1.0)
-                continue
-
-            try:
-                # 30 second timeout per transcription attempt
-                await asyncio.wait_for(
-                    self._transcribe_user(user_name, member),
-                    timeout=TIMEOUT_SECONDS
-                )
-            except asyncio.TimeoutError:
-                logger.warning(f"[Guild {self.vc.guild.id}] Whisper transcription timeout for {user_name}, restarting task...")
-                self.buffers[user_name] = []  # Clear buffer on timeout
-            except Exception:
-                logger.exception(f"[Guild {self.vc.guild.id}] Transcription loop crashed for {user_name}, restarting...")
-                self.buffers[user_name] = []  # Clear buffer on error
-
-            await asyncio.sleep(0.1)
-
-    async def _transcribe_user(self, user_name: str, member: discord.Member):
-        """
-        Process audio buffer for one user.
-
-        Implements rolling buffer, resampling, debouncing, and Whisper transcription.
-        """
-        buffer_samples = int(self.buffer_duration * SAMPLE_RATE)  # e.g., 3 seconds at 96kHz
-
-        chunks = self.buffers.get(user_name, [])
-        if not chunks:
-            return
-
-        # Concatenate all chunks
-        try:
-            audio_array = np.concatenate(chunks)
-        except Exception as e:
-            logger.debug(f"Failed to concatenate audio for {user_name}: {e}")
-            self.buffers[user_name] = []
-            return
-
-        # Keep only last N seconds (rolling buffer)
-        if len(audio_array) > buffer_samples:
-            audio_array = audio_array[-buffer_samples:]
-
-        if len(audio_array) == 0:
-            return
-
-        # Debouncing - don't transcribe too frequently
-        now = self.loop.time()
-        if now - self.last_transcription[user_name] < self.debounce:
-            return
-        self.last_transcription[user_name] = now
 
         # VAD: Check if audio contains speech using RMS energy threshold
-        # Get VAD settings from config (hot-swappable)
         from bot.config import config as bot_config
         speech_cfg = bot_config.config_manager.for_guild("Speech", self.vc.guild.id) if hasattr(bot_config, 'config_manager') else None
 
         if speech_cfg and speech_cfg.enable_vad:
-            rms = np.sqrt(np.mean(audio_array ** 2))
+            rms = np.sqrt(np.mean(mono_audio ** 2))
 
             # Normalize threshold for float32 audio (Whisper uses normalized audio 0.0-1.0)
             # Vosk uses int16 audio (~0-1000), so we need to scale threshold
@@ -205,84 +156,138 @@ class WhisperSink(voice_recv.BasicSink):
             normalized_threshold = speech_cfg.vad_silence_threshold * 0.0001
 
             if rms < normalized_threshold:
-                logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Skipping silence for {user_name} (RMS: {rms:.4f}, threshold: {normalized_threshold:.4f})")
-                self.buffers[user_name] = []  # Clear buffer
+                logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Skipping silence for {member.display_name} (RMS: {rms:.4f}, threshold: {normalized_threshold:.4f})")
                 return
 
-        # Resample 96kHz → 16kHz for Whisper
+        # Resample 48kHz → 16kHz for Whisper
         try:
-            target_len = int(len(audio_array) * TARGET_SR / SAMPLE_RATE)
-            audio_16k = resample(audio_array, target_len)
+            target_len = int(len(mono_audio) * TARGET_SR / SAMPLE_RATE)
+            audio_16k = resample(mono_audio, target_len)
         except Exception as e:
-            logger.warning(f"[Guild {self.vc.guild.id}] Resample failed for {user_name}: {e}")
-            self.buffers[user_name] = []
+            logger.warning(f"[Guild {self.vc.guild.id}] Resample failed for {member.display_name}: {e}")
             return
 
-        # Run Whisper in thread pool (blocking operation)
+        # Transcribe with Whisper (blocking call, runs in thread pool)
         try:
-            result = await self.loop.run_in_executor(
-                self.executor,
-                lambda: self.model.transcribe(audio_16k, fp16=False, language="en")
-            )
-            text = result["text"].strip()
+            result = self.model.transcribe(audio_16k, fp16=False, language="en")
+            whisper_text = result["text"].strip()
         except Exception as e:
-            logger.warning(f"[Guild {self.vc.guild.id}] Whisper transcription failed for {user_name}: {e}")
-            text = ""
-
-        # Clear buffer after transcription
-        self.buffers[user_name] = []
-
-        if not text:
+            logger.error(f"Whisper transcription error for {member.display_name}: {e}", exc_info=True)
             return
 
-        # Invoke callback with transcribed text
-        logger.info(f"[Guild {self.vc.guild.id}] 🗣 Whisper transcribed {user_name}: {text}")
+        if whisper_text:
+            logger.info(f"[Guild {self.vc.guild.id}] Whisper transcribed {member.display_name}: {whisper_text}")
+            # Invoke callback
+            try:
+                self.callback(member, whisper_text)
+            except Exception as e:
+                logger.error(f"Error in Whisper callback: {e}", exc_info=True)
+
+    def start_processing(self):
+        """Start background task to process audio buffers periodically."""
+        if self._processing_task is None or self._processing_task.done():
+            self._stop_processing = False
+            self._processing_task = asyncio.create_task(self._process_buffers_loop())
+            logger.info(f"[Guild {self.vc.guild.id}] Started Whisper buffer processing task")
+
+    async def _process_buffers_loop(self):
+        """Background task that periodically checks and processes audio buffers."""
         try:
-            self.callback(member, text)
+            while not self._stop_processing:
+                await asyncio.sleep(self.processing_interval)
+
+                # Get snapshot of users to process (thread-safe)
+                with self.buffer_lock:
+                    users_to_process = []
+                    current_time = time.time()
+
+                    for user_id, buffer in list(self.buffers.items()):
+                        # Check if enough time has elapsed for this user
+                        if current_time - self.last_chunk_time.get(user_id, 0) >= self.chunk_duration:
+                            if buffer:  # Only process if buffer has data
+                                # Concatenate all buffered audio
+                                pcm_data = b''.join(buffer)
+
+                                # Keep overlap for next chunk (prevents missing words)
+                                bytes_per_second = SAMPLE_RATE * CHANNELS * SAMPLE_WIDTH
+                                overlap_bytes = int(bytes_per_second * self.chunk_overlap)
+                                self.buffers[user_id] = deque([pcm_data[-overlap_bytes:]]) if len(pcm_data) > overlap_bytes else deque()
+                                self.last_chunk_time[user_id] = current_time
+
+                                # Add to processing list
+                                users_to_process.append((user_id, pcm_data))
+
+                # Process users outside the lock
+                for user_id, pcm_data in users_to_process:
+                    # Get member object
+                    member = self.vc.guild.get_member(user_id)
+                    if not member:
+                        continue
+
+                    # Process in thread pool (blocking Whisper call)
+                    self.vc.loop.run_in_executor(
+                        self.executor,
+                        self.transcribe_user,
+                        pcm_data,
+                        member
+                    )
+
+        except asyncio.CancelledError:
+            logger.info(f"[Guild {self.vc.guild.id}] Whisper buffer processing task cancelled")
+            raise
         except Exception as e:
-            logger.error(f"[Guild {self.vc.guild.id}] Error in Whisper callback: {e}", exc_info=True)
+            logger.error(f"[Guild {self.vc.guild.id}] Error in Whisper buffer processing: {e}", exc_info=True)
 
     @voice_recv.BasicSink.listener()
     def on_voice_member_speaking_start(self, member: discord.Member):
-        """Track when users start speaking (for ducking integration)."""
-        logger.debug(f"[Guild {self.vc.guild.id}] 🗣️ {member.name} started talking")
-        self.speaking_state[member.name] = True
+        """Handle member starting to speak."""
+        if member.bot:
+            return
+        logger.debug(f"[Guild {self.vc.guild.id}] 🎤 {member.display_name} started speaking")
 
-        # Notify ducking callback if provided
+        # Notify ducking callback
         if self.ducking_callback:
             try:
-                self.ducking_callback(self.vc.guild.id, member, True)
+                self.ducking_callback(self.vc.guild.id, member, is_speaking=True)
             except Exception as e:
                 logger.error(f"Error in ducking callback (start): {e}", exc_info=True)
 
     @voice_recv.BasicSink.listener()
     def on_voice_member_speaking_stop(self, member: discord.Member):
-        """Track when users stop speaking (for ducking integration)."""
-        logger.debug(f"[Guild {self.vc.guild.id}] 🔇 {member.name} stopped talking")
-        self.speaking_state[member.name] = False
+        """Handle member stopping speaking."""
+        if member.bot:
+            return
+        logger.debug(f"[Guild {self.vc.guild.id}] 🔇 {member.display_name} stopped speaking")
 
-        # Notify ducking callback if provided
+        # Process any remaining audio (thread-safe)
+        with self.buffer_lock:
+            if member.id in self.buffers and self.buffers[member.id]:
+                pcm_data = b''.join(self.buffers[member.id])
+                self.buffers[member.id].clear()
+
+                if pcm_data:
+                    self.vc.loop.run_in_executor(
+                        self.executor,
+                        self.transcribe_user,
+                        pcm_data,
+                        member
+                    )
+
+        # Notify ducking callback
         if self.ducking_callback:
             try:
-                self.ducking_callback(self.vc.guild.id, member, False)
+                self.ducking_callback(self.vc.guild.id, member, is_speaking=False)
             except Exception as e:
                 logger.error(f"Error in ducking callback (stop): {e}", exc_info=True)
 
     def cleanup(self):
-        """Cancel all transcription tasks and cleanup resources."""
-        logger.info(f"[Guild {self.vc.guild.id}] Cleaning up WhisperSink...")
-
-        # Cancel all transcription tasks
-        for user, task in self.transcription_tasks.items():
-            if not task.done():
-                task.cancel()
-                logger.debug(f"Cancelled transcription task for {user}")
-
-        # Clear buffers
+        """Cleanup resources and stop background task."""
+        self._stop_processing = True
+        if self._processing_task and not self._processing_task.done():
+            self._processing_task.cancel()
         self.buffers.clear()
-        self.last_transcription.clear()
-        self.speaking_state.clear()
-        self.transcription_tasks.clear()
+        self.last_chunk_time.clear()
+        logger.debug(f"[Guild {self.vc.guild.id}] WhisperSink cleaned up")
 
 
 class WhisperEngine(SpeechEngine):
@@ -362,18 +367,27 @@ class WhisperEngine(SpeechEngine):
                 logger.error(f"Failed to load Whisper model: {e}", exc_info=True)
                 raise
 
+        # Get Whisper config from ConfigManager
+        speech_cfg = self.bot.config_manager.for_guild("Speech")
+
         # Create and attach WhisperSink
         self.sink = WhisperSink(
             voice_client,
             self.callback,
             self.model,
-            self.buffer_duration,
-            self.debounce_seconds,
             self.executor,
-            ducking_callback=self.ducking_callback
+            ducking_callback=self.ducking_callback,
+            chunk_duration=speech_cfg.whisper_chunk_duration,
+            chunk_overlap=speech_cfg.whisper_chunk_overlap,
+            processing_interval=speech_cfg.whisper_processing_interval
         )
 
+        # Attach to voice client
         voice_client.listen(self.sink)
+
+        # Start background buffer processing task
+        self.sink.start_processing()
+
         self._is_listening = True
 
         logger.info(f"[Guild {voice_client.guild.id}] Started Whisper speech recognition")
