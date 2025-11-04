@@ -526,7 +526,7 @@ class TranscriptSessionManager:
         # Mark session as dirty for next flush
         session._dirty = True
 
-        logger.info(f"Added transcript to session {session.session_id}: {username}: {text[:50]}")
+        logger.debug(f"Added transcript to session {session.session_id}: {username}: {text[:50]}")
 
     def add_bot_message(
         self,

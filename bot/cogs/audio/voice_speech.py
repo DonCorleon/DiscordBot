@@ -695,7 +695,7 @@ class VoiceSpeechCog(BaseCog):
                 }
 
                 # ===== FAST: Console log (keep in callback) =====
-                logger.info(
+                logger.debug(
                     f"\033[92m[{guild_name}] [{member.id}] [{member.display_name}] : {transcribed_text}\033[0m"
                 )
 
@@ -724,7 +724,7 @@ class VoiceSpeechCog(BaseCog):
                         soundboard_cog = self.bot.get_cog("Soundboard")
                         if not soundboard_cog:
                             # No soundboard - just log and record
-                            logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                            logger.debug(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
                             if data_collector:
                                 data_collector.record_transcription(transcription_data)
                             return
@@ -745,7 +745,7 @@ class VoiceSpeechCog(BaseCog):
                                     await self.queue_sound(guild_id, soundfile, member, sound_key, volume, trigger_word, voice_channel_id, from_speech=True)
 
                         # Log transcription with triggers
-                        logger.info(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
+                        logger.debug(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
 
                         # Record to data collector (websocket broadcast)
                         if data_collector:
