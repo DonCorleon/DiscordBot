@@ -103,8 +103,8 @@ class FasterWhisperSink(voice_recv.BasicSink):
             return
 
         member = source
-        if member.bot:
-            return  # Ignore bots
+        if not member or member.bot:
+            return  # Ignore bots and None members
 
         user_name = str(member)
 
