@@ -66,6 +66,14 @@ Sound queued → Async queue processor → Plays via Discord
 - Prevents blocking main event loop
 - 30-second timeout per sound with error recovery
 
+**Speech Recognition System:**
+- Three engines: Vosk (local, fast), Whisper (local, accurate), faster-whisper (local, fast + accurate)
+- All engines use unified buffering pattern from Vosk's proven implementation
+- Periodic processing: chunks audio every 4.0s with 0.5s overlap
+- Thread-safe buffer operations with `threading.Lock`
+- VAD (Voice Activity Detection) filters silence
+- Engine-specific transcription in thread pool (non-blocking)
+
 ### Key Files and Their Purposes
 
 **`cogs/voicespeech.py`** - Voice reception and speech recognition hub
@@ -105,12 +113,43 @@ Sound queued → Async queue processor → Plays via Discord
 - Decorators: `@handle_errors()`, `@safe_operation()`
 - Helper classes: `UserFeedback`, `Validator`, `ProgressTracker`
 
+**Speech Recognition Engines** (`bot/core/audio/speech_engines/`)
+- `vosk.py` - VoskSink (voice_recv.AudioSink), VoskEngine
+  - Fast, local speech recognition using Vosk library
+  - Uses KaldiRecognizer with per-user state
+  - CRITICAL: Must call recognizer.Reset() after recognizer.Result()
+- `whisper.py` - WhisperSink (voice_recv.BasicSink), WhisperEngine
+  - High-accuracy local speech recognition using OpenAI Whisper
+  - Resamples 48kHz → 16kHz for Whisper model
+- `faster_whisper.py` - FasterWhisperSink (voice_recv.BasicSink), FasterWhisperEngine
+  - CTranslate2 backend, 4x faster than openai-whisper
+  - GPU acceleration support
+- `config.py` - Unified speech configuration with shared `speech_*` settings
+- `base.py` - SpeechEngine abstract base class
+
 ### Critical Implementation Details
 
 **Monkey Patching (main.py:47-56):**
 - Patches `discord-ext-voice-recv` `_remove_ssrc()` method
 - Handles missing reader gracefully to prevent crashes
 - Required for voice_recv library compatibility
+
+**Speech Engine Architecture:**
+- **Three engines available:** Vosk, Whisper, faster-whisper
+- **Unified buffering pattern:** All engines use Vosk's proven periodic processing
+- **Inheritance requirements (CRITICAL - DO NOT CHANGE):**
+  - `VoskSink` MUST inherit from `voice_recv.AudioSink`
+  - `WhisperSink` and `FasterWhisperSink` MUST inherit from `voice_recv.BasicSink`
+  - These base classes have different signatures and behaviors - NOT interchangeable
+- **Buffering flow:**
+  1. `write()` - Fast synchronous append to buffer (called for every packet)
+  2. Background task checks buffers every 0.1s
+  3. When chunk_duration elapsed (4.0s), process audio in thread pool
+  4. Keep chunk_overlap (0.5s) to prevent missing words between chunks
+  5. On speaking stop, process remaining audio immediately
+- **Thread safety:** All buffer access protected by `threading.Lock`
+- **Audio format:** Discord sends 48kHz stereo int16 PCM
+- **Configuration:** Shared settings use `speech_*` prefix, engine-specific use `<engine>_*`
 
 **Guild Isolation:**
 - All voice/audio operations pass `guild_id` to prevent cross-guild interference
@@ -119,6 +158,7 @@ Sound queued → Async queue processor → Plays via Discord
 **Thread Safety:**
 - All async operations from sync contexts use `asyncio.run_coroutine_threadsafe()`
 - Proper event loop handling for cross-thread calls
+- Speech engine buffers use `threading.Lock` for thread-safe access
 
 **Memory Efficiency:**
 - Deques use `maxlen` to auto-discard old data

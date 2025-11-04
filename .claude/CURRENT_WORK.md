@@ -1,363 +1,190 @@
-# Current Work: Voice Connection Stability Fixes
+# Current Work: Speech Engine Unification
 
 **Branch:** `master`
-**Last Updated:** 2025-11-03
-**Status:** ✅ OpusError handling and keepalive fixes implemented
+**Last Updated:** 2025-11-04
+**Status:** ✅ Speech engines unified with Vosk's buffering pattern
 
 ---
 
 ## 📍 Current Focus
 
-**Status**: Fixed five critical issues:
-1. ✅ OpusError crashes (COMPLETED - monkey patch working)
-2. ✅ Keepalive struct.error (COMPLETED - added connection ready check)
-3. ✅ pyttsx3 SEGFAULT (COMPLETED - removed engine.stop() calls)
-4. ✅ Vosk executor shutdown (COMPLETED - defensive fix)
-5. ✅ **Vosk KaldiRecognizer SEGFAULT** (COMPLETED - Reset() after Result()) **← THE REAL FIX**
-6. ⚠️ OpusError reconnection timeout (OBSERVED - needs investigation)
+**Status**: Speech engine refactoring completed
 
-**Goal**: Ensure stable voice connections and eliminate all crashes.
+**Goal**: Unified buffering implementation across all speech engines (Vosk, Whisper, faster-whisper) using Vosk's proven periodic processing pattern.
 
-**Latest**: Vosk crash was caused by not resetting KaldiRecognizer after Result() call.
-Internal queue state was corrupting, causing assertion failure in Vosk C++ code.
+**Latest**: All three speech engines now use identical buffering logic with unified configuration settings.
 
 ---
 
-## 🔍 Problem Analysis
+## 🎯 Completed Work (Current Session)
 
-**Error Observed:**
-```
-[2025-11-03 18:22:52] [ERROR] discord.ext.voice_recv.router: Error in <PacketRouter> loop
-discord.opus.OpusError: corrupted stream
-```
+### ✅ 1. Speech Engine Buffering Unification (Commits: fe48d14, 0018fd0)
 
-**Root Cause:**
-- `discord-ext-voice-recv` library crashes when Discord audio packets are corrupted/lost
-- OpusError is raised in `discord.opus.Decoder.decode()` during packet decoding
-- Exception bubbles up through `PacketDecoder._decode_packet()` → `PacketRouter._do_run()`
-- **Entire PacketRouter thread dies** → Speech recognition stops completely
-- User must manually restart listening with `~start` command
+**Problem**:
+- Each speech engine had different buffering implementations
+- Whisper and faster-whisper used per-user resilient loops (complex, error-prone)
+- Different config field names across engines caused confusion
+- faster-whisper was very laggy due to missing config fields
 
-**Impact:** Complete loss of speech recognition until manual intervention.
+**Solution**:
+Applied Vosk's proven buffering pattern to all engines while maintaining proper inheritance:
+- **VoskSink**: Uses `voice_recv.AudioSink` - left completely untouched ✅
+- **WhisperSink**: Uses `voice_recv.BasicSink` - refactored to use Vosk pattern
+- **FasterWhisperSink**: Uses `voice_recv.BasicSink` - refactored to use Vosk pattern
 
----
+**Key Changes**:
+1. **Periodic Processing Pattern**:
+   - Single background task per sink checks all users periodically
+   - Processes audio chunks at regular intervals (default 4.0s)
+   - Chunk overlap prevents missing words (default 0.5s)
+   - Thread-safe buffer access with `threading.Lock`
 
-## 💡 Proposed Solution
+2. **Correct Audio Handling**:
+   - Fixed SAMPLE_RATE: 96000 → 48000 (Discord's actual rate)
+   - Store raw PCM bytes (not pre-converted floats)
+   - Use `member.id` for buffer keys (not `member.name`)
+   - Process remaining audio when user stops speaking
 
-### Approach: Monkey Patch + Threshold-Based Reconnection
+3. **Unified Configuration** (commit 0018fd0):
+   - Renamed: `vosk_chunk_duration` → `speech_chunk_duration`
+   - Renamed: `vosk_chunk_overlap` → `speech_chunk_overlap`
+   - Renamed: `vosk_processing_interval` → `speech_processing_interval`
+   - Category: "Audio/Speech Recognition" (shared by all engines)
+   - All engines now read same config fields
 
-**Primary Behavior:**
-- Patch `PacketDecoder._decode_packet()` to catch OpusError
-- Skip bad packets (return None for pcm)
-- Continue with existing connection (no disruption to users)
+**Files Modified**:
+- `bot/core/audio/speech_engines/whisper.py` - Applied Vosk pattern
+- `bot/core/audio/speech_engines/faster_whisper.py` - Applied Vosk pattern
+- `bot/core/audio/speech_engines/config.py` - Renamed fields to speech_*
+- `bot/core/audio/speech_engines/vosk.py` - Updated to use speech_* fields
 
-**Threshold-Based Reconnection:**
-- Track OpusErrors per guild with timestamps
-- When X errors occur within Y seconds: auto-reconnect
-- Configurable thresholds via ConfigManager
-
-**Logging:**
-- WARNING level for visibility
-- Rate-limited (log every Nth error) to prevent spam
-- Include error count and window stats
-
-### User Requirements (from clarification):
-1. ✅ Continue with existing connection (skip bad packets)
-2. ✅ Add threshold-based reconnection with ConfigManager vars
-3. ✅ WARNING level with rate limiting (mixture of approaches)
-
----
-
-## 📋 Implementation Plan
-
-### 1. Config Fields (VoiceConfig)
-Add to `bot/cogs/audio/voice_speech.py` (~line 79-103):
-```python
-opus_error_threshold: int = 5  # Errors before reconnecting
-opus_error_window: int = 10    # Time window in seconds
-opus_error_log_interval: int = 5  # Log every Nth error
-```
-
-### 2. Monkey Patch
-Add to `bot/cogs/audio/voice_speech.py` (~line 137-220):
-- Patch `discord.ext.voice_recv.opus.PacketDecoder._decode_packet()`
-- Wrap `self._decoder.decode()` in try/except OpusError
-- On error: call `VoiceSpeechCog._handle_opus_error()`, return None
-- Continue with original data structure return
-
-### 3. Error Tracking
-Add to `VoiceSpeechCog.__init__` (~line 176):
-```python
-self.opus_error_tracker = {}  # {guild_id: {"timestamps": deque, "logged_count": int}}
-```
-
-### 4. Error Handler Method
-Add to `VoiceSpeechCog` (~line 442-510):
-- `_handle_opus_error(guild_id, error, packet)`:
-  - Track error timestamp in sliding window
-  - Rate-limited logging (every Nth error)
-  - Check threshold: if exceeded, schedule reconnection task
-  - Clear tracker to prevent duplicate reconnections
-
-### 5. Reconnection Method
-Add to `VoiceSpeechCog` (~line 512-575):
-- `_reconnect_voice_after_opus_errors(guild_id)`:
-  - Stop listening, disconnect, wait 1.5s
-  - Reconnect to same channel
-  - Restart speech listener
-  - Clear error tracker (fresh start)
-
-### 6. Cleanup
-Update `cog_unload()` (~line 439):
-- Clear `self.opus_error_tracker`
-
----
-
-## 📁 Files to Modify
-
-**Single File:**
-- `bot/cogs/audio/voice_speech.py`
-  - Add 3 config fields
-  - Add monkey patch function
-  - Add error tracker to __init__
-  - Add 2 new methods (_handle_opus_error, _reconnect_voice_after_opus_errors)
-  - Update cog_unload
-
-**No other files need changes** - self-contained fix.
-
----
-
-## ✅ 7. Unified TTS Engine System (Committed)
-   - ✅ Created TTS engine abstraction layer (bot/core/tts_engines/)
-   - ✅ Base TTSEngine class with generate_audio(), list_voices(), get_default_voice()
-   - ✅ Three engine implementations:
-     - Pyttsx3Engine: Local TTS (espeak/SAPI)
-     - EdgeEngine: Microsoft Edge TTS (cloud neural)
-     - PiperEngine: Piper TTS (local neural, high quality)
-   - ✅ Added tts_engine config field to switch engines via web UI
-   - ✅ Refactored tts.py to use engine system with per-guild caching
-   - ✅ Updated ~voices command to show engine-specific voices
-   - ✅ Engine auto-switches when config changes
-   - ✅ Fallback to pyttsx3 if selected engine unavailable
-   - ✅ Committed (commit: f0a3237)
-
-   **Note**: edge_tts.py cog still exists with separate `~edge` commands. It can be removed/deprecated now that functionality is merged into main TTS system.
-
-## ✅ Previously Completed (Earlier Session)
-
-### 1. Version Tracking System
-
-**Created `bot/version.py`**:
-- Semantic versioning (MAJOR.MINOR.PATCH)
-- Current version: 1.0.0
-- `get_version()` and `get_version_info()` functions
-- `VERSION_HISTORY` dict for change descriptions
-- Version logged on bot startup in `bot/main.py:303-308`
-
-### 2. Config Migration System
-
-**Created `bot/core/config_migrations.py`**:
-- `ConfigMigration` dataclass for representing migrations
-- `ConfigMigrationManager` class to manage all migrations
-- Automatic detection and application of legacy config keys
-- Full logging of applied migrations
-
-**Integrated into `bot/core/config_system.py`**:
-- Migrations applied automatically on global config load
-- Migrations applied automatically on guild config load
-- Migrated configs saved to disk immediately
-- Helper methods: `_flatten_config()`, `_unflatten_config()`
-
-**First Migration**: `auto_join_timeout` → `auto_disconnect_timeout`
-- Old name was misleading (controls disconnect, not join timeout)
-- Automatic backward compatibility for old configs
-- Updated all code references and documentation
-
-### 3. Removed Duplicate/Dead Config Settings (4 total)
-
-**❌ `ducking_transition_ms` (SoundboardConfig)**:
-- Location: `bot/cogs/audio/soundboard.py`
-- Reason: Dead code - never used anywhere
-- System uses `audio_duck_transition_ms` from SystemConfig instead
-
-**❌ `sound_playback_timeout` (SoundboardConfig)**:
-- Location: `bot/cogs/audio/soundboard.py`
-- Reason: Duplicate - only VoiceConfig version was used
-- Kept VoiceConfig version
-
-**❌ `sound_queue_warning_size` (SoundboardConfig)**:
-- Location: `bot/cogs/audio/soundboard.py`
-- Reason: Dead code - never used anywhere
-- Kept VoiceConfig version (runtime warnings) and SystemConfig version (health monitoring) - they serve different purposes
-
-**❌ `keepalive_interval` (VoiceConfig)**:
-- Location: `bot/cogs/audio/voice_speech.py`
-- Reason: Duplicate - consolidated to SystemConfig
-- Updated `voice_speech.py:635` to use SystemConfig version
-- More permissive max (300s vs 120s)
-
-### 4. Reorganized Config Categories (9 settings)
-
-**Auto-Disconnect Feature** - Now grouped together:
-```
-enable_auto_disconnect (System) → "Audio/Voice Channels/Auto-Disconnect"
-auto_disconnect_timeout (Voice) → "Audio/Voice Channels/Auto-Disconnect"
-```
-
-**Auto-Join Feature**:
-```
-auto_join_enabled (Voice) → "Audio/Voice Channels/Auto-Join"
-```
-
-**Speech Recognition** - Hierarchical structure:
-```
-enable_speech_recognition (System) → "Audio/Speech Recognition" (master toggle)
-engine (Speech) → "Audio/Speech Recognition" (engine selector)
-vosk_model_path (Speech) → "Audio/Speech Recognition/Vosk"
-whisper_model (Speech) → "Audio/Speech Recognition/Whisper"
-whisper_buffer_duration (Speech) → "Audio/Speech Recognition/Whisper"
-whisper_debounce_seconds (Speech) → "Audio/Speech Recognition/Whisper"
-```
-
-**Voice Channels**:
-```
-keepalive_interval (System) → "Audio/Voice Channels"
-```
-
----
-
-## 📦 Files Changed (This Session)
-
-### Created Files:
-- `bot/version.py` - Version tracking system
-- `bot/core/config_migrations.py` - Config migration framework
-- `test_migration.py` - Test script for migration system (all tests pass ✅)
-- `docs/VERSION_AND_MIGRATION_SYSTEM.md` - Version/migration documentation
-- `docs/CONFIG_CLEANUP_AND_REORGANIZATION.md` - Cleanup documentation
-
-### Modified Files:
-- `bot/main.py` - Added version logging on startup
-- `bot/core/config_system.py` - Integrated migration system, added flatten/unflatten helpers
-- `bot/cogs/audio/soundboard.py` - Removed 3 dead/duplicate settings
-- `bot/cogs/audio/voice_speech.py` - Removed 1 duplicate, updated categories, updated keepalive usage, renamed auto_join_timeout
-- `bot/core/system_config.py` - Updated 3 categories
-- `bot/core/audio/speech_engines/config.py` - Organized engine-specific settings into sub-categories
-- `docs/CONFIG_SYSTEM.md` - Updated field name
-- `docs/CONFIG_CATEGORY_MIGRATION.md` - Noted legacy name
-- `docs/config_inventory.json` - Updated with legacy_name
+**Benefits**:
+- ✅ Consistent buffering behavior across all engines
+- ✅ Same proven low-latency pattern that works in Vosk
+- ✅ Proper chunk overlap prevents missing words
+- ✅ Thread-safe operations
+- ✅ Single source of truth for configuration
+- ✅ Fixed faster-whisper lag issues
 
 ---
 
 ## 🔄 Recent Commits
 
-From `backup-2025-11-01-current` branch:
 ```
-c40cb74 fix: restore write() error handling to prevent sink crashes on reconnection
-f276c9a fix: remove unnecessary PyAudio initialization causing ALSA/JACK spam
-224eea1 fix: remove write() error handling that was hiding real exceptions
-851c08e fix: add timeout to PacketRouter wait to prevent infinite blocking
-bac70b8 fix: catch JSONDecodeError from speech recognition text
+0018fd0 refactor: rename vosk_* config fields to speech_* for all engines
+fe48d14 refactor: apply Vosk's buffering pattern to Whisper and FasterWhisper
+d722528 Revert "refactor: unify speech engine buffering using BaseSpeechSink"
+946d0fc refactor: unify speech engine buffering using BaseSpeechSink (REVERTED - broke VoskSink)
 ```
+
+**Note on Reverted Commit**:
+The first attempt (946d0fc) tried to create a shared `BaseSpeechSink` class but incorrectly:
+- Forced VoskSink to use `BasicSink` instead of `AudioSink` (breaking change)
+- Used wrong `super().__init__()` signature
+- Broke PCM data reception completely
+- Lesson: Never assume - verify inheritance requirements
 
 ---
 
-## 🔄 Completed Tasks (Current Session)
+## 📋 Speech Engine Architecture
 
-### ✅ 1. OpusError Monkey Patch (Committed)
-   - ✅ Added 3 config fields to VoiceConfig (lines 115-144)
-   - ✅ Added monkey patch for PacketDecoder._decode_packet() (lines 169-229)
-   - ✅ Added error tracker to VoiceSpeechCog.__init__ (line 272)
-   - ✅ Added _handle_opus_error() method (lines 912-958)
-   - ✅ Added _reconnect_voice_after_opus_errors() method (lines 960-1020)
-   - ✅ Updated cog_unload() cleanup (line 536)
-   - ✅ Fixed TypeError in monkey patch return value
-   - ✅ Committed and pushed
+### Buffering Pattern (Vosk's approach, now used by all):
 
-### ✅ 2. TTS Dynamic Voice System (Committed)
-   - ✅ Removed hardcoded Windows-only voices
-   - ✅ Added _discover_voices() for cross-platform compatibility
-   - ✅ Added tts_default_voice config field
-   - ✅ Updated voice selection to use discovered voices
-   - ✅ Fixed tuple choice validation in config system
-   - ✅ Fixed web UI dropdown handling for tuple choices
-   - ✅ Committed and pushed
+```python
+# 1. write() - Fast synchronous method (called for every packet)
+def write(self, source, data):
+    with self.buffer_lock:  # Thread-safe
+        if member.id not in self.buffers:
+            self.buffers[member.id] = deque()
+            self.last_chunk_time[member.id] = time.time()
+        self.buffers[member.id].append(data.pcm)  # Raw PCM bytes
 
-### ✅ 3. Keepalive struct.error Fix (Committed)
-   - ✅ Added check for MISSING/invalid ssrc before sending packets
-   - ✅ Prevents struct.error when connection not fully established
-   - ✅ Added debug logging for skipped keepalives
-   - ✅ Committed (commit: 03e6cc1)
+# 2. Background task - Periodic processing
+async def _process_buffers_loop(self):
+    while not self._stop_processing:
+        await asyncio.sleep(self.processing_interval)  # 0.1s
 
-### ✅ 4. pyttsx3 SEGFAULT Fix (Committed)
-   - ✅ Removed engine.stop() from _discover_voices()
-   - ✅ Removed engine.stop() from generate_tts()
-   - ✅ Added comments explaining why stop() causes segfaults
-   - ✅ Prevents crashes on bot startup and TTS usage
-   - ✅ Committed (commit: 3c345cb)
+        with self.buffer_lock:
+            for user_id, buffer in self.buffers.items():
+                if time.time() - self.last_chunk_time[user_id] >= self.chunk_duration:
+                    pcm_data = b''.join(buffer)
+                    # Keep overlap for next chunk
+                    overlap_bytes = int(SAMPLE_RATE * CHANNELS * SAMPLE_WIDTH * self.chunk_overlap)
+                    self.buffers[user_id] = deque([pcm_data[-overlap_bytes:]])
+                    # Process in thread pool
+                    self.vc.loop.run_in_executor(self.executor, self.transcribe_user, pcm_data, member)
 
-### ✅ 5. Vosk ThreadPoolExecutor SEGFAULT Fix (Committed)
-   - ✅ Changed executor.shutdown(wait=False) to wait=True
-   - ✅ Prevents forceful termination of Vosk native code
-   - ✅ Committed (commit: ebca5d4)
-   - ⚠️ NOTE: This was a good defensive fix but NOT the root cause
-
-### ✅ 6. Vosk KaldiRecognizer Reset SEGFAULT Fix (Committed) **THE REAL FIX**
-   - ✅ Added recognizer.Reset() after recognizer.Result()
-   - ✅ Added reset on exception to clear corrupted state
-   - ✅ Fixes Vosk assertion failure: queue_.empty()
-   - ✅ Root cause: Reusing recognizer without reset corrupts internal state
-   - ✅ Committed (commit: 62dc431)
-   - **THIS IS THE ACTUAL FIX FOR THE VOSK CRASHES**
-
-## ⚠️ Known Issues
-
-### 1. OpusError Reconnection Timeout
-**Status**: Observed in production logs, not yet investigated
-
-**Error**:
-```
-TimeoutError during channel.connect() in _reconnect_voice_after_opus_errors()
+# 3. on_voice_member_speaking_stop - Process remaining audio
+def on_voice_member_speaking_stop(self, member):
+    with self.buffer_lock:
+        if member.id in self.buffers and self.buffers[member.id]:
+            pcm_data = b''.join(self.buffers[member.id])
+            self.buffers[member.id].clear()
+            self.vc.loop.run_in_executor(self.executor, self.transcribe_user, pcm_data, member)
 ```
 
-**Impact**: When OpusError threshold is exceeded, auto-reconnect times out instead of successfully reconnecting.
+### Configuration (Unified):
 
-**Potential Causes**:
-- Discord voice server not responding
-- Bot trying to reconnect too quickly after disconnect
-- May need longer timeout or delay before reconnect
+```python
+# bot/core/audio/speech_engines/config.py
+speech_chunk_duration: float = 4.0       # Process audio every N seconds
+speech_chunk_overlap: float = 0.5        # Overlap to prevent missing words
+speech_processing_interval: float = 0.1  # Buffer check frequency
+```
 
-**Next Steps**:
-- Add longer delay before reconnect attempt (currently 1.5s)
-- Increase connect timeout
-- Add retry logic with exponential backoff
-- Consider whether auto-reconnect is needed (OpusError skip might be sufficient)
+### Engine-Specific Transcription:
+
+Each engine implements `transcribe_user(pcm_data: bytes, member: discord.Member)`:
+
+**Vosk**:
+- Convert stereo → mono int16
+- Feed to KaldiRecognizer
+- Call Result() then Reset()
+
+**Whisper/FasterWhisper**:
+- Convert stereo → mono float32
+- Resample 48kHz → 16kHz
+- Run model.transcribe()
 
 ---
 
-## 📝 Key Improvements
+## ✅ Previously Completed
 
-### Benefits:
-- ✅ **Version Tracking**: Bot version logged on startup for debugging
-- ✅ **Backward Compatibility**: Old configs automatically migrated
-- ✅ **Cleaner Codebase**: 4 fewer unused settings
-- ✅ **Better Organization**: Related settings grouped together
-- ✅ **Clearer UI**: Web dashboard shows logical groupings
-- ✅ **Easier Configuration**: Users find related settings in one place
-- ✅ **Maintainability**: Clear which settings affect which features
+### 7. Unified TTS Engine System
+   - ✅ Created TTS engine abstraction layer
+   - ✅ Three engines: Pyttsx3, Edge, Piper
+   - ✅ Per-guild engine caching
+   - ✅ Auto-switch on config changes
+   - ✅ Committed (f0a3237)
 
-### New Category Structure:
+### 6. Vosk KaldiRecognizer Reset Fix
+   - ✅ Added Reset() after Result()
+   - ✅ Fixes assertion failure crashes
+   - ✅ Committed (62dc431)
 
-**Audio/Voice Channels**:
-- keepalive_interval
-- Auto-Join (sub-category): auto_join_enabled
-- Auto-Disconnect (sub-category): enable_auto_disconnect, auto_disconnect_timeout
+### 5. Vosk Executor Shutdown Fix
+   - ✅ Changed wait=False to wait=True
+   - ✅ Prevents segfaults in native code
+   - ✅ Committed (ebca5d4)
 
-**Audio/Speech Recognition**:
-- enable_speech_recognition (master toggle)
-- engine (engine selector)
-- Vosk (sub-category): vosk_model_path
-- Whisper (sub-category): whisper_model, whisper_buffer_duration, whisper_debounce_seconds
-- Advanced (sub-category): voice_speech_phrase_time_limit, voice_speech_error_log_threshold, voice_speech_chunk_size
+### 4. pyttsx3 SEGFAULT Fix
+   - ✅ Removed engine.stop() calls
+   - ✅ Committed (3c345cb)
+
+### 3. Keepalive struct.error Fix
+   - ✅ Check for valid ssrc before sending
+   - ✅ Committed (03e6cc1)
+
+### 2. TTS Dynamic Voice System
+   - ✅ Cross-platform voice discovery
+   - ✅ tts_default_voice config field
+   - ✅ Fixed tuple choice validation
+   - ✅ Committed
+
+### 1. OpusError Monkey Patch
+   - ✅ Catch and skip corrupted packets
+   - ✅ Threshold-based reconnection
+   - ✅ Committed
 
 ---
 
@@ -367,46 +194,57 @@ TimeoutError during channel.connect() in _reconnect_voice_after_opus_errors()
 
 ```
 Current branch: master
-Bot Version: 1.0.0
-Status: Planning OpusError monkey patch - ready to implement
+Status: Speech engine unification complete
+Last Commit: 0018fd0
 
-Problem:
-- OpusError: corrupted stream crashes PacketRouter thread
-- Speech recognition stops completely until manual restart
-- Occurs when Discord audio packets are corrupted/lost
+Recent Work:
+- Unified all speech engines to use Vosk's buffering pattern
+- Renamed config fields: vosk_* → speech_*
+- Fixed faster-whisper lag issues
+- All engines now share same timing configuration
 
-Solution Plan:
-1. Monkey patch PacketDecoder._decode_packet() to catch OpusError
-2. Skip bad packets (return None) and continue connection
-3. Track errors per guild with sliding window
-4. Auto-reconnect when threshold exceeded (5 errors in 10 seconds)
-5. Rate-limited WARNING logging (every 5th error)
+Key Files:
+- bot/core/audio/speech_engines/vosk.py (unchanged, uses AudioSink)
+- bot/core/audio/speech_engines/whisper.py (refactored to Vosk pattern)
+- bot/core/audio/speech_engines/faster_whisper.py (refactored to Vosk pattern)
+- bot/core/audio/speech_engines/config.py (unified speech_* fields)
 
-Implementation Details:
-- Single file change: bot/cogs/audio/voice_speech.py
-- Add 3 config fields (opus_error_threshold, opus_error_window, opus_error_log_interval)
-- Add monkey patch function (~line 137-220)
-- Add error tracker to __init__ (~line 176)
-- Add 2 methods: _handle_opus_error(), _reconnect_voice_after_opus_errors()
-- Update cog_unload() for cleanup
-
-User Requirements:
-✅ Continue with existing connection (skip bad packets)
-✅ Add threshold-based reconnection with ConfigManager
-✅ WARNING level logging with rate limiting
-
-Next Steps:
-1. Implement the monkey patch and methods
-2. Test compilation
-3. Test with low threshold to verify reconnection
-4. Commit when working
+Important Lessons:
+- VoskSink uses AudioSink, others use BasicSink - DO NOT change base classes
+- Always verify inheritance requirements before refactoring
+- Apply patterns, not forced abstractions
 ```
-
-**Detailed Implementation Reference:**
-See "Implementation Plan" section above for line-by-line code structure and placement.
 
 ---
 
-**Document Version**: 2.0
-**Last Updated By**: Claude (2025-11-03)
-**Next Review**: After OpusError fix is implemented and tested
+## 📝 Key Architecture Notes
+
+### Speech Engine Design Principles:
+
+1. **Inheritance Matters**:
+   - VoskSink MUST use `voice_recv.AudioSink`
+   - WhisperSink/FasterWhisperSink MUST use `voice_recv.BasicSink`
+   - These are different classes with different behaviors - NOT interchangeable
+
+2. **Buffering Pattern**:
+   - Use Vosk's proven periodic processing approach
+   - Single background task per sink (not per-user)
+   - Thread-safe buffer operations with `threading.Lock`
+   - Process remaining audio on speaking stop
+
+3. **Configuration**:
+   - Shared timing settings: `speech_*` prefix
+   - Engine-specific settings: `<engine>_*` prefix
+   - All in category "Audio/Speech Recognition"
+
+4. **Audio Format**:
+   - Discord sends: 48kHz stereo int16 PCM
+   - Vosk expects: 48kHz mono int16
+   - Whisper expects: 16kHz mono float32
+   - Always store raw PCM, convert in transcription
+
+---
+
+**Document Version**: 3.0
+**Last Updated By**: Claude (2025-11-04)
+**Next Review**: After production testing of unified speech engines
