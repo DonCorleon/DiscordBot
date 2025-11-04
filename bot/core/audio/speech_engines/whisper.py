@@ -191,17 +191,23 @@ class WhisperSink(voice_recv.BasicSink):
         self.last_transcription[user_name] = now
 
         # VAD: Check if audio contains speech using RMS energy threshold
-        # Calculate RMS (Root Mean Square) energy of the float32 audio
-        rms = np.sqrt(np.mean(audio_array ** 2))
+        # Get VAD settings from config (hot-swappable)
+        from bot.config import config as bot_config
+        speech_cfg = bot_config.config_manager.for_guild("Speech", self.vc.guild.id) if hasattr(bot_config, 'config_manager') else None
 
-        # Threshold for silence detection (normalized float32 audio: ~0.01-0.1 for speech)
-        # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
-        SILENCE_THRESHOLD = 0.01
+        if speech_cfg and speech_cfg.enable_vad:
+            rms = np.sqrt(np.mean(audio_array ** 2))
 
-        if rms < SILENCE_THRESHOLD:
-            logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Skipping silence for {user_name} (RMS: {rms:.4f})")
-            self.buffers[user_name] = []  # Clear buffer
-            return
+            # Normalize threshold for float32 audio (Whisper uses normalized audio 0.0-1.0)
+            # Vosk uses int16 audio (~0-1000), so we need to scale threshold
+            # float32 typical speech RMS: ~0.01-0.1, int16 typical speech RMS: ~100-1000
+            # Scale factor: 0.01 / 100 = 0.0001
+            normalized_threshold = speech_cfg.vad_silence_threshold * 0.0001
+
+            if rms < normalized_threshold:
+                logger.debug(f"[Guild {self.vc.guild.id}] Whisper: Skipping silence for {user_name} (RMS: {rms:.4f}, threshold: {normalized_threshold:.4f})")
+                self.buffers[user_name] = []  # Clear buffer
+                return
 
         # Resample 96kHz → 16kHz for Whisper
         try:

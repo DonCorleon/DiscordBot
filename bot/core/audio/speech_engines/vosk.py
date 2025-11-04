@@ -149,17 +149,18 @@ class VoskSink(voice_recv.AudioSink):
                 return
 
             # VAD: Check if audio contains speech using RMS energy threshold
-            # Calculate RMS (Root Mean Square) energy
-            rms = np.sqrt(np.mean(mono_audio.astype(np.float32) ** 2))
+            # Get VAD settings from config (hot-swappable)
+            from bot.config import config as bot_config
+            speech_cfg = bot_config.config_manager.for_guild("Speech", self.vc.guild.id) if hasattr(bot_config, 'config_manager') else None
 
-            # Threshold for silence detection (typical speech is > 500 RMS)
-            # Adjust based on your environment (lower = more sensitive, higher = less sensitive)
-            # Lowered to 100 based on observed RMS values (280-290 for normal speech)
-            SILENCE_THRESHOLD = 100
+            if speech_cfg and speech_cfg.enable_vad:
+                # Calculate RMS (Root Mean Square) energy
+                rms = np.sqrt(np.mean(mono_audio.astype(np.float32) ** 2))
 
-            if rms < SILENCE_THRESHOLD:
-                logger.debug(f"[Guild {self.vc.guild.id}] Vosk: Skipping silence for {member.display_name} (RMS: {rms:.1f})")
-                return
+                # Check against threshold
+                if rms < speech_cfg.vad_silence_threshold:
+                    logger.debug(f"[Guild {self.vc.guild.id}] Vosk: Skipping silence for {member.display_name} (RMS: {rms:.1f}, threshold: {speech_cfg.vad_silence_threshold})")
+                    return
 
             try:
                 # Feed to Vosk (inside lock - accesses recognizer state)

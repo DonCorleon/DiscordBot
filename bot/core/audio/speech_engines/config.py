@@ -22,6 +22,24 @@ class SpeechConfig(ConfigBase):
         requires_restart=True
     )
 
+    # Voice Activity Detection (VAD) Settings
+    enable_vad: bool = config_field(
+        default=True,
+        description="Enable Voice Activity Detection to skip silence (improves performance and accuracy)",
+        category="Audio/Speech Recognition/VAD",
+        guild_override=True
+    )
+
+    vad_silence_threshold: float = config_field(
+        default=100.0,
+        description="VAD silence threshold - lower = more sensitive (processes more audio), higher = less sensitive (skips more silence)",
+        category="Audio/Speech Recognition/VAD",
+        guild_override=False,
+        admin_only=True,
+        min_value=10.0,
+        max_value=1000.0
+    )
+
     # Vosk Settings
     vosk_model_path: str = config_field(
         default="data/speechrecognition/vosk",

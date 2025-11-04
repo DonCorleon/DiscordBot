@@ -62,14 +62,18 @@ class AdminDataCollector:
 
     def __init__(self, bot, max_history: int = 1000, enable_export: bool = True):
         self.bot = bot
-        self.max_history = max_history
         self.enable_export = enable_export
 
-        # Time-series data
-        self.health_history: deque = deque(maxlen=max_history)
-        self.command_history: deque = deque(maxlen=max_history)
-        self.error_history: deque = deque(maxlen=max_history)
-        self.transcription_history: deque = deque(maxlen=500)  # Last 500 transcriptions
+        # Get config values (with fallbacks)
+        sys_cfg = bot.config_manager.for_guild("System") if hasattr(bot, 'config_manager') else None
+        self.max_history = sys_cfg.max_history if sys_cfg else max_history
+        max_transcriptions = sys_cfg.admin_max_transcriptions if sys_cfg else 500
+
+        # Time-series data (use configured limits)
+        self.health_history: deque = deque(maxlen=self.max_history)
+        self.command_history: deque = deque(maxlen=self.max_history)
+        self.error_history: deque = deque(maxlen=self.max_history)
+        self.transcription_history: deque = deque(maxlen=max_transcriptions)
 
         # Current state
         self.current_connections: Dict[int, ConnectionInfo] = {}
@@ -424,15 +428,20 @@ class AdminDataCollector:
                     "connections": [asdict(conn) for conn in self.current_connections.values()]
                 }, f, indent=2)
 
+            # Get export limits from config (hot-swappable)
+            sys_cfg = self.bot.config_manager.for_guild("System") if hasattr(self.bot, 'config_manager') else None
+            commands_limit = sys_cfg.admin_recent_commands_limit if sys_cfg else 100
+            errors_limit = sys_cfg.admin_recent_errors_limit if sys_cfg else 100
+
             with open(self.export_dir / "commands.json", "w") as f:
                 json.dump({
                     "stats": [asdict(stats) for stats in self.command_stats.values()],
-                    "recent_history": list(self.command_history)[-100:]
+                    "recent_history": list(self.command_history)[-commands_limit:]
                 }, f, indent=2)
 
             with open(self.export_dir / "errors.json", "w") as f:
                 json.dump({
-                    "recent": list(self.error_history)[-100:]
+                    "recent": list(self.error_history)[-errors_limit:]
                 }, f, indent=2)
 
             # V3: Export user info keyed by user_id

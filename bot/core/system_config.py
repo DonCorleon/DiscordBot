@@ -122,12 +122,42 @@ class SystemConfig(ConfigBase):
     # Monitoring Settings
     max_history: int = config_field(
         default=1000,
-        description="Maximum history entries to keep in memory",
+        description="Maximum history entries to keep in memory (commands, errors, health metrics)",
         category="Bot Configuration/Monitoring",
         guild_override=False,
         admin_only=True,
         min_value=100,
         max_value=10000
+    )
+
+    admin_max_transcriptions: int = config_field(
+        default=500,
+        description="Maximum transcriptions to keep in admin dashboard memory",
+        category="Bot Configuration/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=100,
+        max_value=2000
+    )
+
+    admin_recent_commands_limit: int = config_field(
+        default=100,
+        description="Number of recent commands to export to admin dashboard",
+        category="Bot Configuration/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=10,
+        max_value=1000
+    )
+
+    admin_recent_errors_limit: int = config_field(
+        default=100,
+        description="Number of recent errors to export to admin dashboard",
+        category="Bot Configuration/Monitoring",
+        guild_override=False,
+        admin_only=True,
+        min_value=10,
+        max_value=1000
     )
 
     health_collection_interval: int = config_field(
