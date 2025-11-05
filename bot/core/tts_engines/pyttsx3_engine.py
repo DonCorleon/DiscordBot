@@ -62,7 +62,7 @@ class Pyttsx3Engine(TTSEngine):
         self,
         text: str,
         voice: Optional[str] = None,
-        rate: Optional[int] = None,
+        rate: Optional[float] = None,
         volume: float = 1.0,
         guild_id: Optional[int] = None,
         **kwargs
@@ -74,7 +74,7 @@ class Pyttsx3Engine(TTSEngine):
 
         # Get default rate from config if not provided
         if rate is None:
-            rate = 150
+            rate = 150.0
             if guild_id and hasattr(self.bot, 'config_manager'):
                 rate = self.bot.config_manager.get("TTS", "tts_default_rate", guild_id)
 

@@ -46,7 +46,7 @@ class EdgeEngine(TTSEngine):
         self,
         text: str,
         voice: Optional[str] = None,
-        rate: Optional[int] = None,
+        rate: Optional[float] = None,
         volume: float = 1.0,
         guild_id: Optional[int] = None,
         **kwargs

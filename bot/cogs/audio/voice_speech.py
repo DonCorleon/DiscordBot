@@ -56,38 +56,6 @@ class VoiceConfig(ConfigBase):
         max_value=500
     )
 
-    # Speech Recognition Settings (Technical - Advanced Users)
-    voice_speech_phrase_time_limit: int = config_field(
-        default=10,
-        description="Maximum seconds of speech to process for recognition",
-        category="Audio/Speech Recognition/Advanced",
-        guild_override=False,
-        admin_only=True,
-        min_value=1,
-        max_value=60
-    )
-
-    voice_speech_error_log_threshold: int = config_field(
-        default=10,
-        description="Number of audio errors before logging warning (prevents spam)",
-        category="Audio/Speech Recognition/Advanced",
-        guild_override=False,
-        admin_only=True,
-        min_value=1,
-        max_value=100
-    )
-
-    voice_speech_chunk_size: int = config_field(
-        default=3840,
-        description="Audio chunk size in bytes (960 samples * 2 channels * 2 bytes = 3840)",
-        category="Audio/Speech Recognition/Advanced",
-        guild_override=False,
-        admin_only=True,
-        requires_restart=True,
-        min_value=960,
-        max_value=38400
-    )
-
     # Transcript Session Settings
     transcript_enabled: bool = config_field(
         default=True,

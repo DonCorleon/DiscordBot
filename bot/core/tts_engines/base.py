@@ -28,7 +28,7 @@ class TTSEngine(ABC):
         self,
         text: str,
         voice: Optional[str] = None,
-        rate: Optional[int] = None,
+        rate: Optional[float] = None,
         volume: float = 1.0,
         guild_id: Optional[int] = None,
         **kwargs
@@ -39,7 +39,7 @@ class TTSEngine(ABC):
         Args:
             text: Text to synthesize
             voice: Voice identifier (engine-specific)
-            rate: Speech rate (words per minute or similar)
+            rate: Speech rate in words per minute (supports decimal values for precise control)
             volume: Volume level (0.0-2.0)
             guild_id: Guild ID for config access
             **kwargs: Additional engine-specific parameters

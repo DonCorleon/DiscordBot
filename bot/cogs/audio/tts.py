@@ -69,13 +69,13 @@ class TTSConfig(ConfigBase):
         max_value=2.0
     )
 
-    tts_default_rate: int = config_field(
-        default=150,
-        description="Default TTS speech rate in words per minute",
+    tts_default_rate: float = config_field(
+        default=150.0,
+        description="Default TTS speech rate in words per minute (decimal values supported for precise control)",
         category="Audio/Text-to-Speech",
         guild_override=True,
-        min_value=50,
-        max_value=400
+        min_value=50.0,
+        max_value=400.0
     )
 
     tts_max_text_length: int = config_field(
