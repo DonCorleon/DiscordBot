@@ -424,24 +424,38 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    # Check if this bot is allowed to use commands
-    if hasattr(bot, 'config_manager'):
-        sys_cfg = bot.config_manager.for_guild("System")
-        allowed_ids_str = sys_cfg.allowed_bot_ids
+    # Bot message - check if command and if allowed
+    is_command = message.content.startswith(bot.command_prefix)
 
-        if allowed_ids_str:
-            # Parse comma-separated bot IDs
-            try:
-                allowed_ids = [
-                    int(id_str.strip())
-                    for id_str in allowed_ids_str.split(",")
-                    if id_str.strip()
-                ]
-                if message.author.id in allowed_ids:
-                    logger.debug(f"Allowing bot {message.author.id} to use commands")
-                    await bot.process_commands(message)
-            except ValueError:
-                logger.warning(f"Invalid allowed_bot_ids config: {allowed_ids_str}")
+    if not hasattr(bot, 'config_manager'):
+        if is_command:
+            logger.warning(f"Bot {message.author.name} ({message.author.id}) tried command but config_manager not ready")
+        return
+
+    sys_cfg = bot.config_manager.for_guild("System")
+    allowed_ids_str = sys_cfg.allowed_bot_ids
+
+    if not allowed_ids_str:
+        if is_command:
+            logger.info(f"Bot {message.author.name} ({message.author.id}) blocked - allowed_bot_ids is empty")
+        return
+
+    # Parse comma-separated bot IDs
+    try:
+        allowed_ids = [
+            int(id_str.strip())
+            for id_str in allowed_ids_str.split(",")
+            if id_str.strip()
+        ]
+    except ValueError:
+        logger.warning(f"Invalid allowed_bot_ids config: {allowed_ids_str}")
+        return
+
+    if message.author.id in allowed_ids:
+        logger.info(f"Allowing bot {message.author.name} ({message.author.id}) to use command: {message.content[:50]}")
+        await bot.process_commands(message)
+    elif is_command:
+        logger.info(f"Bot {message.author.name} ({message.author.id}) blocked - not in allowed_bot_ids. Allowed: {allowed_ids}")
 
 
 # -----------------------
