@@ -456,7 +456,11 @@ async def on_message(message):
 
     if message.author.id in allowed_ids:
         logger.info(f"Allowing bot {message.author.name} ({message.author.id}) to use command: {message.content[:50]}")
-        await bot.process_commands(message)
+        # Can't use process_commands() - it has hardcoded bot check
+        # Manually get context and invoke
+        ctx = await bot.get_context(message)
+        if ctx.command:
+            await bot.invoke(ctx)
     elif is_command:
         logger.info(f"Bot {message.author.name} ({message.author.id}) blocked - not in allowed_bot_ids. Allowed: {allowed_ids}")
 
