@@ -457,3 +457,12 @@ class SystemConfig(ConfigBase):
         min_value=10,
         max_value=500
     )
+
+    # Bot Interaction Settings
+    allowed_bot_ids: str = config_field(
+        default="",
+        description="Comma-separated list of bot IDs allowed to use commands (e.g., ~say). Leave empty to block all bots.",
+        category="Bot Configuration/Permissions",
+        guild_override=False,
+        admin_only=True
+    )

@@ -410,6 +410,40 @@ async def on_connect():
     """Handle initial connection to Discord."""
     logger.info("🔗 Connected to Discord gateway")
 
+
+@bot.event
+async def on_message(message):
+    """
+    Process messages, allowing specific bots to use commands.
+
+    Discord.py ignores bot messages by default. This handler allows
+    bots listed in allowed_bot_ids config to use commands like ~say.
+    """
+    # If not a bot, process normally
+    if not message.author.bot:
+        await bot.process_commands(message)
+        return
+
+    # Check if this bot is allowed to use commands
+    if hasattr(bot, 'config_manager'):
+        sys_cfg = bot.config_manager.for_guild("System")
+        allowed_ids_str = sys_cfg.allowed_bot_ids
+
+        if allowed_ids_str:
+            # Parse comma-separated bot IDs
+            try:
+                allowed_ids = [
+                    int(id_str.strip())
+                    for id_str in allowed_ids_str.split(",")
+                    if id_str.strip()
+                ]
+                if message.author.id in allowed_ids:
+                    logger.debug(f"Allowing bot {message.author.id} to use commands")
+                    await bot.process_commands(message)
+            except ValueError:
+                logger.warning(f"Invalid allowed_bot_ids config: {allowed_ids_str}")
+
+
 # -----------------------
 # Run the bot
 # -----------------------
