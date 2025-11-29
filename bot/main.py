@@ -425,7 +425,10 @@ async def on_message(message):
         return
 
     # Bot message - check if command and if allowed
-    is_command = message.content.startswith(bot.command_prefix)
+    prefix = bot.command_prefix
+    if isinstance(prefix, list):
+        prefix = tuple(prefix)
+    is_command = message.content.startswith(prefix)
 
     if not hasattr(bot, 'config_manager'):
         if is_command:
