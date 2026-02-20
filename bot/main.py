@@ -34,10 +34,10 @@ from bot.core.admin.data_collector import initialize_data_collector
 
 # Monkey patch: prevent OpusError: corrupted stream from crashing the voice receive thread.
 # A single bad packet in PacketRouter._do_run kills the entire listener. This catches and skips it.
+_patch_log = logging.getLogger("discordbot.patch")
+
 try:
     from discord.ext.voice_recv.router import PacketRouter
-
-    _original_do_run = PacketRouter._do_run
 
     def _patched_do_run(self):
         while not self._end_thread.is_set():
@@ -47,7 +47,7 @@ try:
                     try:
                         data = decoder.pop_data()
                     except Exception:
-                        logger.warning(
+                        _patch_log.warning(
                             "Skipped corrupted opus packet in decoder-%s (would have crashed voice receive)",
                             decoder.ssrc,
                         )
@@ -56,9 +56,9 @@ try:
                         self.sink.write(data.source, data)
 
     PacketRouter._do_run = _patched_do_run
-    logger.info("Applied PacketRouter opus decode patch")
+    _patch_log.info("Applied PacketRouter opus decode patch")
 except Exception as e:
-    logger.warning(f"Could not apply PacketRouter patch: {e}")
+    _patch_log.warning(f"Could not apply PacketRouter patch: {e}")
 
 # IMPORTANT: Change to project root so model/ directory can be found
 project_root = Path(__file__).parent.parent
