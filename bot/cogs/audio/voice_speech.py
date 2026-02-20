@@ -102,6 +102,7 @@ except Exception as e:
     logger.warning(f"Could not apply voice_recv patch: {e}")
 
 
+
 class VoiceSpeechCog(BaseCog):
 
     def __init__(self, bot):
