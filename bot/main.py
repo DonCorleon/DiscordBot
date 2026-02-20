@@ -56,9 +56,9 @@ try:
                         self.sink.write(data.source, data)
 
     PacketRouter._do_run = _patched_do_run
-    _patch_log.info("Applied PacketRouter opus decode patch")
+    print("[PATCH] Applied PacketRouter opus decode patch")
 except Exception as e:
-    _patch_log.warning(f"Could not apply PacketRouter patch: {e}")
+    print(f"[PATCH] Could not apply PacketRouter patch: {e}")
 
 # IMPORTANT: Change to project root so model/ directory can be found
 project_root = Path(__file__).parent.parent
