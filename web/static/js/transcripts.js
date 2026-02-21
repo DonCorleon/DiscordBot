@@ -329,6 +329,10 @@ function displayTranscripts(transcriptList) {
 
     container.innerHTML = reversed.map(t => {
         const timestamp = formatTimestamp(t.timestamp);
+        const isSystem = t.source === 'system';
+        const isJoin = t.type === 'join';
+        const isLeave = t.type === 'leave';
+
         const triggers = t.triggers && t.triggers.length > 0
             ? ` | 🔊 ${t.triggers.map(tr => `${escapeHtml(tr.word)}→${escapeHtml(tr.sound)}`).join(', ')}`
             : '';
@@ -346,14 +350,21 @@ function displayTranscripts(transcriptList) {
             ? `<img src="${escapeHtml(t.user_avatar_url)}" class="transcript-avatar" alt="${escapeHtml(t.user)}" onerror="this.style.display='none'">`
             : '';
 
+        // System events (join/leave) get special styling
+        const entryClass = isSystem ? `transcript-entry transcript-system transcript-${t.type || 'event'}` : 'transcript-entry';
+        const icon = isJoin ? '→ ' : isLeave ? '← ' : '';
+        const textContent = isSystem
+            ? `<span class="transcript-text transcript-system-text">${icon}${escapeHtml(t.text)}</span>`
+            : `<span class="transcript-text">${escapeHtml(t.text)}</span>${triggers}`;
+
         return `
-            <div class="transcript-entry">
+            <div class="${entryClass}">
                 <span class="transcript-timestamp">${timestamp}</span>
                 ${guildHtml}
                 ${channelHtml}
                 <span class="transcript-user">${escapeHtml(t.user || 'Unknown')}</span>
                 ${avatarHtml}
-                <span class="transcript-text">${escapeHtml(t.text)}</span>${triggers}
+                ${textContent}
             </div>
         `;
     }).join('');
@@ -416,6 +427,10 @@ function addTranscriptionToView(transcription) {
     }
 
     const timestamp = formatTimestamp(transcription.timestamp);
+    const isSystem = transcription.source === 'system';
+    const isJoin = transcription.type === 'join';
+    const isLeave = transcription.type === 'leave';
+
     const triggers = transcription.triggers && transcription.triggers.length > 0
         ? ` | 🔊 ${transcription.triggers.map(tr => `${escapeHtml(tr.word)}→${escapeHtml(tr.sound)}`).join(', ')}`
         : '';
@@ -433,15 +448,21 @@ function addTranscriptionToView(transcription) {
         ? `<img src="${escapeHtml(transcription.user_avatar_url)}" class="transcript-avatar" alt="${escapeHtml(transcription.user)}" onerror="this.style.display='none'">`
         : '';
 
+    // System events (join/leave) get special styling
+    const icon = isJoin ? '→ ' : isLeave ? '← ' : '';
+    const textContent = isSystem
+        ? `<span class="transcript-text transcript-system-text">${icon}${escapeHtml(transcription.text)}</span>`
+        : `<span class="transcript-text">${escapeHtml(transcription.text)}</span>${triggers}`;
+
     const entry = document.createElement('div');
-    entry.className = 'transcript-entry';
+    entry.className = isSystem ? `transcript-entry transcript-system transcript-${transcription.type || 'event'}` : 'transcript-entry';
     entry.innerHTML = `
         <span class="transcript-timestamp">${timestamp}</span>
         ${guildHtml}
         ${channelHtml}
         <span class="transcript-user">${escapeHtml(transcription.user || 'Unknown')}</span>
         ${avatarHtml}
-        <span class="transcript-text">${escapeHtml(transcription.text)}</span>${triggers}
+        ${textContent}
     `;
 
     // Append to end (newest at bottom)

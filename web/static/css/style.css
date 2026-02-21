@@ -808,6 +808,37 @@ canvas {
     text-overflow: ellipsis;
 }
 
+/* System events (join/leave) */
+.transcript-system {
+    border-left-color: #72767d;
+    opacity: 0.75;
+}
+
+.transcript-system:hover {
+    opacity: 1;
+}
+
+.transcript-system-text {
+    font-style: italic;
+    color: #b0b0b0;
+}
+
+.transcript-join {
+    border-left-color: #43b581;
+}
+
+.transcript-join .transcript-system-text {
+    color: #43b581;
+}
+
+.transcript-leave {
+    border-left-color: #f04747;
+}
+
+.transcript-leave .transcript-system-text {
+    color: #f04747;
+}
+
 /* Notifications */
 .notification {
     position: fixed;
