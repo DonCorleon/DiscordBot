@@ -804,19 +804,12 @@ class VoiceSpeechCog(BaseCog):
         )
 
         # Wire up quality path if enabled and engine is Vosk
+        # Note: actual model loading happens in start_listening() via asyncio.to_thread()
+        # to avoid blocking the event loop during model download/load
         if speech_cfg.enable_quality_transcription and speech_cfg.engine == "vosk":
-            try:
-                from bot.core.audio.speech_engines import create_quality_model
-                quality_model, quality_config = create_quality_model(speech_cfg)
-                if quality_model is not None:
-                    engine._quality_model = quality_model
-                    engine._quality_callback = quality_text_callback
-                    engine._quality_config = quality_config
-                    logger.info(f"[Guild {guild_id}] Quality transcription path configured")
-                else:
-                    logger.warning(f"[Guild {guild_id}] Quality transcription enabled but model failed to load, continuing fast-path only")
-            except Exception as e:
-                logger.warning(f"[Guild {guild_id}] Failed to set up quality path: {e}", exc_info=True)
+            engine._quality_callback = quality_text_callback
+            engine._quality_speech_cfg = speech_cfg
+            logger.info(f"[Guild {guild_id}] Quality transcription path will be loaded on start_listening()")
 
         return engine
 

@@ -342,6 +342,7 @@ class VoskEngine(SpeechEngine):
         self._quality_model = None
         self._quality_callback = None
         self._quality_config = None
+        self._quality_speech_cfg = None  # Set externally; model loaded async in start_listening
         self._dual_sink = None
 
         logger.info(f"VoskEngine initialized (model={model_path})")
@@ -375,6 +376,24 @@ class VoskEngine(SpeechEngine):
             chunk_overlap=speech_cfg.speech_chunk_overlap,
             processing_interval=speech_cfg.speech_processing_interval
         )
+
+        # Load quality model in background thread if configured (avoids blocking event loop)
+        if self._quality_speech_cfg is not None and self._quality_model is None:
+            try:
+                import asyncio
+                from . import create_quality_model
+                quality_cfg = self._quality_speech_cfg
+                quality_model, quality_config = await asyncio.to_thread(
+                    create_quality_model, quality_cfg
+                )
+                if quality_model is not None:
+                    self._quality_model = quality_model
+                    self._quality_config = quality_config
+                    logger.info(f"[Guild {voice_client.guild.id}] Quality model loaded successfully")
+                else:
+                    logger.warning(f"[Guild {voice_client.guild.id}] Quality model failed to load, continuing fast-path only")
+            except Exception as e:
+                logger.warning(f"[Guild {voice_client.guild.id}] Failed to load quality model: {e}", exc_info=True)
 
         # Wrap in DualPathSink if quality path is configured
         actual_sink = self.sink
