@@ -86,7 +86,10 @@ for name, log in logging.root.manager.loggerDict.items():
 # Monkey patch: prevent OpusError: corrupted stream from crashing the voice receive thread.
 # A single bad packet in PacketRouter._do_run kills the entire listener. This catches and skips it.
 try:
+    import time as _time
     from discord.ext.voice_recv.router import PacketRouter
+
+    _opus_error_counts = {}  # decoder ssrc -> [count, first_time, last_time]
 
     def _patched_do_run(self):
         while not self._end_thread.is_set():
@@ -96,10 +99,25 @@ try:
                     try:
                         data = decoder.pop_data()
                     except Exception:
-                        logger.warning(
-                            "Skipped corrupted opus packet in decoder-%s (would have crashed voice receive)",
-                            decoder.ssrc,
-                        )
+                        now = _time.monotonic()
+                        ssrc = decoder.ssrc
+                        entry = _opus_error_counts.get(ssrc)
+                        if entry is None or now - entry[2] > 10:
+                            # First error or >10s since last burst — log and start new count
+                            if entry is not None and entry[0] > 1:
+                                logger.warning(
+                                    "Suppressed %d additional corrupted opus packets from decoder-%s",
+                                    entry[0] - 1, ssrc,
+                                )
+                            _opus_error_counts[ssrc] = [1, now, now]
+                            logger.warning(
+                                "Skipped corrupted opus packet in decoder-%s (would have crashed voice receive)",
+                                ssrc,
+                            )
+                        else:
+                            # Ongoing burst — just count
+                            entry[0] += 1
+                            entry[2] = now
                         continue
                     if data is not None:
                         self.sink.write(data.source, data)
