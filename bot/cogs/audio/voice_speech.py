@@ -768,6 +768,7 @@ class VoiceSpeechCog(BaseCog):
                             from bot.core.admin.data_collector import get_data_collector
                             data_collector = get_data_collector()
                             if data_collector:
+                                data_collector.update_user_info(member)
                                 data_collector.record_transcription({
                                     "timestamp": datetime.now().isoformat(),
                                     "guild_id": guild_id,
@@ -776,6 +777,7 @@ class VoiceSpeechCog(BaseCog):
                                     "channel": ctx.guild.voice_client.channel.name if ctx.guild.voice_client else "Unknown",
                                     "user_id": str(member.id),
                                     "user": member.display_name,
+                                    "user_avatar_url": member.display_avatar.url if member.display_avatar else None,
                                     "text": transcribed_text,
                                     "source": "quality",
                                     "triggers": []
