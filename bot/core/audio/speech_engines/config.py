@@ -164,7 +164,7 @@ class SpeechConfig(ConfigBase):
         description="Model size for quality transcription (larger = more accurate but slower)",
         category="Audio/Speech Recognition/Quality Path",
         guild_override=True,
-        choices=["small", "medium", "large-v2", "large-v3", "large-v3-turbo", "distil-large-v3"]
+        choices=["tiny", "base", "small", "medium", "large-v2", "large-v3", "large-v3-turbo", "distil-large-v3"]
     )
 
     quality_device: str = config_field(
