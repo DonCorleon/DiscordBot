@@ -262,6 +262,7 @@ class VoiceSpeechCog(BaseCog):
                                 "user_avatar_url": member.display_avatar.url if member.display_avatar else None,
                                 "text": f"joined {bot_channel.name}",
                                 "source": "system",
+                                "type": "join",
                                 "triggers": []
                             })
                     except Exception as e:
@@ -289,6 +290,7 @@ class VoiceSpeechCog(BaseCog):
                             "user_avatar_url": member.display_avatar.url if member.display_avatar else None,
                             "text": f"left {bot_channel.name}",
                             "source": "system",
+                            "type": "leave",
                             "triggers": []
                         })
                 except Exception as e:
