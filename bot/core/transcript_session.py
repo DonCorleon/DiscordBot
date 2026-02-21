@@ -41,6 +41,7 @@ class TranscriptEntry:
     username: str
     text: str
     confidence: float = 1.0
+    source: str = "fast"
 
 
 @dataclass
@@ -495,7 +496,8 @@ class TranscriptSessionManager:
         user_id: str,
         username: str,
         text: str,
-        confidence: float = 1.0
+        confidence: float = 1.0,
+        source: str = "fast"
     ):
         """
         Add a transcription to the active session.
@@ -506,6 +508,7 @@ class TranscriptSessionManager:
             username: Username
             text: Transcribed text
             confidence: Recognition confidence (0.0-1.0)
+            source: Transcription source ("fast" for Vosk, "quality" for quality path)
         """
         if channel_id not in self.active_sessions:
             logger.warning(f"No active session for channel {channel_id} when adding transcript")
@@ -518,7 +521,8 @@ class TranscriptSessionManager:
             user_id=user_id,
             username=username,
             text=text,
-            confidence=confidence
+            confidence=confidence,
+            source=source
         )
 
         session.transcript.append(entry)

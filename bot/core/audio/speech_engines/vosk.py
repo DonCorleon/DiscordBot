@@ -338,6 +338,12 @@ class VoskEngine(SpeechEngine):
         self.model = None
         self.executor = ThreadPoolExecutor(max_workers=4)
 
+        # Quality path fields (set externally before start_listening)
+        self._quality_model = None
+        self._quality_callback = None
+        self._quality_config = None
+        self._dual_sink = None
+
         logger.info(f"VoskEngine initialized (model={model_path})")
 
     async def start_listening(self, voice_client):
@@ -370,8 +376,25 @@ class VoskEngine(SpeechEngine):
             processing_interval=speech_cfg.speech_processing_interval
         )
 
+        # Wrap in DualPathSink if quality path is configured
+        actual_sink = self.sink
+        if self._quality_model is not None:
+            try:
+                from .dual_path_sink import DualPathSink
+                self._dual_sink = DualPathSink(
+                    self.sink,
+                    self._quality_callback,
+                    self._quality_model,
+                    self._quality_config
+                )
+                actual_sink = self._dual_sink
+                logger.info(f"[Guild {voice_client.guild.id}] Wrapped VoskSink in DualPathSink for quality path")
+            except Exception as e:
+                logger.error(f"[Guild {voice_client.guild.id}] Failed to create DualPathSink, continuing with VoskSink only: {e}", exc_info=True)
+                self._dual_sink = None
+
         # Attach to voice client
-        voice_client.listen(self.sink)
+        voice_client.listen(actual_sink)
 
         # Start background buffer processing task
         self.sink.start_processing()
@@ -383,6 +406,13 @@ class VoskEngine(SpeechEngine):
 
     async def stop_listening(self):
         """Stop Vosk speech recognition and cleanup resources."""
+        if self._dual_sink:
+            try:
+                self._dual_sink.cleanup()
+            except Exception as e:
+                logger.error(f"Error cleaning up DualPathSink: {e}", exc_info=True)
+            self._dual_sink = None
+
         if self.sink:
             self.sink.cleanup()
             self.sink = None

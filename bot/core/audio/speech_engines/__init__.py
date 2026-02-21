@@ -9,6 +9,7 @@ from .base import SpeechEngine
 from .vosk import VoskEngine
 from .whisper import WhisperEngine
 from .faster_whisper import FasterWhisperEngine
+from .dual_path_sink import DualPathSink
 from .config import SpeechConfig
 import logging
 
@@ -104,11 +105,62 @@ def create_speech_engine(
         )
 
 
+def create_quality_model(speech_cfg):
+    """
+    Attempt to load a faster-whisper model for the quality transcription path.
+
+    Returns:
+        (model, config_dict) on success, (None, None) on any failure.
+        All failures are logged as warnings and never raised.
+    """
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError:
+        logger.warning(
+            "Quality path: faster-whisper not installed. "
+            "Install with: pip install faster-whisper"
+        )
+        return None, None
+
+    try:
+        model_size = speech_cfg.quality_model
+        device = speech_cfg.quality_device
+        compute_type = speech_cfg.quality_compute_type
+
+        logger.info(
+            f"Quality path: loading faster-whisper model "
+            f"(model={model_size}, device={device}, compute_type={compute_type})..."
+        )
+
+        model = WhisperModel(
+            model_size,
+            device=device,
+            compute_type=compute_type
+        )
+
+        config_dict = {
+            "model": model_size,
+            "device": device,
+            "compute_type": compute_type,
+            "beam_size": speech_cfg.quality_beam_size,
+            "max_workers": speech_cfg.quality_max_workers,
+        }
+
+        logger.info(f"Quality path: model loaded successfully ({model_size})")
+        return model, config_dict
+
+    except Exception as e:
+        logger.warning(f"Quality path: failed to load model: {e}", exc_info=True)
+        return None, None
+
+
 __all__ = [
     "SpeechEngine",
     "VoskEngine",
     "WhisperEngine",
     "FasterWhisperEngine",
+    "DualPathSink",
     "SpeechConfig",
     "create_speech_engine",
+    "create_quality_model",
 ]

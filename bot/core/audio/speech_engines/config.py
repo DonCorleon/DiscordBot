@@ -120,3 +120,83 @@ class SpeechConfig(ConfigBase):
         choices=["int8", "int8_float16", "float16", "float32"],
         requires_restart=True
     )
+
+    faster_whisper_beam_size: int = config_field(
+        default=3,
+        description="Beam search size for faster-whisper (1-5). Lower = faster but less accurate, 3 = good balance, 5 = most accurate but slower",
+        category="Audio/Speech Recognition/Faster-Whisper",
+        guild_override=False,
+        admin_only=True,
+        min_value=1,
+        max_value=10
+    )
+
+    # Shared Whisper/faster-whisper Settings
+    speech_min_audio_duration: float = config_field(
+        default=0.2,
+        description="Minimum audio duration in seconds to attempt transcription. Lower = catch short utterances like 'yes'/'no', higher = ignore brief sounds",
+        category="Audio/Speech Recognition",
+        guild_override=False,
+        admin_only=True,
+        min_value=0.1,
+        max_value=2.0
+    )
+
+    # Quality Path Settings (dual-path: Vosk fast + faster-whisper quality)
+    enable_quality_transcription: bool = config_field(
+        default=False,
+        description="Enable quality transcription path alongside fast Vosk path (requires faster-whisper, restart required)",
+        category="Audio/Speech Recognition/Quality Path",
+        guild_override=True,
+        requires_restart=True
+    )
+
+    quality_engine: str = config_field(
+        default="faster-whisper",
+        description="Engine to use for quality transcription path",
+        category="Audio/Speech Recognition/Quality Path",
+        admin_only=True,
+        choices=["faster-whisper"]
+    )
+
+    quality_model: str = config_field(
+        default="small",
+        description="Model size for quality transcription (larger = more accurate but slower)",
+        category="Audio/Speech Recognition/Quality Path",
+        guild_override=True,
+        choices=["small", "medium", "large-v2", "large-v3", "large-v3-turbo", "distil-large-v3"]
+    )
+
+    quality_device: str = config_field(
+        default="cpu",
+        description="Compute device for quality transcription (cuda requires NVIDIA GPU)",
+        category="Audio/Speech Recognition/Quality Path",
+        admin_only=True,
+        choices=["cpu", "cuda"]
+    )
+
+    quality_compute_type: str = config_field(
+        default="int8",
+        description="Compute precision for quality transcription",
+        category="Audio/Speech Recognition/Quality Path",
+        admin_only=True,
+        choices=["int8", "int8_float16", "float16", "float32"]
+    )
+
+    quality_beam_size: int = config_field(
+        default=5,
+        description="Beam search size for quality transcription (higher = more accurate but slower)",
+        category="Audio/Speech Recognition/Quality Path",
+        admin_only=True,
+        min_value=1,
+        max_value=10
+    )
+
+    quality_max_workers: int = config_field(
+        default=2,
+        description="Max concurrent quality transcription workers",
+        category="Audio/Speech Recognition/Quality Path",
+        admin_only=True,
+        min_value=1,
+        max_value=4
+    )

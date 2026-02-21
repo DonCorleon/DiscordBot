@@ -737,6 +737,58 @@ class VoiceSpeechCog(BaseCog):
             else:
                 self._handle_user_speaking_stop(guild_id, member.id)
 
+        # Quality path callback (stripped-down: transcript only, no triggers)
+        def quality_text_callback(member: discord.Member, text: str):
+            """
+            Callback for quality transcription path.
+            Only records transcripts — NO trigger matching, NO soundboard.
+            Runs in quality executor thread, offloads to async.
+            """
+            try:
+                transcribed_text = text.strip()
+                if not transcribed_text:
+                    return
+
+                async def process_quality_transcription():
+                    try:
+                        # Add to transcript session with quality source
+                        self.transcript_manager.add_transcript(
+                            channel_id=voice_channel_id,
+                            user_id=str(member.id),
+                            username=member.display_name,
+                            text=transcribed_text,
+                            confidence=1.0,
+                            source="quality"
+                        )
+
+                        # Record to data collector
+                        try:
+                            from bot.core.admin.data_collector import get_data_collector
+                            data_collector = get_data_collector()
+                            if data_collector:
+                                data_collector.record_transcription({
+                                    "timestamp": datetime.now().isoformat(),
+                                    "guild_id": guild_id,
+                                    "guild": ctx.guild.name,
+                                    "channel_id": voice_channel_id,
+                                    "channel": ctx.guild.voice_client.channel.name if ctx.guild.voice_client else "Unknown",
+                                    "user_id": str(member.id),
+                                    "user": member.display_name,
+                                    "text": transcribed_text,
+                                    "source": "quality",
+                                    "triggers": []
+                                })
+                        except Exception as e:
+                            logger.error(f"[Quality] Error recording transcription: {e}", exc_info=True)
+
+                    except Exception as e:
+                        logger.error(f"[Quality] Error processing transcription: {e}", exc_info=True)
+
+                asyncio.run_coroutine_threadsafe(process_quality_transcription(), self.bot.loop)
+
+            except Exception as e:
+                logger.error(f"[Quality] Error in quality_text_callback: {e}", exc_info=True)
+
         # Get speech config to determine which engine to use
         from bot.core.audio.speech_engines import create_speech_engine
         speech_cfg = self.bot.config_manager.for_guild("Speech")
@@ -750,6 +802,21 @@ class VoiceSpeechCog(BaseCog):
             engine_type=speech_cfg.engine,
             ducking_callback=ducking_callback
         )
+
+        # Wire up quality path if enabled and engine is Vosk
+        if speech_cfg.enable_quality_transcription and speech_cfg.engine == "vosk":
+            try:
+                from bot.core.audio.speech_engines import create_quality_model
+                quality_model, quality_config = create_quality_model(speech_cfg)
+                if quality_model is not None:
+                    engine._quality_model = quality_model
+                    engine._quality_callback = quality_text_callback
+                    engine._quality_config = quality_config
+                    logger.info(f"[Guild {guild_id}] Quality transcription path configured")
+                else:
+                    logger.warning(f"[Guild {guild_id}] Quality transcription enabled but model failed to load, continuing fast-path only")
+            except Exception as e:
+                logger.warning(f"[Guild {guild_id}] Failed to set up quality path: {e}", exc_info=True)
 
         return engine
 
