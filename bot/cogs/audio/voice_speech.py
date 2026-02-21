@@ -680,21 +680,22 @@ class VoiceSpeechCog(BaseCog):
                         if data_collector:
                             data_collector.update_user_info(member)
 
-                        # Add to transcript session
-                        self.transcript_manager.add_transcript(
-                            channel_id=voice_channel_id,
-                            user_id=str(member.id),
-                            username=member.display_name,
-                            text=transcribed_text,
-                            confidence=1.0
-                        )
+                        # Add to transcript session (skip if quality path handles it)
+                        if not quality_enabled:
+                            self.transcript_manager.add_transcript(
+                                channel_id=voice_channel_id,
+                                user_id=str(member.id),
+                                username=member.display_name,
+                                text=transcribed_text,
+                                confidence=1.0
+                            )
 
                         # Check for soundboard triggers
                         soundboard_cog = self.bot.get_cog("Soundboard")
                         if not soundboard_cog:
                             # No soundboard - just log and record
                             logger.debug(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
-                            if data_collector:
+                            if data_collector and not quality_enabled:
                                 data_collector.record_transcription(transcription_data)
                             return
 
@@ -716,8 +717,9 @@ class VoiceSpeechCog(BaseCog):
                         # Log transcription with triggers
                         logger.debug(f"[TRANSCRIPTION] {json.dumps(transcription_data)}")
 
-                        # Record to data collector (websocket broadcast)
-                        if data_collector:
+                        # Record to data collector / websocket broadcast
+                        # (skip if quality path handles it — avoids duplicate broadcasts)
+                        if data_collector and not quality_enabled:
                             data_collector.record_transcription(transcription_data)
 
                     except Exception as e:
@@ -793,6 +795,10 @@ class VoiceSpeechCog(BaseCog):
         from bot.core.audio.speech_engines import create_speech_engine
         speech_cfg = self.bot.config_manager.for_guild("Speech")
 
+        # Track whether quality path is enabled — fast path skips
+        # WebSocket broadcast and transcript recording when True
+        quality_enabled = speech_cfg.enable_quality_transcription and speech_cfg.engine == "vosk"
+
         logger.info(f"[Guild {guild_id}] Creating speech engine: {speech_cfg.engine}")
 
         # Create speech engine (Vosk or Whisper based on config)
@@ -806,7 +812,7 @@ class VoiceSpeechCog(BaseCog):
         # Wire up quality path if enabled and engine is Vosk
         # Note: actual model loading happens in start_listening() via asyncio.to_thread()
         # to avoid blocking the event loop during model download/load
-        if speech_cfg.enable_quality_transcription and speech_cfg.engine == "vosk":
+        if quality_enabled:
             engine._quality_callback = quality_text_callback
             engine._quality_speech_cfg = speech_cfg
             logger.info(f"[Guild {guild_id}] Quality transcription path will be loaded on start_listening()")
