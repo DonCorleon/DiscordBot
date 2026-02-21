@@ -246,6 +246,26 @@ class VoiceSpeechCog(BaseCog):
                         user_id=str(member.id),
                         username=member.display_name
                     )
+                    # Broadcast join event to WebSocket
+                    try:
+                        from bot.core.admin.data_collector import get_data_collector
+                        data_collector = get_data_collector()
+                        if data_collector:
+                            data_collector.record_transcription({
+                                "timestamp": datetime.now().isoformat(),
+                                "guild_id": member.guild.id,
+                                "guild": member.guild.name,
+                                "channel_id": voice_channel_id,
+                                "channel": bot_channel.name,
+                                "user_id": str(member.id),
+                                "user": member.display_name,
+                                "user_avatar_url": member.display_avatar.url if member.display_avatar else None,
+                                "text": f"joined {bot_channel.name}",
+                                "source": "system",
+                                "triggers": []
+                            })
+                    except Exception as e:
+                        logger.error(f"Error broadcasting join event: {e}", exc_info=True)
 
             # User left the channel where bot is
             elif before.channel == bot_channel and after.channel != bot_channel:
@@ -253,6 +273,26 @@ class VoiceSpeechCog(BaseCog):
                     channel_id=voice_channel_id,
                     user_id=str(member.id)
                 )
+                # Broadcast leave event to WebSocket
+                try:
+                    from bot.core.admin.data_collector import get_data_collector
+                    data_collector = get_data_collector()
+                    if data_collector:
+                        data_collector.record_transcription({
+                            "timestamp": datetime.now().isoformat(),
+                            "guild_id": member.guild.id,
+                            "guild": member.guild.name,
+                            "channel_id": voice_channel_id,
+                            "channel": bot_channel.name,
+                            "user_id": str(member.id),
+                            "user": member.display_name,
+                            "user_avatar_url": member.display_avatar.url if member.display_avatar else None,
+                            "text": f"left {bot_channel.name}",
+                            "source": "system",
+                            "triggers": []
+                        })
+                except Exception as e:
+                    logger.error(f"Error broadcasting leave event: {e}", exc_info=True)
 
         # Handle disconnect when channel becomes empty or cancel timer when someone rejoins
         # Skip if the member is a bot (prevents bot's own disconnect from re-triggering)
