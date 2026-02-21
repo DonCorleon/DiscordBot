@@ -170,28 +170,33 @@ class DualPathSink(voice_recv.AudioSink):
             return
 
         try:
-            # Resample 48kHz -> 16kHz using resampy
-            import resampy
-            resampled = resampy.resample(mono_audio, self.SAMPLE_RATE, 16000)
+            # Resample 48kHz -> 16kHz via simple decimation (exact 3:1 ratio)
+            # Much faster than resampy and sufficient for speech recognition
+            from scipy.signal import decimate
+            resampled = decimate(mono_audio, 3, ftype='fir').astype(np.float32)
         except ImportError:
-            logger.error("[Quality] resampy not installed. Install with: pip install resampy")
-            return
+            try:
+                # Fallback: simple slicing (no anti-alias filter, but fast)
+                resampled = mono_audio[::3]
+            except Exception:
+                logger.error(f"[Quality] Resample failed for {member.display_name}")
+                return
         except Exception as e:
             logger.error(f"[Quality] Resample error for {member.display_name}: {e}", exc_info=True)
             return
 
         try:
-            # Transcribe with quality parameters
-            beam_size = self.quality_config.get("beam_size", 5)
+            # Transcribe with speed-optimized parameters
+            beam_size = self.quality_config.get("beam_size", 1)
             segments, info = self.quality_model.transcribe(
                 resampled,
                 beam_size=beam_size,
                 vad_filter=True,
                 temperature=0,
                 no_speech_threshold=0.6,
-                compression_ratio_threshold=2.2,
-                repetition_penalty=1.2,
-                language="en"
+                compression_ratio_threshold=2.4,
+                language="en",
+                condition_on_previous_text=False,
             )
 
             # Collect all segment texts
